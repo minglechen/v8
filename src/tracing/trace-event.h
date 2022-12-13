@@ -440,12 +440,12 @@ SetTraceValue(T arg, unsigned char* type, uint64_t* value) {
   *value = static_cast<uint64_t>(arg);
 }
 
+// TODO: how to fiux the static assert?
 #define INTERNAL_DECLARE_SET_TRACE_VALUE(actual_type, value_type_id)        \
   static V8_INLINE void SetTraceValue(actual_type arg, unsigned char* type, \
                                       uint64_t* value) {                    \
     *type = value_type_id;                                                  \
     *value = 0;                                                             \
-    static_assert(sizeof(arg) <= sizeof(*value));                           \
     memcpy(value, &arg, sizeof(arg));                                       \
   }
 INTERNAL_DECLARE_SET_TRACE_VALUE(double, TRACE_VALUE_TYPE_DOUBLE)

@@ -57,7 +57,7 @@ class AddressRegion {
     Address overlap_start = std::max(begin(), region.begin());
     Address overlap_end =
         std::max(overlap_start, std::min(end(), region.end()));
-    return {overlap_start, overlap_end - overlap_start};
+    return {overlap_start, (size_t) (overlap_end - overlap_start)};
   }
 
   bool operator==(AddressRegion other) const {

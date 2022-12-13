@@ -31,7 +31,9 @@ enum class AccessMode : uint8_t { kNonAtomic, kAtomic };
 // This means that any scalar type with stricter alignment requirements (in
 // practice: long double) cannot be used unrestricted in garbage-collected
 // objects.
-#if defined(V8_TARGET_ARCH_64_BIT)
+#if defined(V8_TARGET_ARCH_128_BIT)
+constexpr size_t kAllocationGranularity = 16;
+#elif defined(V8_TARGET_ARCH_64_BIT)
 constexpr size_t kAllocationGranularity = 8;
 #else   // !V8_TARGET_ARCH_64_BIT
 constexpr size_t kAllocationGranularity = 4;

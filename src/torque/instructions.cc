@@ -153,7 +153,7 @@ void CallIntrinsicInstruction::TypeInstruction(Stack<const Type*>* stack,
                                                ControlFlowGraph* cfg) const {
   std::vector<const Type*> parameter_types =
       LowerParameterTypes(intrinsic->signature().parameter_types);
-  for (intptr_t i = parameter_types.size() - 1; i >= 0; --i) {
+  for (size_t i = parameter_types.size() - 1; i >= 0; --i) {
     const Type* arg_type = stack->Pop();
     const Type* parameter_type = parameter_types.back();
     parameter_types.pop_back();
@@ -208,7 +208,7 @@ void CallCsaMacroInstruction::TypeInstruction(Stack<const Type*>* stack,
                                               ControlFlowGraph* cfg) const {
   std::vector<const Type*> parameter_types =
       LowerParameterTypes(macro->signature().parameter_types);
-  for (intptr_t i = parameter_types.size() - 1; i >= 0; --i) {
+  for (size_t i = parameter_types.size() - 1; i >= 0; --i) {
     const Type* arg_type = stack->Pop();
     const Type* parameter_type = parameter_types.back();
     parameter_types.pop_back();
@@ -280,7 +280,7 @@ void CallCsaMacroAndBranchInstruction::TypeInstruction(
     Stack<const Type*>* stack, ControlFlowGraph* cfg) const {
   std::vector<const Type*> parameter_types =
       LowerParameterTypes(macro->signature().parameter_types);
-  for (intptr_t i = parameter_types.size() - 1; i >= 0; --i) {
+  for (size_t i = parameter_types.size() - 1; i >= 0; --i) {
     const Type* arg_type = stack->Pop();
     const Type* parameter_type = parameter_types.back();
     parameter_types.pop_back();
@@ -763,7 +763,7 @@ void MakeLazyNodeInstruction::TypeInstruction(Stack<const Type*>* stack,
                                               ControlFlowGraph* cfg) const {
   std::vector<const Type*> parameter_types =
       LowerParameterTypes(macro->signature().parameter_types);
-  for (intptr_t i = parameter_types.size() - 1; i >= 0; --i) {
+  for (size_t i = parameter_types.size() - 1; i >= 0; --i) {
     const Type* arg_type = stack->Pop();
     const Type* parameter_type = parameter_types.back();
     parameter_types.pop_back();

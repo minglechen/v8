@@ -153,12 +153,12 @@ void CallIntrinsicInstruction::TypeInstruction(Stack<const Type*>* stack,
                                                ControlFlowGraph* cfg) const {
   std::vector<const Type*> parameter_types =
       LowerParameterTypes(intrinsic->signature().parameter_types);
-  for (size_t i = parameter_types.size() - 1; i >= 0; --i) {
+  for (size_t i = parameter_types.size(); i > 0; --i) {
     const Type* arg_type = stack->Pop();
     const Type* parameter_type = parameter_types.back();
     parameter_types.pop_back();
     if (arg_type != parameter_type) {
-      ReportError("parameter ", i, ": expected type ", *parameter_type,
+      ReportError("parameter ", i - 1, ": expected type ", *parameter_type,
                   " but found type ", *arg_type);
     }
   }
@@ -208,12 +208,12 @@ void CallCsaMacroInstruction::TypeInstruction(Stack<const Type*>* stack,
                                               ControlFlowGraph* cfg) const {
   std::vector<const Type*> parameter_types =
       LowerParameterTypes(macro->signature().parameter_types);
-  for (size_t i = parameter_types.size() - 1; i >= 0; --i) {
+  for (size_t i = parameter_types.size(); i > 0; --i) {
     const Type* arg_type = stack->Pop();
     const Type* parameter_type = parameter_types.back();
     parameter_types.pop_back();
     if (arg_type != parameter_type) {
-      ReportError("parameter ", i, ": expected type ", *parameter_type,
+      ReportError("parameter ", i - 1, ": expected type ", *parameter_type,
                   " but found type ", *arg_type);
     }
   }
@@ -280,12 +280,12 @@ void CallCsaMacroAndBranchInstruction::TypeInstruction(
     Stack<const Type*>* stack, ControlFlowGraph* cfg) const {
   std::vector<const Type*> parameter_types =
       LowerParameterTypes(macro->signature().parameter_types);
-  for (size_t i = parameter_types.size() - 1; i >= 0; --i) {
+  for (size_t i = parameter_types.size(); i > 0; --i) {
     const Type* arg_type = stack->Pop();
     const Type* parameter_type = parameter_types.back();
     parameter_types.pop_back();
     if (arg_type != parameter_type) {
-      ReportError("parameter ", i, ": expected type ", *parameter_type,
+      ReportError("parameter ", i - 1, ": expected type ", *parameter_type,
                   " but found type ", *arg_type);
     }
   }
@@ -763,12 +763,12 @@ void MakeLazyNodeInstruction::TypeInstruction(Stack<const Type*>* stack,
                                               ControlFlowGraph* cfg) const {
   std::vector<const Type*> parameter_types =
       LowerParameterTypes(macro->signature().parameter_types);
-  for (size_t i = parameter_types.size() - 1; i >= 0; --i) {
+  for (size_t i = parameter_types.size(); i > 0; --i) {
     const Type* arg_type = stack->Pop();
     const Type* parameter_type = parameter_types.back();
     parameter_types.pop_back();
     if (arg_type != parameter_type) {
-      ReportError("parameter ", i, ": expected type ", *parameter_type,
+      ReportError("parameter ", i - 1, ": expected type ", *parameter_type,
                   " but found type ", *arg_type);
     }
   }

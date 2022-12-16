@@ -1127,8 +1127,13 @@ constexpr int kIeeeDoubleExponentWordOffset = 0;
     ::i::kWeakHeapObjectTag))
 
 // OBJECT_POINTER_ALIGN returns the value aligned as a HeapObject pointer
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define OBJECT_POINTER_ALIGN(value) \
+  (((value) + (size_t) ::i::kObjectAlignmentMask) & (size_t) ~::i::kObjectAlignmentMask)
+#else
 #define OBJECT_POINTER_ALIGN(value) \
   (((value) + ::i::kObjectAlignmentMask) & ~::i::kObjectAlignmentMask)
+#endif
 
 // OBJECT_POINTER_PADDING returns the padding size required to align value
 // as a HeapObject pointer

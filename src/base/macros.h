@@ -323,7 +323,11 @@ template <typename T>
 inline T RoundDown(T x, intptr_t m) {
   static_assert(std::is_integral<T>::value);
   // m must be a power of two.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  DCHECK(m != 0 && ((m & (size_t) (m - 1)) == 0));
+#else
   DCHECK(m != 0 && ((m & (m - 1)) == 0));
+#endif
   return x & static_cast<T>(-m);
 }
 template <intptr_t m, typename T>

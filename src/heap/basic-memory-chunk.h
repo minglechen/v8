@@ -133,7 +133,11 @@ class BasicMemoryChunk {
                    Address area_start, Address area_end,
                    VirtualMemory reservation);
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  static Address BaseAddress(Address a) { return a & (size_t) ~kAlignmentMask; }
+#else
   static Address BaseAddress(Address a) { return a & ~kAlignmentMask; }
+#endi
 
   Address address() const { return reinterpret_cast<Address>(this); }
 

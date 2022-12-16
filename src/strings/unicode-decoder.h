@@ -31,7 +31,11 @@ inline int NonAsciiStart(const uint8_t* chars, int length) {
     DCHECK_EQ(unibrow::Utf8::kMaxOneByteChar, 0x7F);
     const uintptr_t non_one_byte_mask = kUintptrAllBitsSet / 0xFF * 0x80;
     while (chars + sizeof(uintptr_t) <= limit) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+      if (*reinterpret_cast<const uintptr_t*>(chars) & (size_t) non_one_byte_mask) {
+#else
       if (*reinterpret_cast<const uintptr_t*>(chars) & non_one_byte_mask) {
+#endif
         return static_cast<int>(chars - start);
       }
       chars += sizeof(uintptr_t);

@@ -730,7 +730,11 @@ Map MapWord::ToMap() const {
 }
 
 bool MapWord::IsForwardingAddress() const {
+#if defined(__CHERI_PURE_CAPABILITY__)
   return (value_ & kForwardingTagMask) == kForwardingTag;
+#else
+  return (value_ & kForwardingTagMask) == kForwardingTag;
+#endif
 }
 
 MapWord MapWord::FromForwardingAddress(HeapObject object) {

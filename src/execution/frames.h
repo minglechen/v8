@@ -199,7 +199,11 @@ class StackFrame {
   // and should be converted back to a stack frame type using MarkerToType.
   // Otherwise, the value is a tagged function pointer.
   static bool IsTypeMarker(intptr_t function_or_marker) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    return (function_or_marker & (size_t) kSmiTagMask) == kSmiTag;
+#else
     return (function_or_marker & kSmiTagMask) == kSmiTag;
+#endif
   }
 
   // Copy constructor; it breaks the connection to host iterator

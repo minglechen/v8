@@ -233,11 +233,19 @@ class Page : public MemoryChunk {
   // is in fact in a page.
   static Page* FromAddress(Address addr) {
     DCHECK(!V8_ENABLE_THIRD_PARTY_HEAP_BOOL);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    return reinterpret_cast<Page*>(addr & ~(size_t) kPageAlignmentMask);
+#else
     return reinterpret_cast<Page*>(addr & ~kPageAlignmentMask);
+#endif
   }
   static Page* FromHeapObject(HeapObject o) {
     DCHECK(!V8_ENABLE_THIRD_PARTY_HEAP_BOOL);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    return reinterpret_cast<Page*>(o.ptr() & ~(size_t) kAlignmentMask);
+#else
     return reinterpret_cast<Page*>(o.ptr() & ~kAlignmentMask);
+#endif
   }
 
   static Page* cast(MemoryChunk* chunk) {
@@ -261,7 +269,11 @@ class Page : public MemoryChunk {
 
   // Checks whether an address is page aligned.
   static bool IsAlignedToPageSize(Address addr) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    return (addr & (size_t) kPageAlignmentMask) == 0;
+#else
     return (addr & kPageAlignmentMask) == 0;
+#endif
   }
 
   static Page* ConvertNewToOld(Page* old_page);

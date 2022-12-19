@@ -91,8 +91,7 @@ struct MemoryChunk {
     if (V8_ENABLE_THIRD_PARTY_HEAP_BOOL) return false;
     constexpr uintptr_t kYoungOrSharedChunkMask =
 #if defined(__CHERI_PURE_CAPABILITY__)
-        kFromPageBit | kToPageBit | kInSharedHeapBit;
-        (size_t) kFromPageBit | kToPageBit | kInSharedHeapBit;
+        (size_t) kFromPageBit | (size_t) kToPageBit | (size_t) kInSharedHeapBit;
     return GetFlags() & (size_t) kYoungOrSharedChunkMask;
 #else
         kFromPageBit | kToPageBit | kInSharedHeapBit;

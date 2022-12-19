@@ -298,7 +298,11 @@ class BasicMemoryChunk {
 #endif
   }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Address HighWaterMark() const { return address() + (size_t) high_water_mark_; }
+#else
   Address HighWaterMark() const { return address() + high_water_mark_; }
+#endif
 
   static inline void UpdateHighWaterMark(Address mark) {
     if (mark == kNullAddress) return;

@@ -1205,7 +1205,11 @@ class V8_EXPORT_PRIVATE Isolate final : private HiddenFactory {
   // The kRootRegister is set to this value.
   Address isolate_root() const { return isolate_data()->isolate_root(); }
   static size_t isolate_root_bias() {
+#if defined(__CHERI_PURE_CAPABILITY__)
     return OFFSET_OF(Isolate, isolate_data_) + IsolateData::kIsolateRootBias;
+#else
+    return OFFSET_OF(Isolate, isolate_data_) + IsolateData::kIsolateRootBias;
+#endif
   }
   static Isolate* FromRootAddress(Address isolate_root) {
     return reinterpret_cast<Isolate*>(isolate_root - isolate_root_bias());

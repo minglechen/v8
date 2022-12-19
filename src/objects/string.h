@@ -548,7 +548,11 @@ class String : public TorqueGeneratedString<String, Name> {
       const uintptr_t non_one_byte_mask = kUintptrAllBitsSet / 0xFFFF * 0x00FF;
 #endif
       while (chars + sizeof(uintptr_t) <= limit) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+        if (*reinterpret_cast<const uintptr_t*>(chars) & (size_t) non_one_byte_mask) {
+#else
         if (*reinterpret_cast<const uintptr_t*>(chars) & non_one_byte_mask) {
+#endif
           break;
         }
         chars += (sizeof(uintptr_t) / sizeof(base::uc16));

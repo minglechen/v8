@@ -53,13 +53,25 @@ class Flags final {
   }
 
   constexpr Flags operator&(const Flags& flags) const {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    return Flags(mask_ & (size_t) flags.mask_);
+#else
     return Flags(mask_ & flags.mask_);
+#endif
   }
   constexpr Flags operator|(const Flags& flags) const {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    return Flags(mask_ | (size_t) flags.mask_);
+#else
     return Flags(mask_ | flags.mask_);
+#endif
   }
   constexpr Flags operator^(const Flags& flags) const {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    return Flags(mask_ ^ (size_t) flags.mask_);
+#else
     return Flags(mask_ ^ flags.mask_);
+#endif
   }
 
   Flags& operator&=(flag_type flag) { return operator&=(Flags(flag)); }

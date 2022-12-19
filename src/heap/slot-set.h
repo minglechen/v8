@@ -104,7 +104,7 @@ class PossiblyEmptyBuckets {
       ptr[word_idx] = 0;
     }
 #if defined(__CHERI_PURE_CAPABILITY__)
-    bitmap_ = reinterpret_cast<Address>(ptr) + kPointerTag;
+    bitmap_ = reinterpret_cast<Address>(ptr) + (size_t) kPointerTag;
 #else
     bitmap_ = reinterpret_cast<Address>(ptr) + kPointerTag;
 #endif

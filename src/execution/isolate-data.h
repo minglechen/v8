@@ -25,7 +25,8 @@ class Isolate;
 #define ISOLATE_DATA_FIELDS(V)                                                \
   /* Misc. fields. */                                                         \
   V(kCageBaseOffset, kSystemPointerSize, cage_base)                           \
-  V(kStackGuardOffset, StackGuard::kSizeInBytes, stack_guard)                 \
+  V(kStackGuardOffset, RoundUp<kSystemPointerSize>(StackGuard::kSizeInBytes), \
+    stack_guard)                                                              \
   /* Tier 0 tables (small but fast access). */                                \
   V(kBuiltinTier0EntryTableOffset,                                            \
     Builtins::kBuiltinTier0Count* kSystemPointerSize,                         \
@@ -38,13 +39,16 @@ class Isolate;
   V(kFastCCallCallerFPOffset, kSystemPointerSize, fast_c_call_caller_fp)      \
   V(kFastCCallCallerPCOffset, kSystemPointerSize, fast_c_call_caller_pc)      \
   V(kFastApiCallTargetOffset, kSystemPointerSize, fast_api_call_target)       \
-  V(kLongTaskStatsCounterOffset, kSizetSize, long_task_stats_counter)         \
+  V(kLongTaskStatsCounterOffset, RoundUp<kSystemPointerSize>(kSizetSize),     \
+    long_task_stats_counter)         \
   /* Full tables (arbitrary size, potentially slower access). */              \
   V(kRootsTableOffset, RootsTable::kEntriesCount* kSystemPointerSize,         \
     roots_table)                                                              \
   V(kExternalReferenceTableOffset, ExternalReferenceTable::kSizeInBytes,      \
     external_reference_table)                                                 \
-  V(kThreadLocalTopOffset, ThreadLocalTop::kSizeInBytes, thread_local_top)    \
+  V(kThreadLocalTopOffset,                                                    \
+    RoundUp<kSystemPointerSize>(ThreadLocalTop::kSizeInBytes),                \
+    thread_local_top)                                                         \
   V(kBuiltinEntryTableOffset, Builtins::kBuiltinCount* kSystemPointerSize,    \
     builtin_entry_table)                                                      \
   V(kBuiltinTableOffset, Builtins::kBuiltinCount* kSystemPointerSize,         \
@@ -79,7 +83,11 @@ class IsolateData final {
 
   // The value of the kRootRegister.
   Address isolate_root() const {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    return reinterpret_cast<Address>(this) + (size_t) kIsolateRootBias;
+#else
     return reinterpret_cast<Address>(this) + kIsolateRootBias;
+#endif
   }
 
   // Root-register-relative offsets.
@@ -150,6 +158,18 @@ class IsolateData final {
   // cheaper it is to access them. See also: https://crbug.com/993264.
   // The recommended guideline is to put frequently-accessed fields close to
   // the beginning of IsolateData.
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define FIELDS(V)                                                      \
+  ISOLATE_DATA_FIELDS(V)                                               \
+  /* This padding aligns IsolateData size by 16 bytes. */               \
+  V(kPaddingOffset,                                                    \
+    kSystemPointerSize + RoundUp<kSystemPointerSize>(static_cast<int>(kPaddingOffset)) - kPaddingOffset) \
+  /* Total size. */                                                    \
+  V(kSize, 0)
+
+  DEFINE_FIELD_OFFSET_CONSTANTS(0, FIELDS)
+#undef FIELDS
+#else
 #define FIELDS(V)                                                      \
   ISOLATE_DATA_FIELDS(V)                                               \
   /* This padding aligns IsolateData size by 8 bytes. */               \
@@ -160,6 +180,8 @@ class IsolateData final {
 
   DEFINE_FIELD_OFFSET_CONSTANTS(0, FIELDS)
 #undef FIELDS
+#endif
+
 
   const Address cage_base_;
 

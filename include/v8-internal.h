@@ -142,9 +142,9 @@ struct SmiTagging<16> {
 constexpr size_t kPtrComprCageReservationSize = size_t{1} << 32;
 constexpr size_t kPtrComprCageBaseAlignment = size_t{1} << 32;
 
-static_assert(
-    kApiSystemPointerSize == kApiInt64Size,
-    "Pointer compression can be enabled only for 64-bit architectures");
+//static_assert(
+//    kApiSystemPointerSize == kApiInt64Size,
+//    "Pointer compression can be enabled only for 64-bit architectures");
 const int kApiTaggedSize = kApiInt32Size;
 #else
 const int kApiTaggedSize = kApiSystemPointerSize;

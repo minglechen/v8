@@ -171,7 +171,11 @@ LocalAllocationBuffer LocalAllocationBuffer::FromResult(Heap* heap,
   USE(ok);
   DCHECK(ok);
   Address top = HeapObject::cast(obj).address();
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return LocalAllocationBuffer(heap, LinearAllocationArea(top, top + (size_t) size));
+#else
   return LocalAllocationBuffer(heap, LinearAllocationArea(top, top + size));
+#endif
 }
 
 bool LocalAllocationBuffer::TryMerge(LocalAllocationBuffer* other) {

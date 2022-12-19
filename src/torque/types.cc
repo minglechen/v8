@@ -1103,7 +1103,7 @@ TypeVector LowerType(const Type* type) {
 size_t LoweredSlotCount(const Type* type) { return LowerType(type).size(); }
 
 TypeVector LowerParameterTypes(const TypeVector& parameters) {
-  std::vector<const Type*> result;
+  std::vector<const Type*> result{};
   for (const Type* t : parameters) {
     AppendLoweredTypes(t, &result);
   }

@@ -505,7 +505,11 @@ class OldSpace final : public PagedSpace {
                    allocation_info) {}
 
   static bool IsAtPageStart(Address addr) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    return static_cast<intptr_t>(addr & (size_t) kPageAlignmentMask) ==
+#else
     return static_cast<intptr_t>(addr & kPageAlignmentMask) ==
+#endif
            MemoryChunkLayout::ObjectStartOffsetInDataPage();
   }
 

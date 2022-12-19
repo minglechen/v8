@@ -481,7 +481,8 @@ bool Heap::IsPendingAllocationInternal(HeapObject object) {
 bool Heap::IsPendingAllocation(HeapObject object) {
   bool result = IsPendingAllocationInternal(object);
   if (FLAG_trace_pending_allocations && result) {
-    StdoutStream{} << "Pending allocation: " << std::hex << "0x" << object.ptr()
+    // TODO: Temporary fix as ostream is missing an overloaded operator<< for uintptr_t.
+    StdoutStream{} << "Pending allocation: " << std::hex << "0x" << (size_t) object.ptr()
                    << "\n";
   }
   return result;

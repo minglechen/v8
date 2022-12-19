@@ -31,7 +31,11 @@ MaybeObject MaybeObject::FromObject(Object object) {
 
 MaybeObject MaybeObject::MakeWeak(MaybeObject object) {
   DCHECK(object.IsStrongOrWeak());
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return MaybeObject(object.ptr() | (size_t) kWeakHeapObjectMask);
+#else
   return MaybeObject(object.ptr() | kWeakHeapObjectMask);
+#endif
 }
 
 // static
@@ -61,7 +65,11 @@ HeapObjectReference HeapObjectReference::Strong(Object object) {
 HeapObjectReference HeapObjectReference::Weak(Object object) {
   DCHECK(!object.IsSmi());
   DCHECK(!HasWeakHeapObjectTag(object));
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return HeapObjectReference(object.ptr() | (size_t) kWeakHeapObjectMask);
+#else
   return HeapObjectReference(object.ptr() | kWeakHeapObjectMask);
+#endif
 }
 
 // static
@@ -109,7 +117,11 @@ void HeapObjectReference::Update(THeapObjectSlot slot, HeapObject value) {
 #endif
 
   slot.store(
+#if defined(__CHERI_PURE_CAPABILITY__)
+      HeapObjectReference(new_value | (size_t) (old_value & (size_t) kWeakHeapObjectMask)));
+#else
       HeapObjectReference(new_value | (old_value & kWeakHeapObjectMask)));
+#endif
 
 #ifdef DEBUG
   bool weak_after = HAS_WEAK_HEAP_OBJECT_TAG((*slot).ptr());

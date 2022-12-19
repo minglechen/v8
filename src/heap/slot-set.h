@@ -88,7 +88,7 @@ class PossiblyEmptyBuckets {
   static const int kBitsPerWord = kWordSize * kBitsPerByte;
 
 #if defined(__CHERI_PURE_CAPABILITY__)
-  bool IsAllocated() { return bitmap_ & (size) kPointerTag; }
+  bool IsAllocated() { return bitmap_ & (size_t) kPointerTag; }
 #else
   bool IsAllocated() { return bitmap_ & kPointerTag; }
 #endif
@@ -125,7 +125,7 @@ class PossiblyEmptyBuckets {
   uintptr_t* BitmapArray() {
     DCHECK(IsAllocated());
 #if defined(__CHERI_PURE_CAPABILITY__)
-    return reinterpret_cast<uintptr_t*>(bitmap_ & ~kPointerTag);
+    return reinterpret_cast<uintptr_t*>(bitmap_ & ~(size_t) kPointerTag);
 #else
     return reinterpret_cast<uintptr_t*>(bitmap_ & ~kPointerTag);
 #endif
@@ -499,7 +499,7 @@ class SlotSet {
               uint32_t bit_mask = 1u << bit_offset;
               Address slot = (cell_offset + bit_offset) << kTaggedSizeLog2;
 #if defined(__CHERI_PURE_CAPABILITY__)
-              if (callback(MaybeObjectSlot(chunk_start + slot)) == KEEP_SLOT) {
+              if (callback(MaybeObjectSlot(chunk_start + (size_t) slot)) == KEEP_SLOT) {
 #else
               if (callback(MaybeObjectSlot(chunk_start + slot)) == KEEP_SLOT) {
 #endif

@@ -207,7 +207,11 @@ HeapObject TaggedImpl<kRefType, StorageType>::GetHeapObject() const {
   DCHECK(!IsSmi());
   if (kCanBeWeak) {
     DCHECK(!IsCleared());
+#if defined(__CHERI_PURE_CAPABILITY__)
+    return HeapObject::cast(Object(ptr_ & (size_t) ~kWeakHeapObjectMask));
+#else
     return HeapObject::cast(Object(ptr_ & ~kWeakHeapObjectMask));
+#endif    
   } else {
     DCHECK(!HAS_WEAK_HEAP_OBJECT_TAG(ptr_));
     return HeapObject::cast(Object(ptr_));
@@ -223,7 +227,11 @@ HeapObject TaggedImpl<kRefType, StorageType>::GetHeapObject(
   if (kCanBeWeak) {
     DCHECK(!IsCleared());
     return HeapObject::cast(Object(DecompressTaggedPointer(
+#if defined(__CHERI_PURE_CAPABILITY__)
         isolate, static_cast<Tagged_t>(ptr_) & ~kWeakHeapObjectMask)));
+#else
+        isolate, static_cast<Tagged_t>(ptr_) & ~kWeakHeapObjectMask)));
+#endif    
   } else {
     DCHECK(!HAS_WEAK_HEAP_OBJECT_TAG(ptr_));
     return HeapObject::cast(

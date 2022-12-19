@@ -731,7 +731,7 @@ Map MapWord::ToMap() const {
 
 bool MapWord::IsForwardingAddress() const {
 #if defined(__CHERI_PURE_CAPABILITY__)
-  return (value_ & kForwardingTagMask) == kForwardingTag;
+  return (value_ & (size_t) kForwardingTagMask) == kForwardingTag;
 #else
   return (value_ & kForwardingTagMask) == kForwardingTag;
 #endif

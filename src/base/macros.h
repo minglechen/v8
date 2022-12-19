@@ -325,10 +325,11 @@ inline T RoundDown(T x, intptr_t m) {
   // m must be a power of two.
 #if defined(__CHERI_PURE_CAPABILITY__)
   DCHECK(m != 0 && ((m & (size_t) (m - 1)) == 0));
+  return x & static_cast<T>(-m);
 #else
   DCHECK(m != 0 && ((m & (m - 1)) == 0));
-#endif
   return x & static_cast<T>(-m);
+#endif
 }
 template <intptr_t m, typename T>
 constexpr inline T RoundDown(T x) {
@@ -357,7 +358,11 @@ constexpr inline T RoundUp(T x) {
 
 template <typename T, typename U>
 constexpr inline bool IsAligned(T value, U alignment) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return (value & (size_t) (alignment - 1)) == 0;
+#else
   return (value & (alignment - 1)) == 0;
+#endif
 }
 
 inline void* AlignedAddress(void* address, size_t alignment) {

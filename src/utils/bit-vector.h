@@ -172,7 +172,11 @@ class V8_EXPORT_PRIVATE BitVector : public ZoneObject {
   bool Contains(int i) const {
     DCHECK(i >= 0 && i < length());
     uintptr_t block = is_inline() ? data_.inline_ : data_.ptr_[i / kDataBits];
+#if defined(__CHERI_PURE_CAPABILITY__)
+    return (block & (size_t) (kOne << (i % kDataBits))) != 0;
+#else
     return (block & (kOne << (i % kDataBits))) != 0;
+#endif
   }
 
   void Add(int i) {

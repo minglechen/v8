@@ -130,7 +130,8 @@ V8_INLINE size_t hash_value(T (&v)[N]) {
 
 template <typename T>
 V8_INLINE size_t hash_value(T* const& v) {
-  return hash_value(base::bit_cast<uintptr_t>(v));
+// TODO: Quick fix to get the compilation moving
+  return hash_value((size_t) base::bit_cast<uintptr_t>(v));
 }
 
 template <typename T1, typename T2>

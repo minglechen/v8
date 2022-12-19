@@ -115,7 +115,7 @@ class ExternalReferenceTable {
 };
 
 static_assert(ExternalReferenceTable::kSizeInBytes ==
-              sizeof(ExternalReferenceTable));
+		sizeof(ExternalReferenceTable));
 
 }  // namespace internal
 }  // namespace v8

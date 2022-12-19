@@ -57,7 +57,7 @@ using Atomic64 = SbAtomic64;
 using Atomic8 = char;
 using Atomic16 = int16_t;
 using Atomic32 = int32_t;
-#if defined(V8_HOST_ARCH_64_BIT)
+#if defined(V8_HOST_ARCH_64_BIT) || defined(V8_HOST_ARCH_128_BIT)
 // We need to be able to go between Atomic64 and AtomicWord implicitly.  This
 // means Atomic64 and AtomicWord should be the same type on 64-bit.
 #if defined(__ILP32__)
@@ -65,12 +65,12 @@ using Atomic64 = int64_t;
 #else
 using Atomic64 = intptr_t;
 #endif  // defined(__ILP32__)
-#endif  // defined(V8_HOST_ARCH_64_BIT)
+#endif  // defined(V8_HOST_ARCH_64_BIT) || defined(V8_HOST_ARCH_64_BITS)
 #endif  // V8_OS_STARBOARD
 
 // Use AtomicWord for a machine-sized pointer. It will use the Atomic32 or
 // Atomic64 routines below, depending on your architecture.
-#if defined(V8_HOST_ARCH_64_BIT)
+#if defined(V8_HOST_ARCH_64_BIT) || defined(V8_HOST_ARCH_128_BIT)
 using AtomicWord = Atomic64;
 #else
 using AtomicWord = Atomic32;
@@ -258,7 +258,7 @@ inline Atomic32 SeqCst_Load(volatile const Atomic32* ptr) {
                                    std::memory_order_seq_cst);
 }
 
-#if defined(V8_HOST_ARCH_64_BIT)
+#if defined(V8_HOST_ARCH_64_BIT) || defined(V8_HOST_ARCH_128_BIT)
 
 inline Atomic64 Relaxed_CompareAndSwap(volatile Atomic64* ptr,
                                        Atomic64 old_value, Atomic64 new_value) {

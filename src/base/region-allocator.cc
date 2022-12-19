@@ -350,14 +350,14 @@ const char* RegionStateToString(RegionAllocator::RegionState state) {
 
 void RegionAllocator::Region::Print(std::ostream& os) const {
   std::ios::fmtflags flags = os.flags(std::ios::hex | std::ios::showbase);
-  os << "[" << begin() << ", " << end() << "), size: " << size();
+  os << "[" << (size_t) begin() << ", " << (size_t) end() << "), size: " << size();
   os << ", " << RegionStateToString(state_);
   os.flags(flags);
 }
 
 void RegionAllocator::Print(std::ostream& os) const {
   std::ios::fmtflags flags = os.flags(std::ios::hex | std::ios::showbase);
-  os << "RegionAllocator: [" << begin() << ", " << end() << ")";
+  os << "RegionAllocator: [" << (size_t) begin() << ", " << (size_t) end() << ")";
   os << "\nsize: " << size();
   os << "\nfree_size: " << free_size();
   os << "\npage_size: " << page_size_;

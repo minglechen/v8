@@ -362,9 +362,10 @@ static_assert(kSystemPointerSize == (1 << kSystemPointerSizeLog2));
 static constexpr bool kCompressGraphZone = COMPRESS_ZONES_BOOL;
 
 #ifdef V8_COMPRESS_POINTERS
-static_assert(
-    kSystemPointerSize == kInt64Size,
-    "Pointer compression can be enabled only for 64-bit architectures");
+// TODO: Fix this static assert for CHERI
+// static_assert(
+//    kSystemPointerSize == kInt64Size,
+//    "Pointer compression can be enabled only for 64-bit architectures");
 
 constexpr int kTaggedSize = kInt32Size;
 constexpr int kTaggedSizeLog2 = 2;

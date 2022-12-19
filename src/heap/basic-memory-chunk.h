@@ -137,7 +137,7 @@ class BasicMemoryChunk {
   static Address BaseAddress(Address a) { return a & (size_t) ~kAlignmentMask; }
 #else
   static Address BaseAddress(Address a) { return a & ~kAlignmentMask; }
-#endi
+#endif
 
   Address address() const { return reinterpret_cast<Address>(this); }
 
@@ -291,7 +291,11 @@ class BasicMemoryChunk {
   template <AccessMode mode>
   ConcurrentBitmap<mode>* marking_bitmap() const {
     return static_cast<ConcurrentBitmap<mode>*>(
+#if defined(__CHERI_PURE_CAPABILITY__)
+        Bitmap::FromAddress(address() + (size_t) kMarkingBitmapOffset));
+#else
         Bitmap::FromAddress(address() + kMarkingBitmapOffset));
+#endif
   }
 
   Address HighWaterMark() const { return address() + high_water_mark_; }

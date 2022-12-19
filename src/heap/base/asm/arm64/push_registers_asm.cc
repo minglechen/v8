@@ -32,16 +32,28 @@ asm(
     "PushAllRegistersAndIterateStack:                   \n"
 #endif  // !defined(__APPLE__)
     // x19-x29 are callee-saved.
+#ifdef __CHERI_PURE_CAPABILITY__
+    "  stp c19, c20, [csp, #-32]!                       \n"
+    "  stp c21, c22, [csp, #-32]!                       \n"
+    "  stp c23, c24, [csp, #-32]!                       \n"
+    "  stp c25, c26, [csp, #-32]!                       \n"
+    "  stp c27, c28, [csp, #-32]!                       \n"
+#else
     "  stp x19, x20, [sp, #-16]!                        \n"
     "  stp x21, x22, [sp, #-16]!                        \n"
     "  stp x23, x24, [sp, #-16]!                        \n"
     "  stp x25, x26, [sp, #-16]!                        \n"
     "  stp x27, x28, [sp, #-16]!                        \n"
+#endif
 #ifdef V8_ENABLE_CONTROL_FLOW_INTEGRITY
     // Sign return address.
     "  paciasp                                          \n"
 #endif
+#ifdef __CHERI_PURE_CAPABILITY__
+    "  stp fp, lr,   [csp, #-32]!                       \n"
+#else
     "  stp fp, lr,   [sp, #-16]!                        \n"
+#endif
     // Maintain frame pointer.
     "  mov fp, sp                                       \n"
     // Pass 1st parameter (x0) unchanged (Stack*).
@@ -49,14 +61,26 @@ asm(
     // Save 3rd parameter (x2; IterateStackCallback)
     "  mov x7, x2                                       \n"
     // Pass 3rd parameter as sp (stack pointer).
+#ifdef __CHERI_PURE_CAPABILITY__
+    "  mov c2, csp                                      \n"
+#else
     "  mov x2, sp                                       \n"
+#endif
     "  blr x7                                           \n"
     // Load return address and frame pointer.
+#ifdef __CHERI_PURE_CAPABILITY__
+    "  ldp fp, lr, [csp], #32                           \n"
+#else
     "  ldp fp, lr, [sp], #16                            \n"
+#endif
 #ifdef V8_ENABLE_CONTROL_FLOW_INTEGRITY
     // Authenticate return address.
     "  autiasp                                          \n"
 #endif
     // Drop all callee-saved registers.
+#ifdef __CHERI_PURE_CAPABILITY__
+    "  add csp, csp, #160                               \n"
+#else
     "  add sp, sp, #80                                  \n"
+#endif
     "  ret                                              \n");

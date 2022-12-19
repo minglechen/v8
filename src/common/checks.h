@@ -22,10 +22,20 @@
 #define SLOW_DCHECK_IMPLIES(v1, v2) ((void)0)
 #endif
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define DCHECK_TAG_ALIGNED(address) \
+  DCHECK((address & (size_t) ::v8::internal::kHeapObjectTagMask) == 0)
+#else
 #define DCHECK_TAG_ALIGNED(address) \
   DCHECK((address & ::v8::internal::kHeapObjectTagMask) == 0)
+#endif
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define DCHECK_SIZE_TAG_ALIGNED(size) \
+  DCHECK((size & (size_t) ::v8::internal::kHeapObjectTagMask) == 0)
+#else
 #define DCHECK_SIZE_TAG_ALIGNED(size) \
   DCHECK((size & ::v8::internal::kHeapObjectTagMask) == 0)
+#endif
 
 #endif  // V8_COMMON_CHECKS_H_

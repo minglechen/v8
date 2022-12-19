@@ -23,7 +23,11 @@
 #define V8_HOST_ARCH_32_BIT 1
 #elif defined(__AARCH64EL__) || defined(_M_ARM64)
 #define V8_HOST_ARCH_ARM64 1
+#ifndef __CHERI_PURE_CAPABILITY__
 #define V8_HOST_ARCH_64_BIT 1
+#else
+#define V8_HOST_ARCH_128_BIT 1
+#endif
 #elif defined(__ARMEL__)
 #define V8_HOST_ARCH_ARM 1
 #define V8_HOST_ARCH_32_BIT 1

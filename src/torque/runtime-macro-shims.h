@@ -21,8 +21,13 @@ namespace CodeStubAssembler {
 inline bool BoolConstant(bool b) { return b; }
 inline intptr_t ChangeInt32ToIntPtr(int32_t i) { return i; }
 inline uintptr_t ChangeUint32ToWord(uint32_t u) { return u; }
+#if defined(__CHERI_PURE_CAPABILITY__)
+inline intptr_t IntPtrAdd(intptr_t a, intptr_t b) { return (size_t) a + (size_t) b; }
+inline intptr_t IntPtrMul(intptr_t a, intptr_t b) { return (size_t) a * (size_t) b; }
+#endif
 inline intptr_t IntPtrAdd(intptr_t a, intptr_t b) { return a + b; }
 inline intptr_t IntPtrMul(intptr_t a, intptr_t b) { return a * b; }
+#else
 inline bool IntPtrLessThan(intptr_t a, intptr_t b) { return a < b; }
 inline bool IntPtrLessThanOrEqual(intptr_t a, intptr_t b) { return a <= b; }
 inline intptr_t Signed(uintptr_t u) { return static_cast<intptr_t>(u); }

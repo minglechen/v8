@@ -16,7 +16,16 @@ static_assert(sizeof(1L) == sizeof(int32_t));
 static_assert(sizeof(long) == sizeof(int64_t));  // NOLINT(runtime/int)
 static_assert(sizeof(1L) == sizeof(int64_t));
 #endif
+#if defined(__CHERI_PURE_CAPABILITY__)
+// CHERI C/C++ Programming Guide S4.2.1
+// "According to the C standard, these integer types should be ‘capable of representing
+// any value of any (unsigned) integer type’. In CHERI C/C++, they are not
+// provenance-carrying and can represent the integer range of uintptr_t/intptr_t, but 
+// not the capability metadata or tag bit."
+static_assert(sizeof(intmax_t) == sizeof(int64_t));
+#else
 static_assert(sizeof(void*) == sizeof(int64_t));
+#endif
 static_assert(sizeof(1) == sizeof(int32_t));
 
 // Get the standard printf format macros for C99 stdint types.

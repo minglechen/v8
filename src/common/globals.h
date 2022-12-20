@@ -299,6 +299,9 @@ constexpr int kSystemPointerSizeLog2 = 4;
 constexpr intptr_t kIntptrSignBit =
     static_cast<intptr_t>(uintptr_t{0x8000000000000000});
 constexpr bool kPlatformRequiresCodeRange = true;
+constexpr size_t kMaximalCodeRangeSize =
+    V8_EXTERNAL_CODE_SPACE_BOOL ? 256 * MB : 128 * MB;
+constexpr size_t kMinExpectedOSPageSize = 4 * KB;  // OS page.
 #elif V8_HOST_ARCH_64_BIT
 constexpr int kSystemPointerSizeLog2 = 3;
 constexpr intptr_t kIntptrSignBit =

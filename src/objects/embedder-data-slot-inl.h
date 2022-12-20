@@ -177,7 +177,11 @@ void EmbedderDataSlot::PopulateEmbedderDataSnapshot(
     Map map, JSObject js_object, int entry_index,
     EmbedderDataSlotSnapshot& snapshot) {
 #ifdef V8_COMPRESS_POINTERS
+#if defined(__CHERI_PURE_CAPABILITY__)
+  static_assert(sizeof(uintmax_t) == sizeof(AtomicTagged_t) * 2);
+#else
   static_assert(sizeof(EmbedderDataSlotSnapshot) == sizeof(AtomicTagged_t) * 2);
+#endif
 #else   // !V8_COMPRESS_POINTERS
   static_assert(sizeof(EmbedderDataSlotSnapshot) == sizeof(AtomicTagged_t));
 #endif  // !V8_COMPRESS_POINTERS

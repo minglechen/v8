@@ -172,7 +172,7 @@ HEAP_OBJECT_TEMPLATE_TYPE_LIST(OBJECT_TYPE_TEMPLATE_CASE)
 using BInt = Smi;
 using AtomicInt64 = PairT<IntPtrT, IntPtrT>;
 using AtomicUint64 = PairT<UintPtrT, UintPtrT>;
-#elif defined(V8_HOST_ARCH_64_BIT)
+#elif defined(V8_HOST_ARCH_64_BIT) || defined(V8_HOST_ARCH_128_BIT)
 #define BINT_IS_INTPTR
 using BInt = IntPtrT;
 using AtomicInt64 = IntPtrT;

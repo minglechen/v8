@@ -439,10 +439,12 @@ struct AnyCType {
   };
 };
 
+#ifndef __CHERI_PURE_CAPABILITY__
 static_assert(
     sizeof(AnyCType) == 8,
     "The AnyCType struct should have size == 64 bits, as this is assumed "
     "by EffectControlLinearizer.");
+#endif
 
 class V8_EXPORT CFunction {
  public:

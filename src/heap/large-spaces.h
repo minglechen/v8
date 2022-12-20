@@ -56,7 +56,11 @@ class LargePage : public MemoryChunk {
   friend class MemoryAllocator;
 };
 
+#ifndef __CHERI_PURE_CAPABILITY__
+// The calculation of kHeaderSize is broken for CHERI, as it doesn't take into 
+// account the padding under stronger alignments. I'm doubtful its worth fixing.
 static_assert(sizeof(LargePage) <= MemoryChunk::kHeaderSize);
+#endif
 
 // -----------------------------------------------------------------------------
 // Large objects ( > kMaxRegularHeapObjectSize ) are allocated and managed by

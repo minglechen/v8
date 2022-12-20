@@ -296,10 +296,14 @@ class MachineType {
       case CTypeInfo::Type::kInt64:
         return MachineType::Int64();
       case CTypeInfo::Type::kAny:
+#if defined(__CHERI_PURE_CAPABILITY__)
+        return MachineType::AnyTagged();
+#else
         static_assert(
             sizeof(AnyCType) == kInt64Size,
             "CTypeInfo::Type::kAny is assumed to be of size 64 bits.");
         return MachineType::Int64();
+#endif
       case CTypeInfo::Type::kUint64:
         return MachineType::Uint64();
       case CTypeInfo::Type::kFloat32:

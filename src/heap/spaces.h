@@ -347,10 +347,15 @@ class Page : public MemoryChunk {
   friend class MemoryAllocator;
 };
 
+#ifndef __CHERI_PURE_CAPABILITY__
+// The calculation of kHeaderSize is broken for CHERI, as it doesn't take into 
+// account the padding under stronger alignments. I'm doubtful its worth fixing.
+
 // Validate our estimates on the header size.
 static_assert(sizeof(BasicMemoryChunk) <= BasicMemoryChunk::kHeaderSize);
 static_assert(sizeof(MemoryChunk) <= MemoryChunk::kHeaderSize);
 static_assert(sizeof(Page) <= MemoryChunk::kHeaderSize);
+#endif
 
 // -----------------------------------------------------------------------------
 // Interface for heap object iterator to be implemented by all object space

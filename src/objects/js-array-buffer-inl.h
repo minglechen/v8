@@ -299,7 +299,7 @@ void* JSTypedArray::DataPtr() {
 
 void JSTypedArray::SetOffHeapDataPtr(Isolate* isolate, void* base,
                                      Address offset) {
-  Address address = reinterpret_cast<Address>(base) + offset;
+  Address address = reinterpret_cast<Address>(base) + (size_t) offset;
   set_external_pointer(isolate, address);
   // This is the only spot in which the `base_pointer` field can be mutated
   // after object initialization. Note this can happen at most once, when

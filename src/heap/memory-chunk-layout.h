@@ -5,6 +5,8 @@
 #ifndef V8_HEAP_MEMORY_CHUNK_LAYOUT_H_
 #define V8_HEAP_MEMORY_CHUNK_LAYOUT_H_
 
+#include <cstddef>
+
 #include "src/heap/base/active-system-pages.h"
 #include "src/heap/heap.h"
 #include "src/heap/list.h"
@@ -42,7 +44,7 @@ class V8_EXPORT_PRIVATE MemoryChunkLayout {
 #if V8_CC_MSVC && V8_TARGET_ARCH_IA32
   static constexpr int kMemoryChunkAlignment = 8;
 #else
-  static constexpr int kMemoryChunkAlignment = sizeof(size_t);
+  static constexpr int kMemoryChunkAlignment = alignof(std::max_align_t);
 #endif  // V8_CC_MSVC && V8_TARGET_ARCH_IA32
 #define FIELD(Type, Name) \
   k##Name##Offset, k##Name##End = k##Name##Offset + sizeof(Type) - 1

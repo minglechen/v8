@@ -33,6 +33,26 @@ class IntegerLiteral {
            Compare(IntegerLiteral(std::numeric_limits<T>::max(), false)) <= 0;
   }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  template <>
+  bool IsRepresentableAs<intptr_t>() const {
+    return Compare(IntegerLiteral(std::numeric_limits<intmax_t>::min(), false)) >= 0 &&
+           Compare(IntegerLiteral(std::numeric_limits<intmax_t>::max(), false)) <= 0;
+  }
+
+  template <>
+  bool IsRepresentableAs<uintptr_t>() const {
+    return Compare(IntegerLiteral(std::numeric_limits<uintmax_t>::min(), false)) >= 0 &&
+           Compare(IntegerLiteral(std::numeric_limits<uintmax_t>::max(), false)) <= 0;
+  }
+#endif
+
+  template <typename T>
+  base::Optional<T> TryTo() const {
+    static_assert(std::is_integral<T>::value, "Integral type required");
+    if (!IsRepresentableAs<T>()) return base::nullopt;
+    return To<T>();
+  }
   template <typename T>
   T To() const {
     static_assert(std::is_integral<T>::value, "Integral type required");
@@ -40,13 +60,6 @@ class IntegerLiteral {
     uint64_t v = absolute_value_;
     if (negative_) v = ~v + 1;
     return static_cast<T>(v);
-  }
-
-  template <typename T>
-  base::Optional<T> TryTo() const {
-    static_assert(std::is_integral<T>::value, "Integral type required");
-    if (!IsRepresentableAs<T>()) return base::nullopt;
-    return To<T>();
   }
 
   int Compare(const IntegerLiteral& other) const {

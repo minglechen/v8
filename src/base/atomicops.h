@@ -285,7 +285,7 @@ inline Atomic64 Relaxed_AtomicIncrement(volatile Atomic64* ptr,
 #if defined(__CHERI_PURE_CAPABILITY__)
   return std::atomic_fetch_add_explicit(helper::to_std_atomic(ptr),
                                         increment,
-                                        std::memory_order_relaxed) + increment;
+                                        std::memory_order_relaxed) + (size_t) increment;
 #else
   return increment + std::atomic_fetch_add_explicit(helper::to_std_atomic(ptr),
                                                     increment,

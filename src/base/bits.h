@@ -109,24 +109,43 @@ inline constexpr unsigned CountLeadingZeros64(uint64_t value) {
 // returns {sizeof(T) * 8}.
 // See CountTrailingZerosNonZero for an optimized version for the case that
 // |value| is guaranteed to be non-zero.
-template <typename T, unsigned bits = sizeof(T) * 8>
+template <typename t, unsigned bits = sizeof(t) * 8>
 inline constexpr
-    typename std::enable_if<std::is_integral<T>::value && sizeof(T) <= 8,
+    typename std::enable_if<std::is_integral<t>::value,
                             unsigned>::type
-    CountTrailingZeros(T value) {
-#if V8_HAS_BUILTIN_CTZ
+    CountTrailingZeros(t value) {
+#if v8_has_builtin_ctz
   return value == 0 ? bits
                     : bits == 64 ? __builtin_ctzll(static_cast<uint64_t>(value))
                                  : __builtin_ctz(static_cast<uint32_t>(value));
 #else
-  // Fall back to popcount (see "Hacker's Delight" by Henry S. Warren, Jr.),
-  // chapter 5-4. On x64, since is faster than counting in a loop and faster
+  // fall back to popcount (see "hacker's delight" by henry s. warren, jr.),
+  // chapter 5-4. on x64, since is faster than counting in a loop and faster
   // than doing binary search.
-  using U = typename std::make_unsigned<T>::type;
+  using U = typename std::make_unsigned<t>::type;
   U u = value;
   return CountPopulation(static_cast<U>(~u & (u - 1u)));
 #endif
 }
+
+#if defined(__CHERI_PURE_CAPABILITY__)
+template <>
+inline constexpr
+    typename std::enable_if<(sizeof(uintptr_t) > sizeof(intmax_t)) &&
+                            sizeof(intmax_t) == 8, unsigned>::type
+    CountTrailingZeros<uintptr_t>(uintptr_t value) {
+#if v8_has_builtin_ctz
+  return value == 0 ? sizeof(uint64_t) * 8 : __builtin_ctzll(static_cast<uint64_t>(value));
+#else
+  // fall back to popcount (see "hacker's delight" by henry s. warren, jr.),
+  // chapter 5-4. on x64, since is faster than counting in a loop and faster
+  // than doing binary search.
+  
+  uint64_t u = value;
+  return CountPopulation(static_cast<uint64_t>(~u & (u - 1)));
+#endif
+}
+#endif
 
 inline constexpr unsigned CountTrailingZeros32(uint32_t value) {
   return CountTrailingZeros(value);

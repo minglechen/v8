@@ -116,7 +116,7 @@ class BasicMemoryChunk {
       EVACUATION_CANDIDATE;
 
   static constexpr MainThreadFlags kIsInYoungGenerationMask =
-      MainThreadFlags(FROM_PAGE) | MainThreadFlags(TO_PAGE);
+      MainThreadFlags(FROM_PAGE) | (size_t) MainThreadFlags(TO_PAGE);
 
   static constexpr MainThreadFlags kIsLargePageMask = LARGE_PAGE;
 

@@ -5407,6 +5407,13 @@ template <>
 struct OneByteMask<8> {
   static const uint64_t value = 0xFF00'FF00'FF00'FF00;
 };
+#if defined(__CHERI_PURE_CAPABILITY__)
+template <>
+struct OneByteMask<16> {
+  static const uint64_t value = 0xFF00'FF00'FF00'FF00;
+};
+#endif
+
 static const uintptr_t kOneByteMask = OneByteMask<sizeof(uintptr_t)>::value;
 static const uintptr_t kAlignmentMask = sizeof(uintptr_t) - 1;
 static inline bool Unaligned(const uint16_t* chars) {

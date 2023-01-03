@@ -118,6 +118,16 @@ V8_INLINE size_t hash_value(double v) {
   return v != 0.0 ? hash_value(base::bit_cast<uint64_t>(v)) : 0;
 }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+V8_INLINE size_t hash_value(intptr_t v) {
+  return hash_combine((size_t)v, (size_t)(v >> sizeof(size_t) * CHAR_BIT));
+}
+
+V8_INLINE size_t hash_value(uintptr_t v) {
+  return hash_combine((size_t)v, (size_t)(v >> sizeof(size_t) * CHAR_BIT));
+}
+#endif
+
 template <typename T, size_t N>
 V8_INLINE size_t hash_value(const T (&v)[N]) {
   return hash_range(v, v + N);
@@ -130,8 +140,7 @@ V8_INLINE size_t hash_value(T (&v)[N]) {
 
 template <typename T>
 V8_INLINE size_t hash_value(T* const& v) {
-// TODO: Quick fix to get the compilation moving
-  return hash_value((size_t) base::bit_cast<uintptr_t>(v));
+  return hash_value(base::bit_cast<uintptr_t>(v));
 }
 
 template <typename T1, typename T2>

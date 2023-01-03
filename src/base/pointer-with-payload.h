@@ -80,19 +80,31 @@ class PointerWithPayload {
   V8_INLINE void SetPointer(PointerType* newptr) {
     DCHECK_EQ(reinterpret_cast<uintptr_t>(newptr) & kPayloadMask, 0);
     pointer_with_payload_ = reinterpret_cast<uintptr_t>(newptr) |
+#ifdef __CHERI_PURE_CAPABILITY__
+                            (pointer_with_payload_ & (size_t) kPayloadMask);
+#else
                             (pointer_with_payload_ & kPayloadMask);
+#endif
     DCHECK_EQ(GetPointer(), newptr);
   }
 
   V8_INLINE PayloadType GetPayload() const {
+#ifdef __CHERI_PURE_CAPABILITY__
+    return static_cast<PayloadType>(pointer_with_payload_ & (size_t) kPayloadMask);
+#else
     return static_cast<PayloadType>(pointer_with_payload_ & kPayloadMask);
+#endif
   }
 
   V8_INLINE void SetPayload(PayloadType new_payload) {
     uintptr_t new_payload_ptr = static_cast<uintptr_t>(new_payload);
     DCHECK_EQ(new_payload_ptr & kPayloadMask, new_payload_ptr);
     pointer_with_payload_ =
+#ifdef __CHERI_PURE_CAPABILITY__
+        (pointer_with_payload_ & (size_t) kPointerMask) | (size_t) new_payload_ptr;
+#else
         (pointer_with_payload_ & kPointerMask) | new_payload_ptr;
+#endif
     DCHECK_EQ(GetPayload(), new_payload);
   }
 

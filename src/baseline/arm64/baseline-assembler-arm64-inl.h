@@ -242,7 +242,11 @@ void BaselineAssembler::Move(interpreter::Register output, Register source) {
   Move(RegisterFrameOperand(output), source);
 }
 void BaselineAssembler::Move(Register output, TaggedIndex value) {
+#ifdef __CHERI_PURE_CAPABILITY__
+  __ Mov(output, Immediate(static_cast<size_t>(value.ptr())));
+#else
   __ Mov(output, Immediate(value.ptr()));
+#endif 
 }
 void BaselineAssembler::Move(MemOperand output, Register source) {
   __ Str(source, output);

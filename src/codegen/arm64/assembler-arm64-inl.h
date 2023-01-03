@@ -504,8 +504,12 @@ AssemblerBase::EmbeddedObjectIndex
 Assembler::embedded_object_index_referenced_from(Address pc) {
   Instruction* instr = reinterpret_cast<Instruction*>(pc);
   if (instr->IsLdrLiteralX()) {
+#ifdef __CHERI_PURE_CAPABILITY__
+    return Memory<EmbeddedObjectIndex>(static_cast<size_t>(target_pointer_address_at(pc)));
+#else
     static_assert(sizeof(EmbeddedObjectIndex) == sizeof(intptr_t));
     return Memory<EmbeddedObjectIndex>(target_pointer_address_at(pc));
+#endif
   } else {
     DCHECK(instr->IsLdrLiteralW());
     return Memory<uint32_t>(target_pointer_address_at(pc));

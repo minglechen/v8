@@ -36,9 +36,16 @@ namespace internal {
 //       use. Because a Variable holding a handle with the same location exists
 //       this is ensured.
 
+#ifdef __CHERI_PURE_CAPABILITY__
+static_assert(sizeof(VariableMap) == (sizeof(void*) + 2 * sizeof(uint32_t) +
+			              sizeof(uint64_t) + // Padding
+                                      sizeof(ZoneAllocationPolicy)),
+              "Empty base optimization didn't kick in for VariableMap");
+#else
 static_assert(sizeof(VariableMap) == (sizeof(void*) + 2 * sizeof(uint32_t) +
                                       sizeof(ZoneAllocationPolicy)),
               "Empty base optimization didn't kick in for VariableMap");
+#endif
 
 VariableMap::VariableMap(Zone* zone)
     : ZoneHashMap(8, ZoneAllocationPolicy(zone)) {}

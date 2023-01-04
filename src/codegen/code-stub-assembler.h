@@ -504,8 +504,13 @@ class V8_EXPORT_PRIVATE CodeStubAssembler
 
   uintptr_t ConstexprUintPtrShl(uintptr_t a, int32_t b) { return a << b; }
   uintptr_t ConstexprUintPtrShr(uintptr_t a, int32_t b) { return a >> b; }
+#ifdef __CHERI_PURE_CAPABILITY__
+  intptr_t ConstexprIntPtrAdd(intptr_t a, intptr_t b) { return a + (size_t) b; }
+  uintptr_t ConstexprUintPtrAdd(uintptr_t a, uintptr_t b) { return a + (size_t) b; }
+#else
   intptr_t ConstexprIntPtrAdd(intptr_t a, intptr_t b) { return a + b; }
   uintptr_t ConstexprUintPtrAdd(uintptr_t a, uintptr_t b) { return a + b; }
+#endif
   intptr_t ConstexprWordNot(intptr_t a) { return ~a; }
   uintptr_t ConstexprWordNot(uintptr_t a) { return ~a; }
 

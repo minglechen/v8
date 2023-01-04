@@ -282,8 +282,13 @@ void JSTypedArray::RemoveExternalPointerCompensationForSerialization(
 void JSTypedArray::AddExternalPointerCompensationForDeserialization(
     Isolate* isolate) {
   DCHECK(is_on_heap());
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Address pointer = ExternalPointerCompensationForOnHeapArray(isolate) +
+                    (size_t) ReadField<Address>(kExternalPointerOffset);
+#else
   Address pointer = ReadField<Address>(kExternalPointerOffset) +
                     ExternalPointerCompensationForOnHeapArray(isolate);
+#endif
   set_external_pointer(isolate, pointer);
 }
 

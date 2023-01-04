@@ -269,8 +269,8 @@ class MemoryAllocator {
   struct MemoryChunkAllocationResult {
     void* start;
     size_t size;
-    size_t area_start;
-    size_t area_end;
+    uintptr_t area_start;
+    uintptr_t area_end;
     VirtualMemory reservation;
   };
 

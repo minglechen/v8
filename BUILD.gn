@@ -2053,6 +2053,7 @@ v8_source_set("torque_generated_definitions") {
   public_deps = [ ":v8_maybe_icu" ]
 
   sources = [
+    "src/common/cheri.cc",
     "$target_gen_dir/torque-generated/class-forward-declarations.h",
     "$target_gen_dir/torque-generated/class-verifiers.cc",
     "$target_gen_dir/torque-generated/class-verifiers.h",
@@ -4264,6 +4265,7 @@ v8_source_set("v8_base_without_compiler") {
     "src/codegen/turbo-assembler.cc",
     "src/codegen/unoptimized-compilation-info.cc",
     "src/common/assert-scope.cc",
+    "src/common/cheri.cc",
     "src/common/code-memory-access.cc",
     "src/compiler-dispatcher/lazy-compile-dispatcher.cc",
     "src/compiler-dispatcher/optimizing-compile-dispatcher.cc",

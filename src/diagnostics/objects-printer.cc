@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <memory>
 
+#include "src/common/cheri.h"
 #include "src/common/globals.h"
 #include "src/diagnostics/disasm.h"
 #include "src/diagnostics/disassembler.h"
@@ -29,6 +30,7 @@
 
 namespace v8 {
 namespace internal {
+using cheri::operator<<;
 
 #ifdef OBJECT_PRINT
 

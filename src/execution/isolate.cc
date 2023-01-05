@@ -34,6 +34,7 @@
 #include "src/codegen/compilation-cache.h"
 #include "src/codegen/flush-instruction-cache.h"
 #include "src/common/assert-scope.h"
+#include "src/common/cheri.h"
 #include "src/common/ptr-compr-inl.h"
 #include "src/compiler-dispatcher/lazy-compile-dispatcher.h"
 #include "src/compiler-dispatcher/optimizing-compile-dispatcher.h"
@@ -3815,6 +3816,7 @@ bool Isolate::InitWithSnapshot(SnapshotData* startup_snapshot_data,
 }
 
 namespace {
+using cheri::operator<<;
 static std::string ToHexString(uintptr_t address) {
   std::stringstream stream_address;
   stream_address << "0x" << std::hex << address;

@@ -12,6 +12,7 @@
 #include "src/codegen/machine-type.h"
 #include "src/codegen/register-configuration.h"
 #include "src/codegen/source-position.h"
+#include "src/common/cheri.h"
 #include "src/compiler/common-operator.h"
 #include "src/compiler/graph.h"
 #include "src/compiler/node.h"
@@ -29,6 +30,7 @@
 namespace v8 {
 namespace internal {
 namespace compiler {
+using cheri::operator<<;
 
 const RegisterConfiguration* (*GetRegConfig)() = RegisterConfiguration::Default;
 

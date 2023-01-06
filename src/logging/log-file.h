@@ -15,6 +15,7 @@
 #include "src/base/optional.h"
 #include "src/base/platform/mutex.h"
 #include "src/common/assert-scope.h"
+#include "src/common/cheri.h"
 #include "src/flags/flags.h"
 #include "src/utils/allocation.h"
 #include "src/utils/ostreams.h"
@@ -27,6 +28,7 @@ class Vector;
 }  // namespace base
 
 namespace internal {
+using cheri::operator<<;
 
 class V8FileLogger;
 

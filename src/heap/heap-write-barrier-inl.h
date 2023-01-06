@@ -49,8 +49,8 @@ struct MemoryChunk {
   // The kFlagsOffset and kHeapOffset must be calcualted based on the knowledge of the size of
   // the fields and the padding introduced by the alignment requirements of max_align_t (which
   // is a stronger alignment requirement than for 64bit and 32bit architectures).
-  // The main_thread_flags field is of type size_t, as the next field (_heap) is of
-  // type Address (uintptr_t) padding is inserted to align the heap_ field to alignof(max_align_t).
+  // The size field is of type size_t, as the next field (flags_) is of type uintptr_t padding is
+  // inserted to align the field to alignof(max_align_t).
   __attribute__((cheri_no_provenance)) static constexpr uintptr_t kFlagsOffset = kUIntptrSize;
   __attribute__((cheri_no_provenance)) static constexpr uintptr_t kHeapOffset = kUIntptrSize + kUIntptrSize;
   __attribute__((cheri_no_provenance)) static constexpr uintptr_t kIsExecutableBit = uintptr_t{1} << 0;

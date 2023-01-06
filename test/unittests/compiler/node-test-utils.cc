@@ -6,6 +6,7 @@
 
 #include <vector>
 
+#include "src/common/cheri.h"
 #include "src/compiler/common-operator.h"
 #include "src/compiler/js-operator.h"
 #include "src/compiler/node-properties.h"
@@ -28,6 +29,7 @@ bool operator==(Handle<HeapObject> const& lhs, Handle<HeapObject> const& rhs) {
 }
 
 namespace compiler {
+using cheri::operator<<;
 
 namespace {
 

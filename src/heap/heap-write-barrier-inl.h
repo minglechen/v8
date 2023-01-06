@@ -45,98 +45,72 @@ namespace heap_internals {
 
 struct MemoryChunk {
 #ifdef __CHERI_PURE_CAPABILITY__
-  static constexpr uintptr_t kFlagsOffset = kUIntptrSize;
-  static constexpr uintptr_t kHeapOffset = kUIntptrSize + kUIntptrSize;
+  // Note: That as clients of this interface should be exposed to the details of the heap internals.
+  // The kFlagsOffset and kHeapOffset must be calcualted based on the knowledge of the size of
+  // the fields and the padding introduced by the alignment requirements of max_align_t (which
+  // is a stronger alignment requirement than for 64bit and 32bit architectures).
+  // The main_thread_flags field is of type size_t, as the next field (_heap) is of
+  // type Address (uintptr_t) padding is inserted to align the heap_ field to alignof(max_align_t).
+  __attribute__((cheri_no_provenance)) static constexpr uintptr_t kFlagsOffset = kUIntptrSize;
+  __attribute__((cheri_no_provenance)) static constexpr uintptr_t kHeapOffset = kUIntptrSize + kUIntptrSize;
+  __attribute__((cheri_no_provenance)) static constexpr uintptr_t kIsExecutableBit = uintptr_t{1} << 0;
+  __attribute__((cheri_no_provenance)) static constexpr uintptr_t kMarkingBit = uintptr_t{1} << 17;
+  __attribute__((cheri_no_provenance)) static constexpr uintptr_t kFromPageBit = uintptr_t{1} << 3;
+  __attribute__((cheri_no_provenance)) static constexpr uintptr_t kToPageBit = uintptr_t{1} << 4;
+  __attribute__((cheri_no_provenance)) static constexpr uintptr_t kReadOnlySpaceBit = uintptr_t{1} << 20;
+  __attribute__((cheri_no_provenance)) static constexpr uintptr_t kInSharedHeapBit = uintptr_t{1} << 22;
 #else
   static constexpr uintptr_t kFlagsOffset = kSizetSize;
   static constexpr uintptr_t kHeapOffset = kSizetSize + kUIntptrSize;
-#endif
   static constexpr uintptr_t kIsExecutableBit = uintptr_t{1} << 0;
   static constexpr uintptr_t kMarkingBit = uintptr_t{1} << 17;
   static constexpr uintptr_t kFromPageBit = uintptr_t{1} << 3;
   static constexpr uintptr_t kToPageBit = uintptr_t{1} << 4;
   static constexpr uintptr_t kReadOnlySpaceBit = uintptr_t{1} << 20;
   static constexpr uintptr_t kInSharedHeapBit = uintptr_t{1} << 22;
+#endif
 
   V8_INLINE static heap_internals::MemoryChunk* FromHeapObject(
       HeapObject object) {
     DCHECK(!V8_ENABLE_THIRD_PARTY_HEAP_BOOL);
-#if defined(__CHERI_PURE_CAPABILITY__)
-    return reinterpret_cast<MemoryChunk*>(object.ptr() & ~(size_t) kPageAlignmentMask);
-#else
     return reinterpret_cast<MemoryChunk*>(object.ptr() & ~kPageAlignmentMask);
-#endif
   }
 
-#if defined(__CHERI_PURE_CAPABILITY__)
-  V8_INLINE bool IsMarking() const { return GetFlags() & (size_t) kMarkingBit; }
-#else
   V8_INLINE bool IsMarking() const { return GetFlags() & kMarkingBit; }
-#endif
 
-#if defined(__CHERI_PURE_CAPABILITY__)
-  V8_INLINE bool InSharedHeap() const { return GetFlags() & (size_t) kInSharedHeapBit; }
-#else
   V8_INLINE bool InSharedHeap() const { return GetFlags() & kInSharedHeapBit; }
-#endif
 
   V8_INLINE bool InYoungGeneration() const {
     if (V8_ENABLE_THIRD_PARTY_HEAP_BOOL) return false;
-#if defined(__CHERI_PURE_CAPABILITY__)
-    constexpr uintptr_t kYoungGenerationMask = kFromPageBit | (size_t) kToPageBit;
-    return GetFlags() & (size_t) kYoungGenerationMask;
-#else
     constexpr uintptr_t kYoungGenerationMask = kFromPageBit | kToPageBit;
     return GetFlags() & kYoungGenerationMask;
-#endif
   }
 
   // Checks whether chunk is either in young gen or shared heap.
   V8_INLINE bool IsYoungOrSharedChunk() const {
     if (V8_ENABLE_THIRD_PARTY_HEAP_BOOL) return false;
     constexpr uintptr_t kYoungOrSharedChunkMask =
-#if defined(__CHERI_PURE_CAPABILITY__)
-        (size_t) kFromPageBit | (size_t) kToPageBit | (size_t) kInSharedHeapBit;
-    return GetFlags() & (size_t) kYoungOrSharedChunkMask;
-#else
         kFromPageBit | kToPageBit | kInSharedHeapBit;
     return GetFlags() & kYoungOrSharedChunkMask;
-#endif
   }
 
   V8_INLINE uintptr_t GetFlags() const {
     return *reinterpret_cast<const uintptr_t*>(reinterpret_cast<Address>(this) +
-#if defined(__CHERI_PURE_CAPABILITY__)
-                                               (size_t) kFlagsOffset);
-#else
                                                kFlagsOffset);
-#endif
   }
 
   V8_INLINE Heap* GetHeap() {
     Heap* heap = *reinterpret_cast<Heap**>(reinterpret_cast<Address>(this) +
-#if defined(__CHERI_PURE_CAPABILITY__)
-                                           (size_t) kHeapOffset);
-#else
                                            kHeapOffset);
-#endif
     DCHECK_NOT_NULL(heap);
     return heap;
   }
 
   V8_INLINE bool InReadOnlySpace() const {
-#if defined(__CHERI_PURE_CAPABILITY__)
-    return GetFlags() & (size_t) kReadOnlySpaceBit;
-#else
     return GetFlags() & kReadOnlySpaceBit;
-#endif
   }
 
-#if defined(__CHERI_PURE_CAPABILITY__)
-  V8_INLINE bool InCodeSpace() const { return GetFlags() & (size_t) kIsExecutableBit; }
-#else
   V8_INLINE bool InCodeSpace() const { return GetFlags() & kIsExecutableBit; }
-#endif
 };
 
 inline void CombinedWriteBarrierInternal(HeapObject host, HeapObjectSlot slot,
@@ -167,7 +141,8 @@ inline void CombinedWriteBarrierInternal(HeapObject host, HeapObjectSlot slot,
 
 }  // namespace heap_internals
 
-inline void WriteBarrierForCode(Code host, RelocInfo* rinfo, Object value) {
+inline void WriteBarrierForCode(Code host,
+		RelocInfo* rinfo, Object value) {
   DCHECK(!HasWeakHeapObjectTag(value));
   if (!value.IsHeapObject()) return;
   WriteBarrierForCode(host, rinfo, HeapObject::cast(value));

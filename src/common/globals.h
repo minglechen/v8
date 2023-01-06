@@ -302,6 +302,8 @@ constexpr bool kPlatformRequiresCodeRange = true;
 constexpr size_t kMaximalCodeRangeSize =
     V8_EXTERNAL_CODE_SPACE_BOOL ? 256 * MB : 128 * MB;
 constexpr size_t kMinExpectedOSPageSize = 4 * KB;  // OS page.
+constexpr size_t kMinimumCodeRangeSize = 3 * MB;
+constexpr size_t kReservedCodeRangePages = 0;
 #elif V8_HOST_ARCH_64_BIT
 constexpr int kSystemPointerSizeLog2 = 3;
 constexpr intptr_t kIntptrSignBit =
@@ -712,7 +714,11 @@ constexpr int kCodeZapValue = 0xbadc0de;
 constexpr uint32_t kPhantomReferenceZap = 0xca11bac;
 
 // Page constants.
+#ifdef __CHERI_PURE_CAPABILITY__
+__attribute__((cheri_no_provenance)) static const intptr_t kPageAlignmentMask = (intptr_t{1} << kPageSizeBits) - 1;
+#else
 static const intptr_t kPageAlignmentMask = (intptr_t{1} << kPageSizeBits) - 1;
+#endif
 
 // On Intel architecture, cache line size is 64 bytes.
 // On ARM it may be less (32 bytes), but as far this constant is

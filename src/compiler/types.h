@@ -572,7 +572,7 @@ class V8_EXPORT_PRIVATE Type {
 
   // If LSB is set, the payload is a bitset; if LSB is clear, the payload is
   // a pointer to a subtype of the TypeBase class.
-  uint64_t payload_;
+  uintptr_t payload_;
 };
 
 inline size_t hash_value(Type type) { return type.payload_; }

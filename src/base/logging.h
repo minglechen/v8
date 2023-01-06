@@ -14,6 +14,7 @@
 #include "src/base/compiler-specific.h"
 #include "src/base/immediate-crash.h"
 #include "src/base/template-utils.h"
+#include "src/common/cheri.h"
 
 V8_BASE_EXPORT V8_NOINLINE void V8_Dcheck(const char* file, int line,
                                           const char* message);
@@ -135,6 +136,7 @@ V8_BASE_EXPORT void SetDcheckFunction(void (*dcheck_Function)(const char*, int,
 #endif
 
 namespace detail {
+using cheri::operator<<;
 template <typename... Ts>
 std::string PrintToString(Ts&&... ts) {
   CheckMessageStream oss;

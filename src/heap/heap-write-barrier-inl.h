@@ -82,15 +82,24 @@ struct MemoryChunk {
 
   V8_INLINE bool InYoungGeneration() const {
     if (V8_ENABLE_THIRD_PARTY_HEAP_BOOL) return false;
+#ifdef __CHERI_PURE_CAPABILITY__
+    __attribute__((cheri_no_provenance)) constexpr uintptr_t kYoungGenerationMask = kFromPageBit | kToPageBit;
+#else
     constexpr uintptr_t kYoungGenerationMask = kFromPageBit | kToPageBit;
+#endif
     return GetFlags() & kYoungGenerationMask;
   }
 
   // Checks whether chunk is either in young gen or shared heap.
   V8_INLINE bool IsYoungOrSharedChunk() const {
     if (V8_ENABLE_THIRD_PARTY_HEAP_BOOL) return false;
+#ifdef __CHERI_PURE_CAPABILITY__
+    __attribute__((cheri_no_provenance)) constexpr uintptr_t kYoungOrSharedChunkMask =
+        kFromPageBit | kToPageBit | kInSharedHeapBit;
+#else
     constexpr uintptr_t kYoungOrSharedChunkMask =
         kFromPageBit | kToPageBit | kInSharedHeapBit;
+#endif
     return GetFlags() & kYoungOrSharedChunkMask;
   }
 

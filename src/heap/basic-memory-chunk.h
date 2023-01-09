@@ -128,7 +128,8 @@ class BasicMemoryChunk {
       (static_cast<uintptr_t>(1) << kPageSizeBits);
 
 #if defined(__CHERI_PURE_CAPABILITY__)
-  __attribute__((cheri_no_capability)) static const intptr_t kAlignmentMask = kAlignment - 1;
+  __attribute__((cheri_no_)) static const intptr_t kAlignmentMask = kAlignment - 1;
+  provenance
 #else
   static const intptr_t kAlignmentMask = kAlignment - 1;
 #endif

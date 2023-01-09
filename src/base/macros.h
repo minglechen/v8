@@ -11,6 +11,7 @@
 #include "src/base/compiler-specific.h"
 #include "src/base/logging.h"
 #include "src/base/platform/wrappers.h"
+#include "src/common/cheri.h"
 
 // No-op macro which is used to work around MSVC's funky VA_ARGS support.
 #define EXPAND(x) x
@@ -322,20 +323,30 @@ inline uint64_t make_uint64(uint32_t high, uint32_t low) {
 template <typename T>
 inline T RoundDown(T x, intptr_t m) {
   static_assert(std::is_integral<T>::value);
-  // m must be a power of two.
-#if defined(__CHERI_PURE_CAPABILITY__)
-  DCHECK(m != 0 && ((m & (size_t) (m - 1)) == 0));
-  return x & static_cast<T>(-m);
+  // m must be aç power of two.
+#ifdef __CHERI_PURE_CAPABILITY__
+  DCHECK(m != 0 && ((m & static_cast<size_t>(m - 1)) == 0));
+  if constexpr(cheri::is_intcap<T>::value) {
+    return x & static_cast<size_t>(-m);
+  }
 #else
   DCHECK(m != 0 && ((m & (m - 1)) == 0));
-  return x & static_cast<T>(-m);
 #endif
+  return x & static_cast<T>(-m);
 }
+
 template <intptr_t m, typename T>
 constexpr inline T RoundDown(T x) {
   static_assert(std::is_integral<T>::value);
-  // m must be a power of two.
-  static_assert(m != 0 && ((m & (m - 1)) == 0));
+  // m must be a power0 of two.
+#ifdef __CHERI_PURE_CAPABILITY__
+  DCHECK(m != 0 && ((m & static_cast<size_t>(m - 1)) == 0));
+  if constexpr(cheri::is_intcap<T>::value) {
+    return x & static_cast<size_t>(-m);
+  }
+#else
+  DCHECK(m != 0 && ((m & (m - 1)) == 0));
+#endif
   return x & static_cast<T>(-m);
 }
 
@@ -345,7 +356,12 @@ inline T RoundUp(T x, intptr_t m) {
   static_assert(std::is_integral<T>::value);
   DCHECK_GE(x, 0);
   DCHECK_GE(std::numeric_limits<T>::max() - x, m - 1);  // Overflow check.
-  return RoundDown<T>(static_cast<T>(x + (m - 1)), m);
+#ifdef __CHERI_PURE_CAPABILITY__
+  if constexpr(cheri::is_intcap<T>::value) {
+    return RoundDown<T>(x + static_cast<size_t>(m - 1), m);
+  }
+#endif
+  return RoundDown<T>(x + (m - 1), m);
 }
 
 template <intptr_t m, typename T>
@@ -353,17 +369,54 @@ constexpr inline T RoundUp(T x) {
   static_assert(std::is_integral<T>::value);
   DCHECK_GE(x, 0);
   DCHECK_GE(std::numeric_limits<T>::max() - x, m - 1);  // Overflow check.
-  return RoundDown<m, T>(static_cast<T>(x + (m - 1)));
+#ifdef __CHERI_PURE_CAPABILITY__
+  if constexpr(cheri::is_intcap<T>::value) {
+    return RoundDown<m, T>(x + static_cast<size_t>(m - 1));
+  }
+#endif
+  return RoundDown<m, T>(x + (m - 1));
 }
+
+#ifdef __CHERI_PURE_CAPABILITY__FIX
+template <typename T>
+inline T RoundDown(T x, intptr_t m) {
+  // m must be a power of two.
+  DCHECK(m != 0 && ((m & static_cast<size_t>(m - 1)) == 0));
+  return x & static_cast<size_t>(-m);
+}
+
+template <intptr_t m, typename T>
+constexpr inline RoundDown(T x) {
+  DCHECK(m != 0 && ((m & static_cast<size_t>(m - 1)) == 0));
+  return x & static_cast<size_t>(-m);
+}
+
+template <typename T>
+inline typename RoundUp(T x, intptr_t m) {
+  DCHECK_GE(x, 0);
+  DCHECK_GE(std::numeric_limits<T>::max() - static_cast<size_t>(x), m - 1);  // Overflow check.
+  return RoundDown<T>(x + static_cast<size_t>(m - 1), m);
+}
+
+template <intptr_t m, typename T>
+constexpr inline RoundUp(intptr_t x) {
+  DCHECK_GE(x, 0);
+  DCHECK_GE(std::numeric_limits<T>::max() - static_cast<size_t>(x), m - 1);  // Overflow check.
+  return RoundDown<m, T>(x + static_cast<size_t>(m - 1));
+}
+#endif
 
 template <typename T, typename U>
 constexpr inline bool IsAligned(T value, U alignment) {
-#if defined(__CHERI_PURE_CAPABILITY__)
-  return (value & (size_t) (alignment - 1)) == 0;
-#else
   return (value & (alignment - 1)) == 0;
-#endif
 }
+
+#ifdef __CHERI_PURE_CAPABILITY__
+template <>
+constexpr inline bool IsAligned(uintptr_t value, uintptr_t alignment) {
+  return IsAligned<uintptr_t, size_t>(value, alignment);
+}
+#endif
 
 inline void* AlignedAddress(void* address, size_t alignment) {
   // The alignment must be a power of two.

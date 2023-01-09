@@ -116,7 +116,7 @@ class BasicMemoryChunk {
       EVACUATION_CANDIDATE;
 
   static constexpr MainThreadFlags kIsInYoungGenerationMask =
-      MainThreadFlags(FROM_PAGE) | (size_t) MainThreadFlags(TO_PAGE);
+      MainThreadFlags(FROM_PAGE) | MainThreadFlags(TO_PAGE);
 
   static constexpr MainThreadFlags kIsLargePageMask = LARGE_PAGE;
 
@@ -127,17 +127,17 @@ class BasicMemoryChunk {
   static const intptr_t kAlignment =
       (static_cast<uintptr_t>(1) << kPageSizeBits);
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __attribute__((cheri_no_capability)) static const intptr_t kAlignmentMask = kAlignment - 1;
+#else
   static const intptr_t kAlignmentMask = kAlignment - 1;
+#endif
 
   BasicMemoryChunk(Heap* heap, BaseSpace* space, size_t chunk_size,
                    Address area_start, Address area_end,
                    VirtualMemory reservation);
 
-#if defined(__CHERI_PURE_CAPABILITY__)
-  static Address BaseAddress(Address a) { return a & (size_t) ~kAlignmentMask; }
-#else
   static Address BaseAddress(Address a) { return a & ~kAlignmentMask; }
-#endif
 
   Address address() const { return reinterpret_cast<Address>(this); }
 
@@ -178,8 +178,24 @@ class BasicMemoryChunk {
 
   void set_owner(BaseSpace* space) { owner_ = space; }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+// As Flag is an enum that uses the type uintptr_t the != and & operations
+// in SetFlag() and IsSetFlag() produce warnings about ambiguous provenance source
+// on CHERI.
+// Unfortunately this warning cannot be suppressed in base::Flags implementation
+// as instantiating the class as Flags<uintptr_t, uintptr_t> results in duplication
+// of classes constructor (as flag_type and mask_type are the same).
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcheri-provenance"
+#endif
+
   void SetFlag(Flag flag) { main_thread_flags_ |= flag; }
   bool IsFlagSet(Flag flag) const { return main_thread_flags_ & flag; }
+
+#ifdef __CHERI_PURE_CAPABILITY__
+#pragma GCC diagnostic pop
+#endif
+
   void ClearFlag(Flag flag) {
     main_thread_flags_ = main_thread_flags_.without(flag);
   }
@@ -271,8 +287,13 @@ class BasicMemoryChunk {
   static const intptr_t kHeapOffset = MemoryChunkLayout::kHeapOffset;
   static const intptr_t kAreaStartOffset = MemoryChunkLayout::kAreaStartOffset;
   static const intptr_t kAreaEndOffset = MemoryChunkLayout::kAreaEndOffset;
+#ifdef __CHERI_PURE_CAPABILITY__
+  __attribute__((cheri_no_provenance)) static const intptr_t kMarkingBitmapOffset =
+      MemoryChunkLayout::kMarkingBitmapOffset;
+#else
   static const intptr_t kMarkingBitmapOffset =
       MemoryChunkLayout::kMarkingBitmapOffset;
+#endif
   static const size_t kHeaderSize =
       MemoryChunkLayout::kBasicMemoryChunkHeaderSize;
 
@@ -291,11 +312,7 @@ class BasicMemoryChunk {
   template <AccessMode mode>
   ConcurrentBitmap<mode>* marking_bitmap() const {
     return static_cast<ConcurrentBitmap<mode>*>(
-#if defined(__CHERI_PURE_CAPABILITY__)
-        Bitmap::FromAddress(address() + (size_t) kMarkingBitmapOffset));
-#else
         Bitmap::FromAddress(address() + kMarkingBitmapOffset));
-#endif
   }
 
 #if defined(__CHERI_PURE_CAPABILITY__)
@@ -388,7 +405,22 @@ class BasicMemoryChunk {
   friend class PagedSpace;
 };
 
+#ifdef __CHERI_PURE_CAPABILITY__
+// As Flag is an enum that uses the type uintptr_t the != and & operations
+// in SetFlag() and IsSetFlag() produce warnings about ambiguous provenance source
+// on CHERI.
+// Unfortunately this warning cannot be suppressed in base::Flags implementation
+// as instantiating the class as Flags<uintptr_t, uintptr_t> results in duplication
+// of classes constructor (as flag_type and mask_type are the same).
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcheri-provenance"
+#endif
+
 DEFINE_OPERATORS_FOR_FLAGS(BasicMemoryChunk::MainThreadFlags)
+
+#ifdef __CHERI_PURE_CAPABILITY__
+#pragma GCC diagnostic pop
+#endif
 
 static_assert(std::is_standard_layout<BasicMemoryChunk>::value);
 

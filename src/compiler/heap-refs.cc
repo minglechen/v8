@@ -13,6 +13,7 @@
 #include "src/base/optional.h"
 #include "src/base/platform/platform.h"
 #include "src/codegen/code-factory.h"
+#include "src/common/cheri.h"
 #include "src/compiler/compilation-dependencies.h"
 #include "src/compiler/js-heap-broker.h"
 #include "src/execution/protectors-inl.h"
@@ -27,6 +28,7 @@
 namespace v8 {
 namespace internal {
 namespace compiler {
+using cheri::operator<<;
 
 #define TRACE(broker, x) TRACE_BROKER(broker, x)
 #define TRACE_MISSING(broker, x) TRACE_BROKER_MISSING(broker, x)

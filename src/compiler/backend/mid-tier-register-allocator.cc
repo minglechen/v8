@@ -13,6 +13,7 @@
 #include "src/codegen/machine-type.h"
 #include "src/codegen/register-configuration.h"
 #include "src/codegen/tick-counter.h"
+#include "src/common/cheri.h"
 #include "src/compiler/backend/instruction.h"
 #include "src/compiler/linkage.h"
 #include "src/logging/counters.h"
@@ -20,6 +21,7 @@
 namespace v8 {
 namespace internal {
 namespace compiler {
+using cheri::operator<<;
 
 class RegisterState;
 class DeferredBlocksRegion;

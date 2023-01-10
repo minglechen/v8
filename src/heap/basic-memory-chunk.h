@@ -31,7 +31,11 @@ class BasicMemoryChunk {
     }
   };
 
+#ifdef __CHERI_PURE_CAPABILITY__
+  enum Flag : size_t {
+#else
   enum Flag : uintptr_t {
+#endif
     NO_FLAGS = 0u,
     IS_EXECUTABLE = 1u << 0,
     POINTERS_TO_HERE_ARE_INTERESTING = 1u << 1,
@@ -102,7 +106,11 @@ class BasicMemoryChunk {
     IN_SHARED_HEAP = 1u << 22,
   };
 
+#ifdef __CHERI_PURE_CAPABILITY__
+  using MainThreadFlags = base::Flags<Flag, size_t>;
+#else
   using MainThreadFlags = base::Flags<Flag, uintptr_t>;
+#endif
 
   static constexpr MainThreadFlags kAllFlagsMask = ~MainThreadFlags(NO_FLAGS);
 
@@ -127,7 +135,7 @@ class BasicMemoryChunk {
   static const intptr_t kAlignment =
       (static_cast<uintptr_t>(1) << kPageSizeBits);
 
-#if defined(__CHERI_PURE_CAPABILITY__)
+#ifdef __CHERI_PURE_CAPABILITY__
   __attribute__((cheri_no_provenance)) static const intptr_t kAlignmentMask = kAlignment - 1;
 #else
   static const intptr_t kAlignmentMask = kAlignment - 1;
@@ -178,23 +186,8 @@ class BasicMemoryChunk {
 
   void set_owner(BaseSpace* space) { owner_ = space; }
 
-#ifdef __CHERI_PURE_CAPABILITY__
-// As Flag is an enum that uses the type uintptr_t the != and & operations
-// in SetFlag() and IsSetFlag() produce warnings about ambiguous provenance source
-// on CHERI.
-// Unfortunately this warning cannot be suppressed in base::Flags implementation
-// as instantiating the class as Flags<uintptr_t, uintptr_t> results in duplication
-// of classes constructor (as flag_type and mask_type are the same).
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcheri-provenance"
-#endif
-
   void SetFlag(Flag flag) { main_thread_flags_ |= flag; }
   bool IsFlagSet(Flag flag) const { return main_thread_flags_ & flag; }
-
-#ifdef __CHERI_PURE_CAPABILITY__
-#pragma GCC diagnostic pop
-#endif
 
   void ClearFlag(Flag flag) {
     main_thread_flags_ = main_thread_flags_.without(flag);
@@ -315,7 +308,7 @@ class BasicMemoryChunk {
         Bitmap::FromAddress(address() + kMarkingBitmapOffset));
   }
 
-#if defined(__CHERI_PURE_CAPABILITY__)
+#if def __CHERI_PURE_CAPABILITY__
   Address HighWaterMark() const { return address() + (size_t) high_water_mark_; }
 #else
   Address HighWaterMark() const { return address() + high_water_mark_; }
@@ -405,22 +398,7 @@ class BasicMemoryChunk {
   friend class PagedSpace;
 };
 
-#ifdef __CHERI_PURE_CAPABILITY__
-// As Flag is an enum that uses the type uintptr_t the != and & operations
-// in SetFlag() and IsSetFlag() produce warnings about ambiguous provenance source
-// on CHERI.
-// Unfortunately this warning cannot be suppressed in base::Flags implementation
-// as instantiating the class as Flags<uintptr_t, uintptr_t> results in duplication
-// of classes constructor (as flag_type and mask_type are the same).
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcheri-provenance"
-#endif
-
 DEFINE_OPERATORS_FOR_FLAGS(BasicMemoryChunk::MainThreadFlags)
-
-#ifdef __CHERI_PURE_CAPABILITY__
-#pragma GCC diagnostic pop
-#endif
 
 static_assert(std::is_standard_layout<BasicMemoryChunk>::value);
 

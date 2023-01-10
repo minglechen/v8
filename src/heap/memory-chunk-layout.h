@@ -50,12 +50,12 @@ class V8_EXPORT_PRIVATE MemoryChunkLayout {
   k##Name##Offset, k##Name##End = k##Name##Offset + sizeof(Type) - 1
   enum Header {
     // BasicMemoryChunk fields:
-#ifdef __CHERI_PURE_CAPABILITY__
-    FIELD(max_align_t, Size),
-#else
     FIELD(size_t, Size),
-#endif
+#ifdef __CHERI_PURE_CAPABILITY__
+    FIELD(size_t, Flags),
+#else
     FIELD(uintptr_t, Flags),
+#endif
     FIELD(Heap*, Heap),
     FIELD(Address, AreaStart),
     FIELD(Address, AreaEnd),

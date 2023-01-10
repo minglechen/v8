@@ -10,6 +10,7 @@
 #include "src/base/compiler-specific.h"
 #include "src/base/flags.h"
 #include "src/base/functional.h"
+#include "src/common/cheri.h"
 #include "src/common/globals.h"
 #include "src/handles/handles.h"
 #include "src/objects/feedback-cell.h"
@@ -18,6 +19,7 @@
 namespace v8 {
 namespace internal {
 namespace compiler {
+using cheri::operator<<;
 
 // An operator represents description of the "computation" of a node in the
 // compiler IR. A computation takes values (i.e. data) as input and produces

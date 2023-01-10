@@ -414,7 +414,12 @@ constexpr inline bool IsAligned(T value, U alignment) {
 #ifdef __CHERI_PURE_CAPABILITY__
 template <>
 constexpr inline bool IsAligned(uintptr_t value, uintptr_t alignment) {
-  return IsAligned<uintptr_t, size_t>(value, alignment);
+  return IsAligned<uintptr_t, size_t>(value, static_cast<size_t>(alignment));
+}
+
+template <>
+constexpr inline bool IsAligned(Address value, uintptr_t alignment) {
+  return IsAligned<Address, size_t>(value, static_cast<size_t>(alignment));
 }
 #endif
 

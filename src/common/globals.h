@@ -270,6 +270,10 @@ constexpr int kSystemPointerSize = sizeof(void*);
 constexpr int kSystemPointerHexDigits = kSystemPointerSize == 4 ? 8 : 12;
 constexpr int kPCOnStackSize = kSystemPointerSize;
 constexpr int kFPOnStackSize = kSystemPointerSize;
+#ifdef __CHERI_PURE_CAPABILITY__
+constexpr int kIntMaxSize = sizeof(intmax_t);
+constexpr int kUIntMaxSize = sizeof(uintmax_t);
+#endif
 
 #if V8_TARGET_ARCH_X64 || V8_TARGET_ARCH_IA32
 constexpr int kElidedFrameSlots = kPCOnStackSize / kSystemPointerSize;
@@ -418,6 +422,11 @@ static_assert(kExternalPointerSize == kSystemPointerSize);
 #endif
 
 constexpr int kEmbedderDataSlotSize = kSystemPointerSize;
+#ifdef __CHERI_PURE_CAPABILITY__
+constexpr int kEmbedderDataSlotObservableSize = kIntMaxSize;
+#else
+constexpr int kEmbedderDataSlotObservableSize = kEmbedderDataSlotSize;
+#endif
 
 constexpr int kEmbedderDataSlotSizeInTaggedSlots =
     kEmbedderDataSlotSize / kTaggedSize;

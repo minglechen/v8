@@ -4925,8 +4925,16 @@ Node* EffectControlLinearizer::AdaptFastCallTypedArrayArgument(
   static_assert(kSize == sizeof(FastApiTypedArray<double>),
                 "Size mismatch between different specializations of "
                 "FastApiTypedArray");
+#if __CHERI_PURE_CAPABILITY__
+  // Under the stronger alignment assumptions of CHERI the size of the
+  // FastApiTypeArray includes an additional padding of length size_t.
+  // Padding is applied to ensure correct alignment of the data field.
+  static_assert(
+      kSize == sizeof(uintptr_t) + sizeof(size_t) + sizeof(size_t),
+#else
   static_assert(
       kSize == sizeof(uintptr_t) + sizeof(size_t),
+#else
       "The size of "
       "FastApiTypedArray isn't equal to the sum of its expected members.");
   Node* stack_slot = __ StackSlot(kSize, kAlign);

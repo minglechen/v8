@@ -1322,7 +1322,11 @@ class RegisterBitVector {
 
   static_assert(RegisterConfiguration::kMaxRegisters <= sizeof(uintptr_t) * 8,
                 "Maximum registers must fit in uintptr_t bitmap");
+#ifdef __CHERI_PURE_CAPABILITY__
+  __attribute__((cheri_no_provenance) )uintptr_t bits_;
+#else
   uintptr_t bits_;
+#endif
 };
 
 std::ostream& operator<<(std::ostream& os, RegisterBitVector register_bits) {

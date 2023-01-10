@@ -5,6 +5,7 @@
 #include "src/compiler/common-operator.h"
 
 #include "src/base/lazy-instance.h"
+#include "src/common/cheri.h"
 #include "src/compiler/linkage.h"
 #include "src/compiler/node.h"
 #include "src/compiler/opcodes.h"
@@ -14,6 +15,7 @@
 
 namespace v8 {
 namespace internal {
+using cheri::operator<<;
 
 std::ostream& operator<<(std::ostream& os, BranchHint hint) {
   switch (hint) {

@@ -24,8 +24,12 @@ namespace bits {
 // CountPopulation(value) returns the number of bits set in |value|.
 template <typename T>
 constexpr inline
+#ifdef __CHERI_PURE_CAPABILITY__
+    typename std::enable_if<std::is_unsigned<T>::value && sizeof(T) <= 16, unsigned>::type
+#else
     typename std::enable_if<std::is_unsigned<T>::value && sizeof(T) <= 8,
                             unsigned>::type
+#endif
     CountPopulation(T value) {
   static_assert(sizeof(T) <= 8);
 #if V8_HAS_BUILTIN_POPCOUNT
@@ -56,6 +60,13 @@ constexpr inline
   return static_cast<unsigned>(value & 0xff);
 #endif
 }
+
+#ifdef __CHERI_PURE_CAPABILITY__
+template<>
+constexpr inline unsigned CountPopulation(uintptr_t value) {
+  return CountPopulation<size_t>(static_cast<size_t>(value));
+}
+#endif
 
 // ReverseBits(value) returns |value| in reverse bit order.
 template <typename T>

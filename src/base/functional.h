@@ -120,11 +120,11 @@ V8_INLINE size_t hash_value(double v) {
 
 #ifdef __CHERI_PURE_CAPABILITY__
 V8_INLINE size_t hash_value(intptr_t v) {
-  return hash_value(static_cast<size_t>v);
+  return hash_value(static_cast<size_t>(v));
 }
 
 V8_INLINE size_t hash_value(uintptr_t v) {
-  return hash_value(static_cast<size_t>v);
+  return hash_value(static_cast<size_t>(v));
 }
 #endif
 

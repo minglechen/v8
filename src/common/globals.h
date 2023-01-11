@@ -271,8 +271,12 @@ constexpr int kSystemPointerHexDigits = kSystemPointerSize == 4 ? 8 : 12;
 constexpr int kPCOnStackSize = kSystemPointerSize;
 constexpr int kFPOnStackSize = kSystemPointerSize;
 #ifdef __CHERI_PURE_CAPABILITY__
+constexpr int kPtrAddrSize = sizeof(ptraddr_r);
+// TODO: what to do in bigint
 constexpr int kIntMaxSize = sizeof(intmax_t);
 constexpr int kUIntMaxSize = sizeof(uintmax_t);
+#else
+constexpr int kPtrAddrSize = kSystemPointerSize
 #endif
 
 #if V8_TARGET_ARCH_X64 || V8_TARGET_ARCH_IA32
@@ -298,8 +302,8 @@ constexpr int kMaxDoubleStringLength = 24;
 constexpr size_t kMaxWasmCodeMB = 4095;
 constexpr size_t kMaxWasmCodeMemory = kMaxWasmCodeMB * MB;
 
-#if V8_HOST_ARCH_64_BIT
-#ifdef V8_HOST_CHERI_PURE_CAPABILITY
+#if defined(V8_HOST_ARCH_64_BIT)
+#if defined(V8_HOST_CHERI_PURE_CAPABILITY)
 constexpr int kSystemPointerSizeLog2 = 4;
 #else
 constexpr int kSystemPointerSizeLog2 = 3;
@@ -365,10 +369,9 @@ static_assert(kSystemPointerSize == (1 << kSystemPointerSizeLog2));
 static constexpr bool kCompressGraphZone = COMPRESS_ZONES_BOOL;
 
 #ifdef V8_COMPRESS_POINTERS
-// TODO: Fix this static assert for CHERI
-// static_assert(
-//    kSystemPointerSize == kInt64Size,
-//    "Pointer compression can be enabled only for 64-bit architectures");
+ static_assert(
+    kPtrAddrSize == kInt64Size,
+    "Pointer compression can be enabled only for 64-bit architectures");
 
 constexpr int kTaggedSize = kInt32Size;
 constexpr int kTaggedSizeLog2 = 2;
@@ -417,7 +420,7 @@ static_assert(kExternalPointerSize == kSystemPointerSize);
 
 constexpr int kEmbedderDataSlotSize = kSystemPointerSize;
 #ifdef __CHERI_PURE_CAPABILITY__
-constexpr int kEmbedderDataSlotObservableSize = kIntMaxSize;
+constexpr int kEmbedderDataSlotObservableSize = kPtrAddrSize;
 #else
 constexpr int kEmbedderDataSlotObservableSize = kEmbedderDataSlotSize;
 #endif

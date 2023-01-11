@@ -308,7 +308,7 @@ class BasicMemoryChunk {
         Bitmap::FromAddress(address() + kMarkingBitmapOffset));
   }
 
-#if def __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI_PURE_CAPABILITY__
   Address HighWaterMark() const { return address() + (size_t) high_water_mark_; }
 #else
   Address HighWaterMark() const { return address() + high_water_mark_; }

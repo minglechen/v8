@@ -26,7 +26,9 @@
 #ifndef __CHERI_PURE_CAPABILITY__
 #define V8_HOST_ARCH_64_BIT 1
 #else
+#define V8_HOST_ARCH_64_BIT 1
 #define V8_HOST_ARCH_128_BIT 1
+#define V8_HOST_CHERI_PURE_CAPABILITY 1
 #endif
 #elif defined(__ARMEL__)
 #define V8_HOST_ARCH_ARM 1

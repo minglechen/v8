@@ -416,11 +416,6 @@ template <>
 constexpr inline bool IsAligned(uintptr_t value, uintptr_t alignment) {
   return IsAligned<uintptr_t, size_t>(value, static_cast<size_t>(alignment));
 }
-
-template <>
-constexpr inline bool IsAligned(Address value, uintptr_t alignment) {
-  return IsAligned<Address, size_t>(value, static_cast<size_t>(alignment));
-}
 #endif
 
 inline void* AlignedAddress(void* address, size_t alignment) {
@@ -500,6 +495,12 @@ bool is_inbounds(float_t v) {
 #ifdef GOOGLE3
 // Disable FRIEND_TEST macro in Google3.
 #define FRIEND_TEST(test_case_name, test_name)
+#endif
+
+#ifdef V8_CHERI_PURE_CAPABILITY
+#define V8_CHERI_NO_PROVENANCE __attribute__((cheri_no_provenance))
+#else
+#define V8_CHERI_NO_PROVENANCE
 #endif
 
 #endif  // V8_BASE_MACROS_H_

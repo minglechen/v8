@@ -298,18 +298,12 @@ constexpr int kMaxDoubleStringLength = 24;
 constexpr size_t kMaxWasmCodeMB = 4095;
 constexpr size_t kMaxWasmCodeMemory = kMaxWasmCodeMB * MB;
 
-#if V8_HOST_ARCH_128_BIT
+#if V8_HOST_ARCH_64_BIT
+#ifdef V8_HOST_CHERI_PURE_CAPABILITY
 constexpr int kSystemPointerSizeLog2 = 4;
-constexpr intptr_t kIntptrSignBit =
-    static_cast<intptr_t>(uintptr_t{0x8000000000000000});
-constexpr bool kPlatformRequiresCodeRange = true;
-constexpr size_t kMaximalCodeRangeSize =
-    V8_EXTERNAL_CODE_SPACE_BOOL ? 256 * MB : 128 * MB;
-constexpr size_t kMinExpectedOSPageSize = 4 * KB;  // OS page.
-constexpr size_t kMinimumCodeRangeSize = 3 * MB;
-constexpr size_t kReservedCodeRangePages = 0;
-#elif V8_HOST_ARCH_64_BIT
+#else
 constexpr int kSystemPointerSizeLog2 = 3;
+#endif
 constexpr intptr_t kIntptrSignBit =
     static_cast<intptr_t>(uintptr_t{0x8000000000000000});
 constexpr bool kPlatformRequiresCodeRange = true;
@@ -334,7 +328,7 @@ constexpr size_t kMinimumCodeRangeSize = 3 * MB;
 constexpr size_t kReservedCodeRangePages = 0;
 #endif
 
-#else  // V8_HOST_ARCH_128_BIT
+#else  // V8_HOST_ARCH_64_BIT
 
 constexpr int kSystemPointerSizeLog2 = 2;
 constexpr intptr_t kIntptrSignBit = 0x80000000;
@@ -699,7 +693,7 @@ const uint32_t kClearedWeakHeapObjectLower32 = 3;
 
 // Zap-value: The value used for zapping dead objects.
 // Should be a recognizable hex value tagged as a failure.
-#if defined(V8_HOST_ARCH_64_BIT) || defined(V8_HOST_ARCH_128_BIT)
+#if defined(V8_HOST_ARCH_64_BIT)
 constexpr uint64_t kClearedFreeMemoryValue = 0;
 constexpr uint64_t kZapValue = uint64_t{0xdeadbeedbeadbeef};
 constexpr uint64_t kHandleZapValue = uint64_t{0x1baddead0baddeaf};

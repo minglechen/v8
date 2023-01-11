@@ -147,7 +147,8 @@ class HeapObjectHeader {
             std::memory_order memory_order = std::memory_order_seq_cst>
   inline void StoreEncoded(uint16_t bits, uint16_t mask);
 
-#if defined(V8_TARGET_ARCH_128_BIT)
+#if defined(V8_TARGET_ARCH_64_BIT)
+#if defined(V8_TARGET_ARCH_CHERI_PURE_CAPABILITY)
   // If cage is enabled, to save on space required by sweeper metadata, we store
   // the list of to-be-finalized objects inlined in HeapObjectHeader.
 #if defined(CPPGC_CAGED_HEAP)
@@ -155,9 +156,7 @@ class HeapObjectHeader {
 #else   // !defined(CPPGC_CAGED_HEAP)
   uint64_t padding_ = 0;
 #endif  // !defined(CPPGC_CAGED_HEAP)
-#endif  // defined(V8_TARGET_ARCH_128_BIT)
-
-#if defined(V8_TARGET_ARCH_64_BIT)
+#else
   // If cage is enabled, to save on space required by sweeper metadata, we store
   // the list of to-be-finalized objects inlined in HeapObjectHeader.
 #if defined(CPPGC_CAGED_HEAP)
@@ -165,6 +164,7 @@ class HeapObjectHeader {
 #else   // !defined(CPPGC_CAGED_HEAP)
   uint32_t padding_ = 0;
 #endif  // !defined(CPPGC_CAGED_HEAP)
+#endif
 #endif  // defined(V8_TARGET_ARCH_64_BIT)
   uint16_t encoded_high_;
   uint16_t encoded_low_;

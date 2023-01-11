@@ -497,7 +497,7 @@ bool is_inbounds(float_t v) {
 #define FRIEND_TEST(test_case_name, test_name)
 #endif
 
-#ifdef V8_CHERI_PURE_CAPABILITY
+#if defined(V8_TARGET_ARCH_CHERI_PURE_CAPABILITY)
 #define V8_CHERI_NO_PROVENANCE __attribute__((cheri_no_provenance))
 #else
 #define V8_CHERI_NO_PROVENANCE

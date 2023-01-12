@@ -28,7 +28,6 @@
 namespace v8 {
 namespace internal {
 namespace compiler {
-using cheri::operator<<;
 
 #define TRACE(broker, x) TRACE_BROKER(broker, x)
 #define TRACE_MISSING(broker, x) TRACE_BROKER_MISSING(broker, x)
@@ -67,6 +66,7 @@ enum ObjectDataKind {
 };
 
 namespace {
+using cheri::operator<<;
 
 bool IsReadOnlyHeapObjectForCompiler(PtrComprCageBase cage_base,
                                      HeapObject object) {

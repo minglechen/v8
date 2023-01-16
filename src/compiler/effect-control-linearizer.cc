@@ -4934,7 +4934,7 @@ Node* EffectControlLinearizer::AdaptFastCallTypedArrayArgument(
 #else
   static_assert(
       kSize == sizeof(uintptr_t) + sizeof(size_t),
-#else
+#endif
       "The size of "
       "FastApiTypedArray isn't equal to the sum of its expected members.");
   Node* stack_slot = __ StackSlot(kSize, kAlign);
@@ -4945,9 +4945,17 @@ Node* EffectControlLinearizer::AdaptFastCallTypedArrayArgument(
   __ Store(StoreRepresentation(MachineType::PointerRepresentation(),
                                kNoWriteBarrier),
            stack_slot, sizeof(size_t), data_ptr);
+#ifdef __CHERI_PURE_CAPABILITY__
+  // MachineType::PointerRepresentation only supports 4 and 8 byte pointers.
+  // This will require adaption to 16 bytes pointers. As the current priortity
+  // is to compile a working interpreter, ignore this for the moment. 
+  // See src/codegen/machine-type.h
+  static_assert(sizeof(ptraddr_t) == sizeof(size_t),
+#else
   static_assert(sizeof(uintptr_t) == sizeof(size_t),
                 "The buffer length can't "
                 "fit the PointerRepresentation used to store it.");
+#endif
 
   return stack_slot;
 }

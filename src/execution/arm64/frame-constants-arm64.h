@@ -49,8 +49,13 @@ class EntryFrameConstants : public AllStatic {
  public:
   // This is the offset to where JSEntry pushes the current value of
   // Isolate::c_entry_fp onto the stack.
+#ifdef __CHERI_PURE_CAPABILITY__
+  static constexpr int kCallerFPOffset = -3 * kPtrAddrSize;
+  static constexpr int kFixedFrameSize = 4 * kPtrAddrSize;
+#else
   static constexpr int kCallerFPOffset = -3 * kSystemPointerSize;
   static constexpr int kFixedFrameSize = 4 * kSystemPointerSize;
+#endif
 
   // The following constants are defined so we can static-assert their values
   // near the relevant JSEntry assembly code, not because they're actually very

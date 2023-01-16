@@ -4953,9 +4953,9 @@ Node* EffectControlLinearizer::AdaptFastCallTypedArrayArgument(
   static_assert(sizeof(ptraddr_t) == sizeof(size_t),
 #else
   static_assert(sizeof(uintptr_t) == sizeof(size_t),
+#endif
                 "The buffer length can't "
                 "fit the PointerRepresentation used to store it.");
-#endif
 
   return stack_slot;
 }

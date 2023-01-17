@@ -50,7 +50,11 @@ struct PtrComprCageReservationParams
     page_size =
         RoundUp(size_t{1} << kPageSizeBits, page_allocator->AllocatePageSize());
     requested_start_hint =
+#if defined(__CHERI_PURE_CAPABILITY__)
+	nullptr;
+#else
         reinterpret_cast<Address>(page_allocator->GetRandomMmapAddr());
+#endif
     jit = JitPermission::kNoJit;
   }
 };

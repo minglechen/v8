@@ -417,7 +417,14 @@ class Internals {
   static const int kIsolateLongTaskStatsCounterOffset =
       kIsolateFastApiCallTargetOffset + kApiSystemPointerSize;
   static const int kIsolateRootsOffset =
+#if defined(__CHER_PURE_CAPABILITY__)
+      // With CHERI's stronger alignment, padding of sizeof(size_t) is added
+      // between the long_stat_task_counter_ (size_t) and roots_table_ (uintptr_t)
+      // fields.
+      kIsolateLongTaskStatsCounterOffset + kApiSizetSize + kApiSizetSize;
+#else
       kIsolateLongTaskStatsCounterOffset + kApiSizetSize;
+#endif
 
   static const int kExternalPointerTableBufferOffset = 0;
   static const int kExternalPointerTableCapacityOffset =

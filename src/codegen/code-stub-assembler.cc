@@ -4754,7 +4754,11 @@ void CodeStubAssembler::FillFixedArrayWithSmiZero(TNode<FixedArray> array,
   // Call out to memset to perform initialization.
   TNode<ExternalReference> memset =
       ExternalConstant(ExternalReference::libc_memset_function());
+#if defined(__CHERI_PURE_CAPABILITY__)
+  static_assert(kSizetSize == kPtrAddrSize);
+#else
   static_assert(kSizetSize == kIntptrSize);
+#endif
   CallCFunction(memset, MachineType::Pointer(),
                 std::make_pair(MachineType::Pointer(), backing_store),
                 std::make_pair(MachineType::IntPtr(), IntPtrConstant(0)),
@@ -4776,7 +4780,11 @@ void CodeStubAssembler::FillFixedDoubleArrayWithZero(
   // Call out to memset to perform initialization.
   TNode<ExternalReference> memset =
       ExternalConstant(ExternalReference::libc_memset_function());
+#if defined(__CHERI_PURE_CAPABILITY__)
+  static_assert(kSizetSize == kPtrAddrSize);
+#else
   static_assert(kSizetSize == kIntptrSize);
+#endif
   CallCFunction(memset, MachineType::Pointer(),
                 std::make_pair(MachineType::Pointer(), backing_store),
                 std::make_pair(MachineType::IntPtr(), IntPtrConstant(0)),

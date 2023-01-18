@@ -200,6 +200,28 @@ struct ImmediateInitializer {
   }
 };
 
+#ifdef __CHERI_PURE_CAPABILITY__
+template <>
+struct ImmediateInitializer<intptr_t> {
+  static inline RelocInfo::Mode rmode_for(intptr_t) { return RelocInfo::NO_INFO; }
+  static inline int64_t immediate_for(intptr_t t) {
+    static_assert(sizeof(intptr_t) <= 16);
+    static_assert(std::is_integral<intptr_t>::value);
+    return static_cast<int64_t>(t);
+  }
+};
+
+template <>
+struct ImmediateInitializer<Address> {
+  static inline RelocInfo::Mode rmode_for(Address) { return RelocInfo::NO_INFO; }
+  static inline int64_t immediate_for(Address t) {
+    static_assert(sizeof(Address) <= 16);
+    static_assert(std::is_integral<Address>::value);
+    return static_cast<uint64_t>(t);
+  }
+};
+#endif
+
 template <>
 struct ImmediateInitializer<Smi> {
   static inline RelocInfo::Mode rmode_for(Smi t) { return RelocInfo::NO_INFO; }

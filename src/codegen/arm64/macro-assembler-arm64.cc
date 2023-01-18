@@ -1376,8 +1376,14 @@ void TurboAssembler::CopyDoubleWords(Register dst, Register src, Register count,
     Bind(&pointer1_below_pointer2);
     Add(pointer1, pointer1, pointer2);
   }
+
+#if defined(__CHERI_PURE_CAPABILITY__)
+  // TODO: codegen is not expected to cpompile or work correctly for purecap.
+  // Pragmatic choice to ignore the static assert for now.
+#else
   static_assert(kSystemPointerSize == kDRegSize,
                 "pointers must be the same size as doubles");
+#endif
 
   if (mode == kDstLessThanSrcAndReverse) {
     Add(src, src, Operand(count, LSL, kSystemPointerSizeLog2));

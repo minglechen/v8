@@ -47,7 +47,9 @@ class CacheLineSizes {
 
 void CpuFeatures::FlushICache(void* address, size_t length) {
 #if defined(V8_HOST_ARCH_ARM64)
-#if defined(V8_OS_WIN)
+#if __has_builtin(__clear_cache)
+  __clear_cache(address, (void *)((uintptr_t) address + length));
+#elif defined(V8_OS_WIN)
   ::FlushInstructionCache(GetCurrentProcess(), address, length);
 #elif defined(V8_OS_DARWIN)
   sys_icache_invalidate(address, length);
@@ -59,25 +61,14 @@ void CpuFeatures::FlushICache(void* address, size_t length) {
   uintptr_t start = reinterpret_cast<uintptr_t>(address);
   // Sizes will be used to generate a mask big enough to cover a pointer.
   CacheLineSizes sizes;
-#ifdef __CHERI_PURE_CAPABILITY__
-  size_t dsize = sizes.dcache_line_size();
-  size_t isize = sizes.icache_line_size();
-#else
   uintptr_t dsize = sizes.dcache_line_size();
   uintptr_t isize = sizes.icache_line_size();
-#endif
   // Cache line sizes are always a power of 2.
   DCHECK_EQ(CountSetBits(dsize, 64), 1);
   DCHECK_EQ(CountSetBits(isize, 64), 1);
-#ifdef __CHERI_PURE_CAPABILITY__
-  size_t dstart = start & ~(dsize - 1);
-  size_t istart = start & ~(isize - 1);
-  size_t end = start + length;
-#else
   uintptr_t dstart = start & ~(dsize - 1);
   uintptr_t istart = start & ~(isize - 1);
   uintptr_t end = start + length;
-#endif
 
   __asm__ __volatile__(
       // Clean every line of the D cache containing the target data.

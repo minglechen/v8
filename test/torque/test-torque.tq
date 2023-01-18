@@ -1171,8 +1171,6 @@ macro TestBitFieldMultipleFlags(a: bool, b: int32, c: bool): void {
 class ExportedSubClass extends ExportedSubClassBase {
   c_field: int32;
   d_field: int32;
-  padding_0: uint32;
-  padding_1: uint32;
   e_field: Smi;
 }
 
@@ -1204,8 +1202,6 @@ struct InternalClassStructElement {
 class InternalClassWithStructElements extends HeapObject {
   dummy1: int32;
   dummy2: int32;
-  padding_0: uint32;
-  padding_1: uint32;
   const count: Smi;
   data: Smi;
   object: Object;
@@ -1252,8 +1248,6 @@ macro TestFullyGeneratedClassWithElements(): void {
   const object2 = new InternalClassWithStructElements{
     dummy1: 44,
     dummy2: 45,
-    padding_0: 0,
-    padding_1: 0,
     count: length,
     data: 55,
     object: Undefined,
@@ -1282,25 +1276,23 @@ macro TestFullyGeneratedClassWithElements(): void {
 @export
 macro TestFullyGeneratedClassFromCpp(): ExportedSubClass {
   return new
-  ExportedSubClass{a: Null, b: Null, c_field: 7, d_field: 8, padding_0: 0, padding_1: 0, e_field: 9};
+  ExportedSubClass{a: Null, b: Null, c_field: 7, d_field: 8, e_field: 9};
 }
 
 @export
 class ExportedSubClass2 extends ExportedSubClassBase {
   x_field: int32;
   y_field: int32;
-  padding_0: uint32;
-  padding_1: uint32;
   z_field: Smi;
 }
 
 @export
 macro TestGeneratedCastOperators(implicit context: Context)(): void {
   const a = new
-  ExportedSubClass{a: Null, b: Null, c_field: 3, d_field: 4, padding_0: 0, padding_1: 0, e_field: 5};
+  ExportedSubClass{a: Null, b: Null, c_field: 3, d_field: 4, e_field: 5};
   const b = new ExportedSubClassBase{a: Undefined, b: Null};
   const c = new
-  ExportedSubClass2{a: Null, b: Null, x_field: 3, y_field: 4, padding_0: 0, padding_1: 0, z_field: 5};
+  ExportedSubClass2{a: Null, b: Null, x_field: 3, y_field: 4, z_field: 5};
   const aO: Object = a;
   const bO: Object = b;
   const cO: Object = c;

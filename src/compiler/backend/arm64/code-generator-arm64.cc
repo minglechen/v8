@@ -3081,8 +3081,13 @@ void CodeGenerator::AssembleConstructFrame() {
   if (frame_access_state()->has_frame()) {
     // Link the frame
     if (call_descriptor->IsJSFunctionCall()) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+      static_assert(InterpreterFrameConstants::kFixedFrameSize % 16 == 0);
+      DCHECK_EQ(required_slots % 2, 0);
+#else
       static_assert(InterpreterFrameConstants::kFixedFrameSize % 16 == 8);
       DCHECK_EQ(required_slots % 2, 1);
+#endif
       __ Prologue();
       // Update required_slots count since we have just claimed one extra slot.
       static_assert(TurboAssembler::kExtraSlotClaimedByPrologue == 1);

@@ -1113,11 +1113,15 @@ class V8_EXPORT_PRIVATE Constant final {
     kCompressedHeapObject,
     kHeapObject,
     kRpoNumber,
-    kDelayedStringConstant
+    kDelayedStringConstant,
+    kIntPtr
   };
 
   explicit Constant(int32_t v);
   explicit Constant(int64_t v) : type_(kInt64), value_(v) {}
+#ifdef __CHERI_PURE_CAPABILITY__
+  explicit Constant(intptr_t v) : type_(kIntPtr), value_(v) {}
+#endif
   explicit Constant(float v)
       : type_(kFloat32), value_(base::bit_cast<int32_t>(v)) {}
   explicit Constant(double v)
@@ -1172,7 +1176,7 @@ class V8_EXPORT_PRIVATE Constant final {
 
   base::Double ToFloat64() const {
     DCHECK_EQ(kFloat64, type());
-    return base::Double(base::bit_cast<uint64_t>(value_));
+    return base::Double(base::bit_cast<uint64_t>(static_cast<uint64_t>(value_)));
   }
 
   ExternalReference ToExternalReference() const {
@@ -1192,7 +1196,11 @@ class V8_EXPORT_PRIVATE Constant final {
  private:
   Type type_;
   RelocInfo::Mode rmode_ = RelocInfo::NO_INFO;
+#ifdef __CHERI_PURE_CAPABILITY__
+  intptr_t value_;
+#else
   int64_t value_;
+#endif
 };
 
 std::ostream& operator<<(std::ostream&, const Constant&);

@@ -354,10 +354,14 @@ class OperandGenerator {
       case IrOpcode::kExternalConstant:
         return Constant(OpParameter<ExternalReference>(node->op()));
       case IrOpcode::kComment: {
+#if defined(__CHERI_PURE_CAPABILITY__)
+        using ptrsize_int_t = intptr_t;
+#else
         // We cannot use {intptr_t} here, since the Constant constructor would
         // be ambiguous on some architectures.
         using ptrsize_int_t =
-            std::conditional<intptr_t>::type;
+            std::conditional<kSystemPointerSize == 8, int64_t, int32_t>::type;
+#endif	
         return Constant(reinterpret_cast<ptrsize_int_t>(
             OpParameter<const char*>(node->op())));
       }

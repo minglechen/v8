@@ -299,7 +299,13 @@ void* OS::GetRandomMmapAddr() {
   uintptr_t raw_addr;
   {
     MutexGuard guard(rng_mutex.Pointer());
+#if defined(__CHERI_PURE_CAPABILITY__)
+    ptraddr_t raw_ptr_addr;
+    GetPlatformRandomNumberGenerator()->NextBytes(&raw_ptr_addr, sizeof(raw_ptr_addr));
+    raw_addr = raw_ptr_addr;
+#else
     GetPlatformRandomNumberGenerator()->NextBytes(&raw_addr, sizeof(raw_addr));
+#endif
   }
 #if V8_HOST_ARCH_ARM64
 #if defined(V8_TARGET_OS_MACOS)

@@ -67,6 +67,9 @@ class V8_EXPORT_PRIVATE MemoryChunkLayout {
     // MemoryChunk fields:
     FIELD(SlotSet* [kNumSets], SlotSet),
     FIELD(ProgressBar, ProgressBar),
+#if defined(__CHERI_PURE_CAPABILITY__)
+    FIELD(size_t, Padding0),
+#endif
     FIELD(std::atomic<intptr_t>, LiveByteCount),
     FIELD(TypedSlotsSet* [kNumSets], TypedSlotSet),
     FIELD(void* [kNumSets], InvalidatedSlots),

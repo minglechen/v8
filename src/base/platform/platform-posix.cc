@@ -182,8 +182,14 @@ void* Allocate(void* hint, size_t size, OS::MemoryPermission access,
 int GetProtectionFromMemoryPermission(OS::MemoryPermission access) {
   switch (access) {
     case OS::MemoryPermission::kNoAccess:
+#if !defined(__CHERI_PURE_CAPABILITY__)
     case OS::MemoryPermission::kNoAccessWillJitLater:
+#endif
       return PROT_NONE;
+#if defined(__CHERI_PURE_CAPABILITY__)
+    case OS::MemoryPermission::kNoAccessWillJitLater:
+      return PROT_MAX(PROT_EXEC) | (PROT_READ | PROT_WRITE);
+#endif
     case OS::MemoryPermission::kRead:
       return PROT_READ;
     case OS::MemoryPermission::kReadWrite:

@@ -46,12 +46,14 @@ void* PageAllocator::GetRandomMmapAddr() {
 void* PageAllocator::AllocatePages(void* hint, size_t size, size_t alignment,
                                    PageAllocator::Permission access) {
 #if !V8_HAS_PTHREAD_JIT_WRITE_PROTECT
+#if !defined(__CHERI_PURE_CAPABILITY__)
   // kNoAccessWillJitLater is only used on Apple Silicon. Map it to regular
   // kNoAccess on other platforms, so code doesn't have to handle both enum
   // values.
   if (access == PageAllocator::kNoAccessWillJitLater) {
     access = PageAllocator::kNoAccess;
   }
+#endif
 #endif
   return base::OS::Allocate(hint, size, alignment,
                             static_cast<base::OS::MemoryPermission>(access));

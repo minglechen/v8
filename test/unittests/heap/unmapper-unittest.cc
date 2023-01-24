@@ -17,7 +17,7 @@
 
 namespace v8 {
 namespace internal {
-using cher::operator<<;
+using cheri::operator<<;
 
 // This is a v8::PageAllocator implementation that decorates provided page
 // allocator object with page tracking functionality.

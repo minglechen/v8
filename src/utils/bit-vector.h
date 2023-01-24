@@ -91,8 +91,13 @@ class V8_EXPORT_PRIVATE BitVector : public ZoneObject {
   };
 
   static const int kDataLengthForInline = 1;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  static const int kDataBits = kBitsPerPtrAddr;
+  static const int kDataBitShift = kBitsPerPtrAddrLog2;
+#else
   static const int kDataBits = kBitsPerSystemPointer;
   static const int kDataBitShift = kBitsPerSystemPointerLog2;
+#endif
   static const uintptr_t kOne = 1;  // This saves some static_casts.
 
   BitVector() : length_(0), data_length_(kDataLengthForInline), data_(0) {}

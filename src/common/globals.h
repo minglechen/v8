@@ -260,6 +260,7 @@ constexpr int kUInt16Size = sizeof(uint16_t);
 constexpr int kIntSize = sizeof(int);
 constexpr int kInt32Size = sizeof(int32_t);
 constexpr int kInt64Size = sizeof(int64_t);
+constexpr int kUInt64Size = sizeof(uint64_t);
 constexpr int kUInt32Size = sizeof(uint32_t);
 constexpr int kSizetSize = sizeof(size_t);
 constexpr int kFloatSize = sizeof(float);
@@ -271,10 +272,7 @@ constexpr int kSystemPointerHexDigits = kSystemPointerSize == 4 ? 8 : 12;
 constexpr int kPCOnStackSize = kSystemPointerSize;
 constexpr int kFPOnStackSize = kSystemPointerSize;
 #ifdef __CHERI_PURE_CAPABILITY__
-constexpr int kPtrAddrSize = sizeof(ptraddr_r);
-// TODO: what to do in bigint
-constexpr int kIntMaxSize = sizeof(intmax_t);
-constexpr int kUIntMaxSize = sizeof(uintmax_t);
+constexpr int kPtrAddrSize = sizeof(ptraddr_t);
 #else
 constexpr int kPtrAddrSize = kSystemPointerSize
 #endif
@@ -305,7 +303,9 @@ constexpr size_t kMaxWasmCodeMemory = kMaxWasmCodeMB * MB;
 #if defined(V8_HOST_ARCH_64_BIT)
 #if defined(V8_HOST_CHERI_PURE_CAPABILITY)
 constexpr int kSystemPointerSizeLog2 = 4;
+constexpr int kPtrAddrSizeLog2 = 3;
 #else
+constexpr int kPtrAddrSizeLog2 = 3;
 constexpr int kSystemPointerSizeLog2 = 3;
 #endif
 constexpr intptr_t kIntptrSignBit =
@@ -446,6 +446,11 @@ constexpr int kBitsPerByteLog2 = 3;
 constexpr int kBitsPerSystemPointer = kSystemPointerSize * kBitsPerByte;
 constexpr int kBitsPerSystemPointerLog2 =
     kSystemPointerSizeLog2 + kBitsPerByteLog2;
+#if defined(__CHERI_PURE_CAPABILITY__)
+constexpr int kBitsPerPtrAddr = kPtrAddrSize * kBitsPerByte;
+constexpr int kBitsPerPtrAddrLog2 =
+    kPtrAddrSizeLog2 + kBitsPerByteLog2;
+#endif
 constexpr int kBitsPerInt = kIntSize * kBitsPerByte;
 
 // IEEE 754 single precision floating point number bit layout.

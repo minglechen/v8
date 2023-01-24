@@ -34,9 +34,6 @@ void FunctionInStaticBinaryForAddressHint() {}
 
 Address CodeRangeAddressHint::GetAddressHint(size_t code_range_size,
                                              size_t alignment) {
-#if defined(__CHERI_PURE_CAPABILITY__)
-  return reinterpret_cast<Address>(nullptr);
-#else
   base::MutexGuard guard(&mutex_);
 
   // Try to allocate code range in the preferred region where we can use
@@ -63,8 +60,13 @@ Address CodeRangeAddressHint::GetAddressHint(size_t code_range_size,
       // with a higher chances to point to the free address space range.
       return RoundUp(preferred_region.begin(), alignment);
     }
+#if defined(__CHERI_PURE_CAPABILITY__)
+    return static_cast<ptraddr_t>(RoundUp(FUNCTION_ADDR(&FunctionInStaticBinaryForAddressHint),
+                                  alignment));
+#else
     return RoundUp(FUNCTION_ADDR(&FunctionInStaticBinaryForAddressHint),
                    alignment);
+#endif
   }
 
   // Try to reuse near code range first.
@@ -85,7 +87,6 @@ Address CodeRangeAddressHint::GetAddressHint(size_t code_range_size,
   CHECK(IsAligned(result, alignment));
   it->second.pop_back();
   return result;
-#endif
 }
 
 void CodeRangeAddressHint::NotifyFreedCodeRange(Address code_range_start,

@@ -109,7 +109,7 @@ class PointerWithPayload {
       "storage bits. Override PointerWithPayloadTraits to guarantee available "
       "bits manually.");
 
-  static constexpr uintptr_t kPayloadMask =
+  V8_CHERI_NO_PROVENANCE static constexpr uintptr_t kPayloadMask =
       (uintptr_t{1} << NumPayloadBits) - 1;
 #ifdef __CHERI_PURE_CAPABILITY__
   __attribute__((cheri_no_provenance)) static constexpr uintptr_t kPointerMask = ~kPayloadMask;

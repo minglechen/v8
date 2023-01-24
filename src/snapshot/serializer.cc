@@ -268,10 +268,9 @@ void Serializer::PutRoot(RootIndex root) {
 
 void Serializer::PutSmiRoot(FullObjectSlot slot) {
   // Serializing a smi root in compressed pointer builds will serialize the
-  // full object slot (of kSystemPointerSize) to avoid complications during
+  // full object slot (of kPtrAddrSize) to avoid complications during
   // deserialization (endianness or smi sequences).
-  static_assert(decltype(slot)::kSlotDataSize == sizeof(Address));
-  static_assert(decltype(slot)::kSlotDataSize == kSystemPointerSize);
+  static_assert(decltype(slot)::kSlotDataSize == kPtrAddrSize);
   static constexpr int bytes_to_output = decltype(slot)::kSlotDataSize;
   static constexpr int size_in_tagged = bytes_to_output >> kTaggedSizeLog2;
   sink_.Put(FixedRawDataWithSize::Encode(size_in_tagged), "Smi");

@@ -205,8 +205,13 @@ class V8_EXPORT_PRIVATE Zone final {
   // (e.g. tracking allocated bytes, maintaining linked lists, etc).
   void ReleaseSegment(Segment* segment);
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  // All pointers returned from New() are alignof(max_align_t) aligned.
+  static const size_t kAlignmentInBytes = alignof(max_align_t);
+#else
   // All pointers returned from New() are 8-byte aligned.
   static const size_t kAlignmentInBytes = 8;
+#endif
 
   // Never allocate segments smaller than this size in bytes.
   static const size_t kMinimumSegmentSize = 8 * KB;

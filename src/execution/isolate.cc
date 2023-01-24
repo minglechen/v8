@@ -431,7 +431,11 @@ size_t Isolate::HashIsolateForEmbeddedBlob() {
     // they change when creating the off-heap trampolines. Other data fields
     // must remain the same.
 #ifdef V8_EXTERNAL_CODE_SPACE
+#if defined(__CHERI_PURE_CAPABILITY__)
+    static_assert(Code::kMainCage == Code::kDataStart);
+#else
     static_assert(Code::kMainCageBaseUpper32BitsOffset == Code::kDataStart);
+#endif
     static_assert(Code::kInstructionSizeOffset ==
                   Code::kMainCageBaseUpper32BitsOffsetEnd + 1);
 #else

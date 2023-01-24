@@ -165,10 +165,21 @@ class SlotSet {
     // faster access in the write barrier. The number of buckets is needed for
     // calculating the size of this data structure.
     size_t buckets_size = buckets * sizeof(Bucket*);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    size_t size = RoundUp(kInitialBucketsSize, alignof(max_align_t)) + buckets_size;
+#else
     size_t size = kInitialBucketsSize + buckets_size;
+#endif
     void* allocation = AlignedAlloc(size, kSystemPointerSize);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    SlotSet* slot_set = reinterpret_cast<SlotSet*>(
+        reinterpret_cast<uint8_t*>(RoundUp(
+        reinterpret_cast<uintptr_t>(allocation) + kInitialBucketsSize,
+        alignof(max_align_t))));
+#else
     SlotSet* slot_set = reinterpret_cast<SlotSet*>(
         reinterpret_cast<uint8_t*>(allocation) + kInitialBucketsSize);
+#endif
     DCHECK(
         IsAligned(reinterpret_cast<uintptr_t>(slot_set), kSystemPointerSize));
 #ifdef DEBUG

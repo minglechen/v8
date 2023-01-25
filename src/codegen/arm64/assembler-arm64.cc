@@ -3979,8 +3979,10 @@ void Assembler::LoadStore(const CPURegister& rt, const MemOperand& addr,
 
     // Shifts are encoded in one bit, indicating a left shift by the memory
     // access size.
+#if !defined(__CHERI_PURE_CAPABILITY__)
     DCHECK((shift_amount == 0) ||
            (shift_amount == static_cast<unsigned>(CalcLSDataSize(op))));
+#endif
     Emit(LoadStoreRegisterOffsetFixed | memop | Rm(addr.regoffset()) |
          ExtendMode(ext) | ImmShiftLS((shift_amount > 0) ? 1 : 0));
   } else {
@@ -4296,19 +4298,17 @@ void Assembler::GrowBuffer() {
   byte* new_start = new_buffer->start();
 
   // Copy the data.
-  intptr_t pc_delta = new_start - buffer_start_;
-  intptr_t rc_delta = (new_start + new_size) - (buffer_start_ + old_size);
+  ptrdiff_t pc_delta = pc_offset();
   size_t reloc_size = (buffer_start_ + old_size) - reloc_info_writer.pos();
   memmove(new_start, buffer_start_, pc_offset());
-  memmove(reloc_info_writer.pos() + rc_delta, reloc_info_writer.pos(),
-          reloc_size);
+  memmove((new_start + new_size) - reloc_size, reloc_info_writer.pos(), reloc_size);
 
   // Switch buffers.
   buffer_ = std::move(new_buffer);
   buffer_start_ = new_start;
-  pc_ += pc_delta;
-  reloc_info_writer.Reposition(reloc_info_writer.pos() + rc_delta,
-                               reloc_info_writer.last_pc() + pc_delta);
+  pc_ = buffer_start_ + pc_delta;
+  reloc_info_writer.Reposition((buffer_start_ + new_size)  - reloc_size,
+                               buffer_start_ + pc_delta);
 
   // None of our relocation types are pc relative pointing outside the code
   // buffer nor pc absolute pointing inside the code buffer, so there is no need

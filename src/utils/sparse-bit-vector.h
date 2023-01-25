@@ -21,7 +21,11 @@ class SparseBitVector : public ZoneObject {
   // 6 words for the bits plus {offset} plus {next} will be 8 machine words per
   // {Segment}. Most bit vectors are expected to fit in that single {Segment}.
   static constexpr int kNumWordsPerSegment = 6;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  static constexpr int kBitsPerWord = kBitsPerByte * kPtrAddrSize;
+#else
   static constexpr int kBitsPerWord = kBitsPerByte * kSystemPointerSize;
+#endif
   static constexpr int kNumBitsPerSegment = kBitsPerWord * kNumWordsPerSegment;
 
   struct Segment {

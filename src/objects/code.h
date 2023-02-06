@@ -631,37 +631,6 @@ class Code : public HeapObject {
 
   class OptimizedCodeIterator;
 
-#if defined(__CHERI_PURE_CAPABILITY__)
-  // Layout description.
-#define CODE_FIELDS(V)                                                        \
-  V(kRelocationInfoOffset, kTaggedSize)                                       \
-  V(kDeoptimizationDataOrInterpreterDataOffset, kTaggedSize)                  \
-  V(kPositionTableOffset, kTaggedSize)                                        \
-  V(kCodeDataContainerOffset, kTaggedSize)                                    \
-  /* Data or code not directly visited by GC directly starts here. */         \
-  /* The serializer needs to copy bytes starting from here verbatim. */       \
-  /* Objects embedded into code is visited via reloc info. */                 \
-  V(kDataStart, 0)                                                            \
-  V(kMainCageBaseAdress,                                                      \
-    V8_EXTERNAL_CODE_SPACE_BOOL ? kSystemPointerSize : 0)                     \
-  V(kInstructionSizeOffset, kIntSize)                                         \
-  V(kMetadataSizeOffset, kIntSize)                                            \
-  V(kFlagsOffset, kInt32Size)                                                 \
-  V(kBuiltinIndexOffset, kIntSize)                                            \
-  V(kInlinedBytecodeSizeOffset, kIntSize)                                     \
-  V(kOsrOffsetOffset, kInt32Size)                                             \
-  /* Offsets describing inline metadata tables, relative to MetadataStart. */ \
-  V(kHandlerTableOffsetOffset, kIntSize)                                      \
-  V(kConstantPoolOffsetOffset,                                                \
-    FLAG_enable_embedded_constant_pool.value() ? kIntSize : 0)                \
-  V(kCodeCommentsOffsetOffset, kIntSize)                                      \
-  V(kUnwindingInfoOffsetOffset, kInt32Size)                                   \
-  V(kUnalignedHeaderSize, 0)                                                  \
-  /* Add padding to align the instruction start following right after */      \
-  /* the Code object header. */                                               \
-  V(kOptionalPaddingOffset, CODE_POINTER_PADDING(kOptionalPaddingOffset))     \
-  V(kHeaderSize, 0)
-#else
   // Layout description.
 #define CODE_FIELDS(V)                                                        \
   V(kRelocationInfoOffset, kTaggedSize)                                       \
@@ -691,7 +660,6 @@ class Code : public HeapObject {
   /* the Code object header. */                                               \
   V(kOptionalPaddingOffset, CODE_POINTER_PADDING(kOptionalPaddingOffset))     \
   V(kHeaderSize, 0)
-#endif
 
   DEFINE_FIELD_OFFSET_CONSTANTS(HeapObject::kHeaderSize, CODE_FIELDS)
 #undef CODE_FIELDS

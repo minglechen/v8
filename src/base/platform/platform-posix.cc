@@ -188,12 +188,16 @@ int GetProtectionFromMemoryPermission(OS::MemoryPermission access) {
       return PROT_NONE;
 #if defined(__CHERI_PURE_CAPABILITY__)
     case OS::MemoryPermission::kNoAccessWillJitLater:
-      return PROT_MAX(PROT_EXEC) | (PROT_READ | PROT_WRITE);
+      return PROT_EXEC | PROT_READ | PROT_WRITE;
 #endif
     case OS::MemoryPermission::kRead:
       return PROT_READ;
     case OS::MemoryPermission::kReadWrite:
+#if defined(__CHERI_PURE_CAPABILITY__)
+      return PROT_EXEC | PROT_READ | PROT_WRITE;
+#else
       return PROT_READ | PROT_WRITE;
+#endif
     case OS::MemoryPermission::kReadWriteExecute:
       return PROT_READ | PROT_WRITE | PROT_EXEC;
     case OS::MemoryPermission::kReadExecute:
@@ -586,8 +590,15 @@ bool OS::CanReserveAddressSpace() { return true; }
 Optional<AddressSpaceReservation> OS::CreateAddressSpaceReservation(
     void* hint, size_t size, size_t alignment,
     MemoryPermission max_permission) {
-  // On POSIX, address space reservations are backed by private memory mappings.
   MemoryPermission permission = MemoryPermission::kNoAccess;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  if (max_permission == MemoryPermission::kReadWrite) {
+    permission = MemoryPermission::kReadWrite;
+  }
+#else
+  // On POSIX, address space reservations are backed by private memory mappings.
+  permission = MemoryPermission::kNoAccess;
+#endif
   if (max_permission == MemoryPermission::kReadWriteExecute) {
     permission = MemoryPermission::kNoAccessWillJitLater;
   }

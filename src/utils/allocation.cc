@@ -255,7 +255,13 @@ VirtualMemory::VirtualMemory(v8::PageAllocator* page_allocator, size_t size,
   PageAllocator::Permission permissions =
       jit == JitPermission::kMapAsJittable
           ? PageAllocator::kNoAccessWillJitLater
+#if defined(__CHERI_PURE_CAPABILITY__)
+	  // To ensure the ability to write a capability to the mapping
+	  // it must be created with read/write permissions.
+          : PageAllocator::kReadWrite;
+#else
           : PageAllocator::kNoAccess;
+#endif
   Address address = reinterpret_cast<Address>(AllocatePages(
       page_allocator_, hint, RoundUp(size, page_size), alignment, permissions));
   if (address != kNullAddress) {

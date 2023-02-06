@@ -290,7 +290,11 @@ constexpr bool kAllowBackingStoresOutsideSandbox = true;
 // size allows omitting bounds checks on table accesses if the indices are
 // guaranteed (e.g. through shifting) to be below the maximum index. This
 // value must be a power of two.
+#if defined(__CHERI_PURE_CAPABILITY__)
+static const size_t kExternalPointerTableReservationSize = 256 * MB;
+#else
 static const size_t kExternalPointerTableReservationSize = 128 * MB;
+#endif
 
 // The maximum number of entries in an external pointer table.
 static const size_t kMaxSandboxedExternalPointers =

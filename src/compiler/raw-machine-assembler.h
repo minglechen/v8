@@ -89,8 +89,8 @@ class V8_EXPORT_PRIVATE RawMachineAssembler {
   }
   Node* IntPtrConstant(intptr_t value) {
     // TODO(dcarney): mark generated code as unserializable if value != 0.
-    return kSystemPointerSize == 8 ? Int64Constant(value)
-                                   : Int32Constant(static_cast<int>(value));
+    return kSystemPointerAddrSize == 8 ? Int64Constant(value)
+                                       : Int32Constant(static_cast<int>(value));
   }
   Node* RelocatableIntPtrConstant(intptr_t value, RelocInfo::Mode rmode);
   Node* Int32Constant(int32_t value) {
@@ -586,8 +586,8 @@ class V8_EXPORT_PRIVATE RawMachineAssembler {
 
 #define INTPTR_BINOP(prefix, name)                           \
   Node* IntPtr##name(Node* a, Node* b) {                     \
-    return kSystemPointerSize == 8 ? prefix##64##name(a, b)  \
-                                   : prefix##32##name(a, b); \
+    return kSystemPointerAddrSize == 8 ? prefix##64##name(a, b)  \
+                                       : prefix##32##name(a, b); \
   }
 
   INTPTR_BINOP(Int, Add)
@@ -607,8 +607,8 @@ class V8_EXPORT_PRIVATE RawMachineAssembler {
 
 #define UINTPTR_BINOP(prefix, name)                          \
   Node* UintPtr##name(Node* a, Node* b) {                    \
-    return kSystemPointerSize == 8 ? prefix##64##name(a, b)  \
-                                   : prefix##32##name(a, b); \
+    return kSystemPointerAddrSize == 8 ? prefix##64##name(a, b)  \
+                                       : prefix##32##name(a, b); \
   }
 
   UINTPTR_BINOP(Uint, LessThan)
@@ -627,8 +627,8 @@ class V8_EXPORT_PRIVATE RawMachineAssembler {
   }
 
   Node* IntPtrAbsWithOverflow(Node* a) {
-    return kSystemPointerSize == 8 ? Int64AbsWithOverflow(a)
-                                   : Int32AbsWithOverflow(a);
+    return kSystemPointerAddrSize == 8 ? Int64AbsWithOverflow(a)
+                                       : Int32AbsWithOverflow(a);
   }
 
   Node* Float32Add(Node* a, Node* b) {

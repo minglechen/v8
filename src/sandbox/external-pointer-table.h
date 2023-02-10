@@ -114,7 +114,11 @@ class V8_EXPORT_PRIVATE ExternalPointerTable {
   // An external pointer table grows in blocks of this size. This is also the
   // initial size of the table.
   static const size_t kBlockSize = 64 * KB;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  static const size_t kEntriesPerBlock = kBlockSize / (2 * kSystemPointerSize);
+#else
   static const size_t kEntriesPerBlock = kBlockSize / kSystemPointerSize;
+#endif
 
   static const Address kExternalPointerMarkBit = 1ULL << 63;
 

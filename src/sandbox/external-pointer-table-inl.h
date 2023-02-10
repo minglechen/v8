@@ -23,7 +23,12 @@ void ExternalPointerTable::Init(Isolate* isolate) {
                    root_space->allocation_granularity()));
   buffer_ = root_space->AllocatePages(
       VirtualAddressSpace::kNoHint, kExternalPointerTableReservationSize,
+#if defined(__CHERI_PURE_CAPABILITY__)
+      // Need 
+      root_space->allocation_granularity(), PagePermissions::kReadWrite);
+#else
       root_space->allocation_granularity(), PagePermissions::kNoAccess);
+#endif
   if (!buffer_) {
     V8::FatalProcessOutOfMemory(
         isolate,
@@ -44,6 +49,15 @@ void ExternalPointerTable::Init(Isolate* isolate) {
   // empty EmbedderDataSlots represent nullptr.
   static_assert(kNullExternalPointer == 0);
   store(kNullExternalPointer, kNullAddress);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  // ORing the type information with the pointer invalidates the capability.
+  // Therefore, for CHERI the external pointer table stores the tag information
+  // seperately in an entry after the pointer. Entries are store in the
+  // external pointer table as follows:
+  // index = pointer
+  // index + 1 = pointer tag
+  store(kNullExternalPointerTag, kNullAddress);
+#endif
 }
 
 void ExternalPointerTable::TearDown() {
@@ -61,22 +75,42 @@ void ExternalPointerTable::TearDown() {
 
 Address ExternalPointerTable::Get(uint32_t index,
                                   ExternalPointerTag tag) const {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  DCHECK_LT(index, capacity_);
+  DCHECK_LT(index + 1, capacity_);
+  
+  Address entry = load_atomic(index);
+
+  Address entry_tag = load_atomic(index + 1);
+  DCHECK(!is_free(entry_tag));
+
+  return entry & ~(entry_tag & ~tag); 
+#else
   DCHECK_LT(index, capacity_);
 
   Address entry = load_atomic(index);
   DCHECK(!is_free(entry));
 
-  return entry & ~tag;
+ return entry & ~tag;
+#endif
 }
 
 void ExternalPointerTable::Set(uint32_t index, Address value,
                                ExternalPointerTag tag) {
-  DCHECK_LT(index, capacity_);
   DCHECK_NE(kNullExternalPointer, index);
-  DCHECK_EQ(0, value & kExternalPointerTagMask);
   DCHECK(is_marked(tag));
+  DCHECK_EQ(0, value & kExternalPointerTagMask);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  DCHECK_LT(index, capacity_);
+  DCHECK_LT(index + 1, capacity_);
+
+  store_atomic(index, value);
+  store_atomic(index + 1, tag);
+#else
+  DCHECK_LT(index, capacity_);
 
   store_atomic(index, value | tag);
+#endif
 }
 
 uint32_t ExternalPointerTable::Allocate() {
@@ -124,10 +158,19 @@ uint32_t ExternalPointerTable::Allocate() {
 }
 
 void ExternalPointerTable::Mark(uint32_t index) {
+#if defined(__CHERI_PURE_CAPABILITY__)
   DCHECK_LT(index, capacity_);
+  DCHECK_LT(index + 1, capacity_);
+#else
+  DCHECK_LT(index, capacity_);
+#endif
   static_assert(sizeof(base::Atomic64) == sizeof(Address));
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  base::Atomic64 old_val = load_atomic(index + 1);
+#else
   base::Atomic64 old_val = load_atomic(index);
+#endif
   DCHECK(!is_free(old_val));
   base::Atomic64 new_val = set_mark_bit(old_val);
 
@@ -135,7 +178,11 @@ void ExternalPointerTable::Mark(uint32_t index) {
   // to the old value, then the mutator must've just written a new value into
   // the entry. This in turn must've set the marking bit already (see
   // ExternalPointerTable::Set), so we don't need to do it again.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  base::Atomic64* ptr = reinterpret_cast<base::Atomic64*>(entry_address(index + 1));
+#else
   base::Atomic64* ptr = reinterpret_cast<base::Atomic64*>(entry_address(index));
+#endif
   base::Atomic64 val = base::Relaxed_CompareAndSwap(ptr, old_val, new_val);
   DCHECK((val == old_val) || is_marked(val));
   USE(val);

@@ -17,6 +17,9 @@ V8_INLINE Address DecodeExternalPointer(const Isolate* isolate,
                                         ExternalPointerTag tag);
 
 constexpr ExternalPointer_t kNullExternalPointer = 0;
+#if defined(__CHERI_PURE_CAPABILITY__)
+constexpr ExternalPointer_t kNullExternalPointerTag = 1;
+#endif
 
 // Creates zero-initialized entry in external pointer table and writes the entry
 // id to the field. When sandbox is not enabled, it's a no-op.

@@ -35,22 +35,44 @@ uint32_t ExternalPointerTable::Sweep(Isolate* isolate) {
 
   // Skip the special null entry.
   DCHECK_GE(capacity_, 1);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  for (uint32_t i = capacity_ - 2; i > 0; i=i-2) {
+#else
   for (uint32_t i = capacity_ - 1; i > 0; i--) {
+#endif
     // No other threads are active during sweep, so there is no need to use
     // atomic operations here.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    // Load the tag stored along with the external pointer
+    Address entry = load(i + 1);
+#else
     Address entry = load(i);
+#endif
     if (!is_marked(entry)) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+      store(i, current_freelist_head);
+      store(i + 1, kExternalPointerFreeEntryTag);
+#else
       store(i, make_freelist_entry(current_freelist_head));
+#endif
       current_freelist_head = i;
       freelist_size++;
     } else {
+#if defined(__CHERI_PURE_CAPABILITY__)
+      store(i + 1, clear_mark_bit(entry));
+#else
       store(i, clear_mark_bit(entry));
+#endif
     }
   }
 
   freelist_head_ = current_freelist_head;
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  uint32_t num_active_entries = capacity_ / 2 - freelist_size;
+#else
   uint32_t num_active_entries = capacity_ - freelist_size;
+#endif
   isolate->counters()->sandboxed_external_pointers_count()->AddSample(
       num_active_entries);
   return num_active_entries;
@@ -76,12 +98,25 @@ uint32_t ExternalPointerTable::Grow() {
   capacity_ = new_capacity;
 
   // Build freelist bottom to top, which might be more cache friendly.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  uint32_t start = std::max<uint32_t>(old_capacity, 2);  // Skip entry zero
+  uint32_t last = new_capacity - 2;
+  for (uint32_t i = start; i < last; i+=2) {
+    store(i, i + 2);
+    store(i + 1, kExternalPointerFreeEntryTag);
+#else
   uint32_t start = std::max<uint32_t>(old_capacity, 1);  // Skip entry zero
   uint32_t last = new_capacity - 1;
   for (uint32_t i = start; i < last; i++) {
     store(i, make_freelist_entry(i + 1));
+#endif
   }
+#if defined(__CHERI_PURE_CAPABILITY__)
+  store(last, 0);
+  store(last + 1, kExternalPointerFreeEntryTag);
+#else
   store(last, make_freelist_entry(0));
+#endif
 
   // This must be a release store to prevent reordering of the preceeding
   // stores to the freelist from being reordered past this store. See

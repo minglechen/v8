@@ -118,7 +118,11 @@ TEST(AsAtomic8, CompareAndSwap_Concurrent) {
   }
 }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+TEST(AsAtomicIntPtr, SetBits_Sequential) {
+#else
 TEST(AsAtomicWord, SetBits_Sequential) {
+#endif
   uintptr_t word = 0;
   // Fill the word with a repeated 0xF0 pattern.
   for (unsigned i = 0; i < sizeof(word); i++) {
@@ -132,7 +136,11 @@ TEST(AsAtomicWord, SetBits_Sequential) {
   uintptr_t mask = 0xFF;
   for (unsigned i = 0; i < sizeof(word); i++) {
     uintptr_t byte = static_cast<uintptr_t>(i) << (i * 8);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    AsAtomicIntPtr::SetBits(&word, byte, mask);
+#else
     AsAtomicWord::SetBits(&word, byte, mask);
+#endif
     mask <<= 8;
   }
   for (unsigned i = 0; i < sizeof(word); i++) {
@@ -157,7 +165,11 @@ class BitSettingThread final : public Thread {
   void Run() override {
     uintptr_t bit = 1;
     bit = bit << bit_index_;
+#if defined(__CHERI_PURE_CAPABILITY__)
+    AsAtomicIntPtr::SetBits(word_addr_, bit, bit);
+#else
     AsAtomicWord::SetBits(word_addr_, bit, bit);
+#endif
   }
 
  private:
@@ -167,13 +179,21 @@ class BitSettingThread final : public Thread {
 
 }  // namespace.
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+TEST(AsAtomicIntPtr, SetBits_Concurrent) {
+#else
 TEST(AsAtomicWord, SetBits_Concurrent) {
+#endif
   const int kBitCount = sizeof(uintptr_t) * 8;
   const int kThreadCount = kBitCount / 2;
   BitSettingThread threads[kThreadCount];
 
   uintptr_t word;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  AsAtomicIntPtr::Relaxed_Store(&word, 0);
+#else
   AsAtomicWord::Relaxed_Store(&word, 0);
+#endif
   for (int i = 0; i < kThreadCount; i++) {
     // Thread i sets bit number i * 2.
     threads[i].Initialize(&word, i * 2);
@@ -184,7 +204,11 @@ TEST(AsAtomicWord, SetBits_Concurrent) {
   for (int i = 0; i < kThreadCount; i++) {
     threads[i].Join();
   }
+#if defined(__CHERI_PURE_CAPABILITY__)
+  uintptr_t actual_word = AsAtomicIntPtr::Relaxed_Load(&word);
+#else
   uintptr_t actual_word = AsAtomicWord::Relaxed_Load(&word);
+#endif
   for (int i = 0; i < kBitCount; i++) {
     // Every second bit must be set.
     uintptr_t expected = (i % 2 == 0);

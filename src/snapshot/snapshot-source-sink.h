@@ -57,6 +57,16 @@ class SnapshotByteSource final {
   }
 
   void CopySlots(Address* dest, int number_of_slots) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    base::AtomicIntPtr* start = reinterpret_cast<base::AtomicIntPtr*>(dest);
+    base::AtomicIntPtr* end = start + number_of_slots;
+    for (base::AtomicIntPtr* p = start; p < end;
+      ++p, position_ += sizeof(base::AtomicIntPtr)) {
+      base::AtomicIntPtr val;
+      memcpy(&val, data_ + position_, sizeof(base::AtomicIntPtr));
+      base::Relaxed_Store(p, val);
+    }
+#else
     base::AtomicWord* start = reinterpret_cast<base::AtomicWord*>(dest);
     base::AtomicWord* end = start + number_of_slots;
     for (base::AtomicWord* p = start; p < end;
@@ -65,6 +75,7 @@ class SnapshotByteSource final {
       memcpy(&val, data_ + position_, sizeof(base::AtomicWord));
       base::Relaxed_Store(p, val);
     }
+#endif
   }
 
 #ifdef V8_COMPRESS_POINTERS

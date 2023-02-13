@@ -35,8 +35,33 @@ class AtomicValue {
   }
 
  private:
+#if defined(__CHERI_PURE_CAPABILITY__)
+  static_assert(sizeof(T) <= sizeof(base::AtomicIntPtr));
+#else
   static_assert(sizeof(T) <= sizeof(base::AtomicWord));
+#endif
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  template <typename S>
+  struct cast_helper {
+    static base::AtomicIntPtr to_storage_type(S value) {
+      return static_cast<base::AtomicIntPtr>(value);
+    }
+    static S to_return_type(base::AtomicIntPtr value) {
+      return static_cast<S>(value);
+    }
+  };
+
+  template <typename S>
+  struct cast_helper<S*> {
+    static base::AtomicIntPtr to_storage_type(S* value) {
+      return reinterpret_cast<base::AtomicIntPtr>(value);
+    }
+    static S* to_return_type(base::AtomicIntPtr value) {
+      return reinterpret_cast<S*>(value);
+    }
+  };
+#else
   template <typename S>
   struct cast_helper {
     static base::AtomicWord to_storage_type(S value) {
@@ -56,8 +81,13 @@ class AtomicValue {
       return reinterpret_cast<S*>(value);
     }
   };
+#endif
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  base::AtomicIntPtr value_;
+#else
   base::AtomicWord value_;
+#endif
 };
 
 // Provides atomic operations for a values stored at some address.
@@ -201,6 +231,9 @@ using AsAtomic8 = AsAtomicImpl<base::Atomic8>;
 using AsAtomic16 = AsAtomicImpl<base::Atomic16>;
 using AsAtomic32 = AsAtomicImpl<base::Atomic32>;
 using AsAtomicWord = AsAtomicImpl<base::AtomicWord>;
+#if defined(__CHERI_PURE_CAPABILITY__)
+using AsAtomicIntPtr = AsAtomicImpl<base::AtomicIntPtr>;
+#endif
 
 template <int Width>
 struct AtomicTypeFromByteWidth {};
@@ -221,6 +254,12 @@ template <>
 struct AtomicTypeFromByteWidth<8> {
   using type = base::Atomic64;
 };
+#if defined(__CHERI_PURE_CAPABILITY__)
+template <>
+struct AtomicTypeFromByteWidth<16> {
+  using type = base::AtomicIntPtr;
+};
+#endif
 #endif
 
 // This is similar to AsAtomicWord but it explicitly deletes functionality
@@ -232,7 +271,11 @@ class AsAtomicPointerImpl : public AsAtomicImpl<TAtomicStorageType> {
   static bool SetBits(T* addr, T bits, T mask) = delete;
 };
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+using AsAtomicPointer = AsAtomicPointerImpl<base::AtomicIntPtr>;
+#else
 using AsAtomicPointer = AsAtomicPointerImpl<base::AtomicWord>;
+#endif
 
 template <typename T,
           typename = typename std::enable_if<std::is_unsigned<T>::value>::type>

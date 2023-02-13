@@ -76,7 +76,11 @@ bool BasicMemoryChunk::InLargeObjectSpace() const {
 #ifdef THREAD_SANITIZER
 void BasicMemoryChunk::SynchronizedHeapLoad() const {
   CHECK(reinterpret_cast<Heap*>(
+#if defined(__CHERI_PURE_CAPABILITY__)
+            base::Acquire_Load(reinterpret_cast<base::AtomicIntPtr*>(
+#else
             base::Acquire_Load(reinterpret_cast<base::AtomicWord*>(
+#endif
                 &(const_cast<BasicMemoryChunk*>(this)->heap_)))) != nullptr ||
         InReadOnlySpaceRaw());
 }

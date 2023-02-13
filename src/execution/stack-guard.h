@@ -159,8 +159,17 @@ class V8_EXPORT_PRIVATE V8_NODISCARD StackGuard final {
 
     // jslimit_ and climit_ can be read without any lock.
     // Writing requires the ExecutionAccess lock.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    // Whilst it is not strictly neccessary for these values to be 
+    // AtomicIntPtr values, it preserves the invartaint:
+    // static_assert(StackGuard::kSizeInBytes == sizeof(StackGuard));
+    // without changing kSizeInBytes to account for the architecture.
+    base::AtomicIntPtr jslimit_ = kIllegalLimit;
+    base::AtomicIntPtr climit_ = kIllegalLimit;
+#else
     base::AtomicWord jslimit_ = kIllegalLimit;
     base::AtomicWord climit_ = kIllegalLimit;
+#endif
 
     uintptr_t jslimit() {
       return base::bit_cast<uintptr_t>(base::Relaxed_Load(&jslimit_));

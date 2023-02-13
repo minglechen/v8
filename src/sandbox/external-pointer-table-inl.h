@@ -161,13 +161,14 @@ void ExternalPointerTable::Mark(uint32_t index) {
 #if defined(__CHERI_PURE_CAPABILITY__)
   DCHECK_LT(index, capacity_);
   DCHECK_LT(index + 1, capacity_);
+  static_assert(sizeof(base::AtomicIntPtr) == sizeof(Address));
 #else
   DCHECK_LT(index, capacity_);
-#endif
   static_assert(sizeof(base::Atomic64) == sizeof(Address));
+#endif
 
 #if defined(__CHERI_PURE_CAPABILITY__)
-  base::Atomic64 old_val = load_atomic(index + 1);
+  base::AtomicIntPtr old_val = load_atomic(index + 1);
 #else
   base::Atomic64 old_val = load_atomic(index);
 #endif
@@ -179,7 +180,7 @@ void ExternalPointerTable::Mark(uint32_t index) {
   // the entry. This in turn must've set the marking bit already (see
   // ExternalPointerTable::Set), so we don't need to do it again.
 #if defined(__CHERI_PURE_CAPABILITY__)
-  base::Atomic64* ptr = reinterpret_cast<base::Atomic64*>(entry_address(index + 1));
+  base::AtomicIntPtr* ptr = reinterpret_cast<base::AtomicIntPtr*>(entry_address(index + 1));
 #else
   base::Atomic64* ptr = reinterpret_cast<base::Atomic64*>(entry_address(index));
 #endif

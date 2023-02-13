@@ -38,8 +38,13 @@ void MemoryChunk::InitializationMemoryFence() {
   // to tell TSAN that there is no data race when emitting a
   // InitializationMemoryFence. Note that the other thread still needs to
   // perform MemoryChunk::synchronized_heap().
+#if defined(__CHERI_PURE_CAPABILITY__)
+  base::Release_Store(reinterpret_cast<base::AtomicIntPtr*>(&heap_),
+                      reinterpret_cast<base::AtomicIntPtr>(heap_));
+#else
   base::Release_Store(reinterpret_cast<base::AtomicWord*>(&heap_),
                       reinterpret_cast<base::AtomicWord>(heap_));
+#endif
 #endif
 }
 

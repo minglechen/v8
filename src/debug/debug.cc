@@ -388,7 +388,11 @@ void Debug::ThreadInit() {
   clear_restart_frame();
   clear_suspended_generator();
   base::Relaxed_Store(&thread_local_.current_debug_scope_,
+#if defined(__CHERI_PURE_CAPABILITY__)
+                      static_cast<base::AtomicIntPtr>(0));
+#else
                       static_cast<base::AtomicWord>(0));
+#endif
   thread_local_.break_on_next_function_call_ = false;
   UpdateHookOnFunctionCall();
   thread_local_.promise_stack_ = Smi::zero();
@@ -2591,7 +2595,11 @@ DebugScope::DebugScope(Debug* debug)
       no_interrupts_(debug_->isolate_) {
   // Link recursive debugger entry.
   base::Relaxed_Store(&debug_->thread_local_.current_debug_scope_,
+#if defined(__CHERI_PURE_CAPABILITY__)
+                      reinterpret_cast<base::AtomicIntPtr>(this));
+#else
                       reinterpret_cast<base::AtomicWord>(this));
+#endif
   // Store the previous frame id and return value.
   break_frame_id_ = debug_->break_frame_id();
 
@@ -2619,7 +2627,11 @@ DebugScope::~DebugScope() {
   }
   // Leaving this debugger entry.
   base::Relaxed_Store(&debug_->thread_local_.current_debug_scope_,
+#if defined(__CHERI_PURE_CAPABILITY__)
+                      reinterpret_cast<base::AtomicIntPtr>(prev_));
+#else
                       reinterpret_cast<base::AtomicWord>(prev_));
+#endif
 
   // Restore to the previous break state.
   debug_->thread_local_.break_frame_id_ = break_frame_id_;

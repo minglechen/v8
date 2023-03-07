@@ -833,8 +833,6 @@ class V8_EXPORT_PRIVATE CodeStubAssembler
 #error "This code requires updating for big-endian architectures"
 #endif
     // Given the fields layout we can read the Code reference as a full word.
-    static_assert(CodeDataContainer::kCodeCageBaseUpper32BitsOffset ==
-                  CodeDataContainer::kCodeOffset + kTaggedSize);
     TNode<Object> o = BitcastWordToTagged(Load<RawPtrT>(
         code, IntPtrConstant(CodeDataContainer::kCodeOffset - kHeapObjectTag)));
     return CAST(o);

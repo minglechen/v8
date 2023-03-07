@@ -269,12 +269,16 @@ constexpr int kIntptrSize = sizeof(intptr_t);
 constexpr int kUIntptrSize = sizeof(uintptr_t);
 constexpr int kSystemPointerSize = sizeof(void*);
 constexpr int kSystemPointerHexDigits = kSystemPointerSize == 4 ? 8 : 12;
-constexpr int kPCOnStackSize = kSystemPointerSize;
-constexpr int kFPOnStackSize = kSystemPointerSize;
 #ifdef __CHERI_PURE_CAPABILITY__
 constexpr int kPtrAddrSize = sizeof(ptraddr_t);
+constexpr int kSystemPointerAddrSize = sizeof(ptraddr_t);
+constexpr int kPCOnStackSize = kSystemPointerAddrSize;
+constexpr int kFPOnStackSize = kSystemPointerAddrSize;
 #else
 constexpr int kPtrAddrSize = kSystemPointerSize
+constexpr int kSystemPOinterAddrSize = kSystemPointerSize
+constexpr int kPCOnStackSize = kSystemPointerSize;
+constexpr int kFPOnStackSize = kSystemPointerSize;
 #endif
 
 #if V8_TARGET_ARCH_X64 || V8_TARGET_ARCH_IA32
@@ -303,11 +307,11 @@ constexpr size_t kMaxWasmCodeMemory = kMaxWasmCodeMB * MB;
 #if defined(V8_HOST_ARCH_64_BIT)
 #if defined(V8_HOST_CHERI_PURE_CAPABILITY)
 constexpr int kSystemPointerSizeLog2 = 4;
-constexpr int kPtrAddrSizeLog2 = 3;
 #else
 constexpr int kPtrAddrSizeLog2 = 3;
-constexpr int kSystemPointerSizeLog2 = 3;
 #endif
+constexpr int kSystemPointerAddrSizeLog2 = 3;
+constexpr int kPtrAddrSizeLog2 = 3;
 constexpr intptr_t kIntptrSignBit =
     static_cast<intptr_t>(uintptr_t{0x8000000000000000});
 constexpr bool kPlatformRequiresCodeRange = true;
@@ -389,7 +393,11 @@ constexpr int kTaggedSizeLog2 = kSystemPointerSizeLog2;
 // These types define raw and atomic storage types for tagged values stored
 // on V8 heap.
 using Tagged_t = Address;
+#if defined(__CHERI_PURE_CAPABILITY__)
 using AtomicTagged_t = base::AtomicWord;
+#else
+using AtomicTagged_t = base::AtomicIntPtr;
+#endif
 
 #endif  // V8_COMPRESS_POINTERS
 
@@ -949,6 +957,9 @@ inline constexpr bool IsSharedAllocationType(AllocationType kind) {
 }
 
 enum AllocationAlignment {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  kSystemPointerAligned,
+#endif
   // The allocated address is kTaggedSize aligned (this is default for most of
   // the allocations).
   kTaggedAligned,
@@ -967,7 +978,11 @@ enum AllocationAlignment {
 // unaligned access since both x64 and arm64 architectures (where pointer
 // compression is supported) allow unaligned access to doubles and full words.
 #endif  // V8_COMPRESS_POINTERS
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define USE_ALLOCATION_ALIGNMENT_BOOL true
+#else
 #define USE_ALLOCATION_ALIGNMENT_BOOL false
+#endif  // __CHERI_PURE_CAPABILITY__
 #endif  // V8_HOST_ARCH_32_BIT
 
 enum class AccessMode { ATOMIC, NON_ATOMIC };

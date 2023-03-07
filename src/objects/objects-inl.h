@@ -151,9 +151,14 @@ template <class T,
                                       !std::is_floating_point<T>::value,
                                   int>::type>
 T Object::Relaxed_ReadField(size_t offset) const {
+// CHERI requires that both the code_cage_base and main_cage_base addresses
+// are stored by the Object, care has been taken to ensure that these
+// values are correctly aligned.
+#if !defined(__CHERI_PURE_CAPABILITY__)
   // Pointer compression causes types larger than kTaggedSize to be
   // unaligned. Atomic loads must be aligned.
   DCHECK_IMPLIES(COMPRESS_POINTERS_BOOL, sizeof(T) <= kTaggedSize);
+#endif
   using AtomicT = typename base::AtomicTypeFromByteWidth<sizeof(T)>::type;
   return static_cast<T>(base::AsAtomicImpl<AtomicT>::Relaxed_Load(
       reinterpret_cast<AtomicT*>(field_address(offset))));
@@ -165,9 +170,14 @@ template <class T,
                                       !std::is_floating_point<T>::value,
                                   int>::type>
 void Object::Relaxed_WriteField(size_t offset, T value) {
+// CHERI requires that both the code_cage_base and main_cage_base addresses
+// are stored by the Object, care has been taken to ensure that these
+// values are correctly aligned.
+#if !defined(__CHERI_PURE_CAPABILITY__)
   // Pointer compression causes types larger than kTaggedSize to be
   // unaligned. Atomic stores must be aligned.
   DCHECK_IMPLIES(COMPRESS_POINTERS_BOOL, sizeof(T) <= kTaggedSize);
+#endif
   using AtomicT = typename base::AtomicTypeFromByteWidth<sizeof(T)>::type;
   base::AsAtomicImpl<AtomicT>::Relaxed_Store(
       reinterpret_cast<AtomicT*>(field_address(offset)),

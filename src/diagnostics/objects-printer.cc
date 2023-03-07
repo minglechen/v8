@@ -1729,7 +1729,7 @@ void CodeDataContainer::CodeDataContainerPrint(std::ostream& os) {
   PrintHeader(os, "CodeDataContainer");
   os << "\n - kind_specific_flags: " << kind_specific_flags(kRelaxedLoad);
   if (V8_EXTERNAL_CODE_SPACE_BOOL) {
-    os << "\n - code: " << Brief(code());
+    os << "\n - code: " << Brief(code(PtrComprCageBase(GetIsolate()->code_cage_base())));
     os << "\n - code_entry_point: "
        << reinterpret_cast<void*>(code_entry_point());
   }
@@ -2928,7 +2928,8 @@ V8_EXPORT_PRIVATE extern void _v8_internal_Print_Code(void* object) {
     return;
   }
 
-  i::Code code = lookup_result.ToCode();
+  i::Code code = lookup_result.ToCode(
+    v8::internal::PtrComprCageBase(isolate->code_cage_base()));
 
 #ifdef ENABLE_DISASSEMBLER
   i::StdoutStream os;

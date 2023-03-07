@@ -70,19 +70,6 @@ class CodeDataContainer : public HeapObject {
   DECL_GETTER(code, Code)
   DECL_RELAXED_GETTER(code, Code)
 
-  // When V8_EXTERNAL_CODE_SPACE is enabled, Code objects are allocated in
-  // a separate pointer compression cage instead of the cage where all the
-  // other objects are allocated.
-  // This field contains code cage base value which is used for decompressing
-  // the reference to respective Code. Basically, |code_cage_base| and |code|
-  // fields together form a full pointer. The reason why they are split is that
-  // the code field must also support atomic access and the word alignment of
-  // the full value is not guaranteed.
-  inline PtrComprCageBase code_cage_base() const;
-  inline void set_code_cage_base(Address code_cage_base);
-  inline PtrComprCageBase code_cage_base(RelaxedLoadTag) const;
-  inline void set_code_cage_base(Address code_cage_base, RelaxedStoreTag);
-
   // Cached value of code().InstructionStart().
   // Available only when V8_EXTERNAL_CODE_SPACE is defined.
   DECL_GETTER(code_entry_point, Address)
@@ -192,8 +179,6 @@ class CodeDataContainer : public HeapObject {
   V(kCodeOffset, V8_EXTERNAL_CODE_SPACE_BOOL ? kTaggedSize : 0)     \
   V(kCodePointerFieldsStrongEndOffset, 0)                           \
   /* Raw data fields. */                                            \
-  V(kCodeCageBaseUpper32BitsOffset,                                 \
-    V8_EXTERNAL_CODE_SPACE_BOOL ? kTaggedSize : 0)                  \
   V(kCodeEntryPointOffset,                                          \
     V8_EXTERNAL_CODE_SPACE_BOOL ? kExternalPointerSize : 0)         \
   V(kFlagsOffset, V8_EXTERNAL_CODE_SPACE_BOOL ? kUInt16Size : 0)    \
@@ -632,6 +617,44 @@ class Code : public HeapObject {
   class OptimizedCodeIterator;
 
   // Layout description.
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define CODE_FIELDS(V)                                                        \
+  V(kRelocationInfoOffset, kTaggedSize)                                       \
+  V(kDeoptimizationDataOrInterpreterDataOffset, kTaggedSize)                  \
+  V(kPositionTableOffset, kTaggedSize)                                        \
+  V(kCodeDataContainerOffset, kTaggedSize)                                    \
+  /* Data or code not directly visited by GC directly starts here. */         \
+  /* The serializer needs to copy bytes starting from here verbatim. */       \
+  /* Objects embedded into code is visited via reloc info. */                 \
+  V(kDataStart, 0)                                                            \
+  /* 4 x kTaggedSize leaves the kMainCageBaseOffset field */                  \
+  /* kSystemPointerSize aligned (regardless of COMPRESS_POINTERS_BOOL). */    \
+  /* Assuming the code object is at least kSystemPointerSize aligned, */      \
+  /* this preserves the capability tag. */                                    \
+  /* Note that kCodeAlignment is 64bytes for ARM64. */                        \
+  V(kPadding0Offset, kTaggedSize)                                             \
+  V(kPadding1Offset, kTaggedSize)                                             \
+  V(kPadding2Offset, kTaggedSize)                                             \
+  V(kMainCageBaseOffset,                                                      \
+    V8_EXTERNAL_CODE_SPACE_BOOL ? kSystemPointerSize: 0)                      \
+  V(kInstructionSizeOffset, kIntSize)                                         \
+  V(kMetadataSizeOffset, kIntSize)                                            \
+  V(kFlagsOffset, kInt32Size)                                                 \
+  V(kBuiltinIndexOffset, kIntSize)                                            \
+  V(kInlinedBytecodeSizeOffset, kIntSize)                                     \
+  V(kOsrOffsetOffset, kInt32Size)                                             \
+  /* Offsets describing inline metadata tables, relative to MetadataStart. */ \
+  V(kHandlerTableOffsetOffset, kIntSize)                                      \
+  V(kConstantPoolOffsetOffset,                                                \
+    FLAG_enable_embedded_constant_pool.value() ? kIntSize : 0)                \
+  V(kCodeCommentsOffsetOffset, kIntSize)                                      \
+  V(kUnwindingInfoOffsetOffset, kInt32Size)                                   \
+  V(kUnalignedHeaderSize, 0)                                                  \
+  /* Add padding to align the instruction start following right after */      \
+  /* the Code object header. */                                               \
+  V(kOptionalPaddingOffset, CODE_POINTER_PADDING(kOptionalPaddingOffset))     \
+  V(kHeaderSize, 0)
+#else
 #define CODE_FIELDS(V)                                                        \
   V(kRelocationInfoOffset, kTaggedSize)                                       \
   V(kDeoptimizationDataOrInterpreterDataOffset, kTaggedSize)                  \
@@ -660,6 +683,7 @@ class Code : public HeapObject {
   /* the Code object header. */                                               \
   V(kOptionalPaddingOffset, CODE_POINTER_PADDING(kOptionalPaddingOffset))     \
   V(kHeaderSize, 0)
+#endif
 
   DEFINE_FIELD_OFFSET_CONSTANTS(HeapObject::kHeaderSize, CODE_FIELDS)
 #undef CODE_FIELDS
@@ -667,8 +691,14 @@ class Code : public HeapObject {
   // This documents the amount of free space we have in each Code object header
   // due to padding for code alignment.
 #if V8_TARGET_ARCH_ARM64
+#if defined(__CHERI_PURE_CAPABILITY__)
+  static_assert(V8_EXTERNAL_CODE_SPACE_BOOL);
+  static_assert(COMPRESS_POINTERS_BOOL);
+  static constexpr int kHeaderPaddingSize = 12;
+#else
   static constexpr int kHeaderPaddingSize =
       V8_EXTERNAL_CODE_SPACE_BOOL ? 4 : (COMPRESS_POINTERS_BOOL ? 8 : 20);
+#endif
 #elif V8_TARGET_ARCH_MIPS64
   static constexpr int kHeaderPaddingSize = 20;
 #elif V8_TARGET_ARCH_LOONG64
@@ -862,7 +892,7 @@ class CodeLookupResult {
   // Helper method, coverts the successful lookup result to Code object.
   // It's not safe to be used from GC because conversion to Code might perform
   // a map check.
-  inline Code ToCode() const;
+  inline Code ToCode(PtrComprCageBase cage_base) const;
 
   // Helper method, coverts the successful lookup result to CodeT object.
   // It's not safe to be used from GC because conversion to CodeT might perform
@@ -907,12 +937,11 @@ class Code::OptimizedCodeIterator {
 inline CodeT ToCodeT(Code code);
 inline Handle<CodeT> ToCodeT(Handle<Code> code, Isolate* isolate);
 inline Code FromCodeT(CodeT code);
-inline Code FromCodeT(CodeT code, RelaxedLoadTag);
-inline Code FromCodeT(CodeT code, AcquireLoadTag);
-inline Code FromCodeT(CodeT code, PtrComprCageBase);
+inline Code FromCodeT(CodeT code, Isolate*, RelaxedLoadTag);
 inline Code FromCodeT(CodeT code, PtrComprCageBase, RelaxedLoadTag);
-inline Code FromCodeT(CodeT code, PtrComprCageBase, AcquireLoadTag);
 inline Handle<CodeT> FromCodeT(Handle<Code> code, Isolate* isolate);
+inline Handle<AbstractCode> ToAbstractCode(Handle<CodeT> code,
+		                           Isolate* isolate);
 inline CodeDataContainer CodeDataContainerFromCodeT(CodeT code);
 
 class AbstractCode : public HeapObject {

@@ -431,9 +431,11 @@ size_t Isolate::HashIsolateForEmbeddedBlob() {
     // they change when creating the off-heap trampolines. Other data fields
     // must remain the same.
 #ifdef V8_EXTERNAL_CODE_SPACE
+#if !defined(__CHERI_PURE_CAPABILITY__)
     static_assert(Code::kMainCageBaseUpper32BitsOffset == Code::kDataStart);
     static_assert(Code::kInstructionSizeOffset ==
                   Code::kMainCageBaseUpper32BitsOffsetEnd + 1);
+#endif
 #else
     static_assert(Code::kInstructionSizeOffset == Code::kDataStart);
 #endif  // V8_EXTERNAL_CODE_SPACE
@@ -755,7 +757,7 @@ class CallSiteBuilder {
     Handle<Object> receiver(combinator->native_context().promise_function(),
                             isolate_);
     // TODO(v8:11880): avoid roundtrips between cdc and code.
-    Handle<Code> code(FromCodeT(combinator->code()), isolate_);
+    Handle<Code> code(FromCodeT(combinator->code(), isolate_);
 
     // TODO(mmarchini) save Promises list from the Promise combinator
     Handle<FixedArray> parameters = isolate_->factory()->empty_fixed_array();
@@ -4038,10 +4040,37 @@ bool Isolate::Init(SnapshotData* startup_snapshot_data,
     }
   }
 #ifdef V8_EXTERNAL_CODE_SPACE
-  if (heap_.code_range()) {
-    code_cage_base_ = GetPtrComprCageBaseAddress(heap_.code_range()->base());
-  } else {
-    code_cage_base_ = cage_base();
+  {
+    VirtualMemoryCage* code_cage;	
+    if (heap_.code_range()) {
+      code_cage = heap_.code_range();
+    } else {
+      CHECK(jitless_);
+      // In jitless mode the code space pages will be allocated in the main
+      // pointer compression cage.
+      code_cage = GetPtrComprCage();
+    }
+
+  code_cage_base_ = ExternalCodeCompressionScheme::PrepareCageBaseAddress(
+      code_cage->base());
+#ifdef V8_COMPRESS_POINTERS_IN_SHARED_CAGE
+    CHECK_EQ(ExternalCodeCompressionScheme::base(), code_cage_base_);
+#endif  // V8_COMPRESS_POINTERS_IN_SHARED_CAGE
+
+    // Ensure that ExternalCodeCompressionScheme is applicable to all objects
+    // stored in the code cage.
+    using ComprScheme = ExternalCodeCompressionScheme;
+    Address base = code_cage->base();
+    Address last = base + code_cage->size() - 1;
+    Address upper_bound = base + kPtrComprCageReservationSize - 1;
+    PtrComprCageBase code_cage_base{code_cage_base_};
+    CHECK_EQ(base, ComprScheme::DecompressTaggedPointer(
+                       code_cage_base, ComprScheme::CompressTagged(base)));
+    CHECK_EQ(last, ComprScheme::DecompressTaggedPointer(
+                       code_cage_base, ComprScheme::CompressTagged(last)));
+    CHECK_EQ(upper_bound,
+             ComprScheme::DecompressTaggedPointer(
+                 code_cage_base, ComprScheme::CompressTagged(upper_bound)));
   }
 #endif  // V8_EXTERNAL_CODE_SPACE
 

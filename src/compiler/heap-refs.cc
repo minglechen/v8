@@ -2176,7 +2176,7 @@ CodeRef JSFunctionRef::code() const {
   CodeT code = object()->code(kAcquireLoad);
   // Safe to do a relaxed conversion to Code here since CodeT::code field is
   // modified only by GC and the CodeT was acquire-loaded.
-  return MakeRefAssumeMemoryFence(broker(), FromCodeT(code, kRelaxedLoad));
+  return MakeRefAssumeMemoryFence(broker(), FromCodeT(code, GetPtrComprCageBase(code), kRelaxedLoad));
 }
 
 NativeContextRef JSFunctionRef::native_context() const {

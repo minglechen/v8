@@ -13,27 +13,13 @@ namespace internal {
 
 class Object;
 
-template <typename T>
-class SlotBaseSize {
-  public:
-    constexpr static size_t size = sizeof(T);
-};
-
-#ifdef __CHERI_PURE_CAPABILITY__
-template <>
-class SlotBaseSize<Address> {
-  public:
-    constexpr static size_t size = kPtrAddrSize;
-};
-#endif
-
 template <typename Subclass, typename Data,
           size_t SlotDataAlignment = sizeof(Data)>
 class SlotBase {
  public:
   using TData = Data;
 
-  static constexpr size_t kSlotDataSize = SlotBaseSize<Data>::size;
+  static constexpr size_t kSlotDataSize = sizeof(Data);
   static constexpr size_t kSlotDataAlignment = SlotDataAlignment;
 
   Subclass& operator++() {  // Prefix increment.

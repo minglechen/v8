@@ -1065,20 +1065,20 @@ void CodeDataContainer::CodeDataContainerVerify(Isolate* isolate) {
   VerifyObjectField(isolate, kNextCodeLinkOffset);
   CHECK(next_code_link().IsCodeT() || next_code_link().IsUndefined(isolate));
   if (V8_EXTERNAL_CODE_SPACE_BOOL) {
-    if (raw_code() != Smi::zero()) {
+    if (raw_code(PtrComprCageBase(isolate->code_cage_base())) != Smi::zero()) {
 #ifdef V8_EXTERNAL_CODE_SPACE
       // kind and builtin_id() getters are not available on CodeDataContainer
       // when external code space is not enabled.
-      CHECK_EQ(code().kind(), kind());
-      CHECK_EQ(code().builtin_id(), builtin_id());
+      CHECK_EQ(code(PtrComprCageBase(isolate->code_cage_base())).kind(), kind());
+      CHECK_EQ(code(PtrComprCageBase(isolate->code_cage_base())).builtin_id(), builtin_id());
 #endif  // V8_EXTERNAL_CODE_SPACE
-      CHECK_EQ(code().code_data_container(kAcquireLoad), *this);
+      CHECK_EQ(code(PtrComprCageBase(isolate->code_cage_base())).code_data_container(kAcquireLoad), *this);
 
       // Ensure the cached code entry point corresponds to the Code object
       // associated with this CodeDataContainer.
 #ifdef V8_COMPRESS_POINTERS_IN_SHARED_CAGE
       if (V8_SHORT_BUILTIN_CALLS_BOOL) {
-        if (code().InstructionStart() == code_entry_point()) {
+        if (code(PtrComprCageBase(isolate->code_cage_base())).InstructionStart() == code_entry_point()) {
           // Most common case, all good.
         } else {
           // When shared pointer compression cage is enabled and it has the
@@ -1093,7 +1093,8 @@ void CodeDataContainer::CodeDataContainerVerify(Isolate* isolate) {
               isolate->heap()->GcSafeFindCodeForInnerPointer(
                   code_entry_point());
           CHECK(lookup_result.IsFound());
-          CHECK_EQ(lookup_result.ToCode(), code());
+          CHECK_EQ(lookup_result.ToCode(PtrComprCageBase(isolate->code_cage_base())),
+	           code(PtrComprCageBase(isolate->code_cage_base())));
         }
       } else {
         CHECK_EQ(code().InstructionStart(), code_entry_point());
@@ -1122,7 +1123,7 @@ void Code::CodeVerify(Isolate* isolate) {
   CHECK_IMPLIES(!ReadOnlyHeap::Contains(*this),
                 IsAligned(raw_instruction_start(), kCodeAlignment));
   if (V8_EXTERNAL_CODE_SPACE_BOOL) {
-    CHECK_EQ(*this, code_data_container(kAcquireLoad).code());
+    CHECK_EQ(*this, code_data_container(kAcquireLoad).code(PtrComprCageBase(isolate->code_cage_base())));
   }
   // TODO(delphick): Refactor Factory::CodeBuilder::BuildInternal, so that the
   // following CHECK works builtin trampolines. It currently fails because

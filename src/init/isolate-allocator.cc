@@ -51,7 +51,7 @@ struct PtrComprCageReservationParams
         RoundUp(size_t{1} << kPageSizeBits, page_allocator->AllocatePageSize());
     requested_start_hint =
 #if defined(__CHERI_PURE_CAPABILITY__)
-	nullptr;
+	reinterpret_cast<Address>(nullptr);
 #else
         reinterpret_cast<Address>(page_allocator->GetRandomMmapAddr());
 #endif
@@ -112,7 +112,13 @@ void IsolateAllocator::InitializeOncePerProcess() {
         "Failed to reserve virtual memory for process-wide V8 "
         "pointer compression cage");
   }
-#endif
+  #ifdef V8_EXTERNAL_CODE_SPACE
+  // Speculatively set the code cage base to the same value in case jitless
+  // mode will be used. Once the process-wide CodeRange instance is created
+  // the code cage base will be set accordingly.
+  ExternalCodeCompressionScheme::InitBase(GetProcessWidePtrComprCage()->base());
+#endif  // V8_EXTERNAL_CODE_SPACE
+#endif  // V8_COMPRESS_POINTERS_IN_SHARED_CAGE
 }
 
 IsolateAllocator::IsolateAllocator() {

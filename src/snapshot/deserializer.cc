@@ -490,10 +490,9 @@ void Deserializer<IsolateT>::PostProcessNewObject(Handle<Map> map,
   } else if (V8_EXTERNAL_CODE_SPACE_BOOL &&
              InstanceTypeChecker::IsCodeDataContainer(instance_type)) {
     auto code_data_container = CodeDataContainer::cast(raw_obj);
-    code_data_container.set_code_cage_base(isolate()->code_cage_base());
     code_data_container.AllocateExternalPointerEntries(main_thread_isolate());
     code_data_container.UpdateCodeEntryPoint(main_thread_isolate(),
-                                             code_data_container.code());
+                                             code_data_container.code(PtrComprCageBase(main_thread_isolate()->code_cage_base())));
   } else if (InstanceTypeChecker::IsMap(instance_type)) {
     if (FLAG_log_maps) {
       // Keep track of all seen Maps to log them later since they might be only
@@ -1195,8 +1194,13 @@ int Deserializer<IsolateT>::ReadSingleBytecodeData(byte data,
     case CASE_RANGE(kFixedRawData, 32): {
       // Deserialize raw data of fixed length from 1 to 32 times kTaggedSize.
       int size_in_tagged = FixedRawDataWithSize::Decode(data);
+#if defined(__CHERI_PURE_CAPABILITY__)
+      static_assert(kSystemPointerAddrSize == kTaggedSize ||
+                    kSystemPointerAddrSize == 2 * kTaggedSize);
+#else
       static_assert(TSlot::kSlotDataSize == kTaggedSize ||
                     TSlot::kSlotDataSize == 2 * kTaggedSize);
+#endif
       int size_in_slots = size_in_tagged / (TSlot::kSlotDataSize / kTaggedSize);
       // kFixedRawData can have kTaggedSize != TSlot::kSlotDataSize when
       // serializing Smi roots in pointer-compressed builds. In this case, the

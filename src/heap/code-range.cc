@@ -129,10 +129,7 @@ bool CodeRange::InitReservation(v8::PageAllocator* page_allocator,
   // is enabled so that InitReservation would not break the alignment in
   // GetAddressHint().
   const size_t allocate_page_size = page_allocator->AllocatePageSize();
-  params.base_alignment =
-      V8_EXTERNAL_CODE_SPACE_BOOL
-          ? base::bits::RoundUpToPowerOfTwo(requested)
-          : VirtualMemoryCage::ReservationParams::kAnyBaseAlignment;
+  params.base_alignment = VirtualMemoryCage::ReservationParams::kAnyBaseAlignment;
   params.base_bias_size = RoundUp(reserved_area, allocate_page_size);
   params.page_size = MemoryChunk::kPageSize;
   params.requested_start_hint =
@@ -141,16 +138,6 @@ bool CodeRange::InitReservation(v8::PageAllocator* page_allocator,
       FLAG_jitless ? JitPermission::kNoJit : JitPermission::kMapAsJittable;
 
   if (!VirtualMemoryCage::InitReservation(params)) return false;
-
-  if (V8_EXTERNAL_CODE_SPACE_BOOL) {
-    // Ensure that the code range does not cross the 4Gb boundary and thus
-    // default compression scheme of truncating the Code pointers to 32-bit
-    // still work.
-    Address base = page_allocator_->begin();
-    Address last = base + page_allocator_->size() - 1;
-    CHECK_EQ(GetPtrComprCageBaseAddress(base),
-             GetPtrComprCageBaseAddress(last));
-  }
 
   // On some platforms, specifically Win64, we need to reserve some pages at
   // the beginning of an executable space. See
@@ -315,6 +302,16 @@ std::shared_ptr<CodeRange> CodeRange::EnsureProcessWideCodeRange(
           nullptr, "Failed to reserve virtual memory for CodeRange");
     }
     *process_wide_code_range_.Pointer() = code_range;
+#ifdef V8_EXTERNAL_CODE_SPACE
+#ifdef V8_COMPRESS_POINTERS_IN_SHARED_CAGE
+    // This might be not the first time we create a code range because previous
+    // code range instance could have been deleted if it wasn't kept alive by an
+    // active Isolate. Let the base be initialized from scratch once again.
+    ExternalCodeCompressionScheme::InitBase(
+        ExternalCodeCompressionScheme::PrepareCageBaseAddress(
+            code_range->base()));
+#endif  // V8_COMPRESS_POINTERS_IN_SHARED_CAGE
+#endif  // V8_EXTERNAL_CODE_SPACE
   }
   return code_range;
 }

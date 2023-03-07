@@ -408,6 +408,7 @@ void StringStream::PrintSecurityTokenIfChanged(JSFunction fun) {
 
 void StringStream::PrintFunction(JSFunction fun, Object receiver, Code* code) {
   PrintPrototype(fun, receiver);
+  Isolate* isolate = fun.GetIsolate();
   *code = FromCodeT(fun.code());
 }
 

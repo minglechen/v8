@@ -268,9 +268,9 @@ void Serializer::PutRoot(RootIndex root) {
 
 void Serializer::PutSmiRoot(FullObjectSlot slot) {
   // Serializing a smi root in compressed pointer builds will serialize the
-  // full object slot (of kPtrAddrSize) to avoid complications during
+  // full object slot (of kSystemPointerSize) to avoid complications during
   // deserialization (endianness or smi sequences).
-  static_assert(decltype(slot)::kSlotDataSize == kPtrAddrSize);
+  static_assert(decltype(slot)::kSlotDataSize == kSystemPointerSize);
   static constexpr int bytes_to_output = decltype(slot)::kSlotDataSize;
   static constexpr int size_in_tagged = bytes_to_output >> kTaggedSizeLog2;
   sink_.Put(FixedRawDataWithSize::Encode(size_in_tagged), "Smi");
@@ -941,11 +941,7 @@ void Serializer::ObjectSerializer::VisitCodePointer(HeapObject host,
   HandleScope scope(isolate());
   DisallowGarbageCollection no_gc;
 
-#ifdef V8_EXTERNAL_CODE_SPACE
   PtrComprCageBase code_cage_base(isolate()->code_cage_base());
-#else
-  PtrComprCageBase code_cage_base(isolate());
-#endif
   Object contents = slot.load(code_cage_base);
   DCHECK(HAS_STRONG_HEAP_OBJECT_TAG(contents.ptr()));
   DCHECK(contents.IsCode());
@@ -1204,15 +1200,13 @@ void Serializer::ObjectSerializer::OutputRawData(Address up_to) {
           sizeof(field_value), field_value);
     } else if (V8_EXTERNAL_CODE_SPACE_BOOL &&
                object_->IsCodeDataContainer(cage_base)) {
-      // code_cage_base and code_entry_point fields contain raw values that
+      // The code_entry_point field contains a raw value that
       // will be recomputed after deserialization, so write zeros to keep the
       // snapshot deterministic.
-      CHECK_EQ(CodeDataContainer::kCodeCageBaseUpper32BitsOffset + kTaggedSize,
-               CodeDataContainer::kCodeEntryPointOffset);
-      static byte field_value[kTaggedSize + kExternalPointerSize] = {0};
+      static byte field_value[kExternalPointerSize] = {0};
       OutputRawWithCustomField(
           sink_, object_start, base, bytes_to_output,
-          CodeDataContainer::kCodeCageBaseUpper32BitsOffset,
+          CodeDataContainer::kCodeEntryPointOffset,
           sizeof(field_value), field_value);
     } else {
       sink_->PutRaw(reinterpret_cast<byte*>(object_start + base),

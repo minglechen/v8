@@ -567,7 +567,7 @@ CodeLookupResult GetContainingCode(Isolate* isolate, Address pc) {
 Code StackFrame::LookupCode() const {
   CodeLookupResult result = GetContainingCode(isolate(), pc());
   DCHECK(result.IsFound());
-  Code code = result.ToCode();
+  Code code = result.ToCode(PtrComprCageBase(isolate()->code_cage_base()));
   DCHECK_GE(pc(), code.InstructionStart(isolate(), pc()));
   DCHECK_LT(pc(), code.InstructionEnd(isolate(), pc()));
   return code;
@@ -595,7 +595,7 @@ CodeLookupResult StackFrame::LookupCodeT() const {
 void StackFrame::IteratePc(RootVisitor* v, Address* pc_address,
                            Address* constant_pool_address,
                            CodeLookupResult lookup_result) const {
-  Code holder = lookup_result.ToCode();
+  Code holder = lookup_result.ToCode(PtrComprCageBase(isolate()->code_cage_base()));
   Address old_pc = ReadPC(pc_address);
   DCHECK(ReadOnlyHeap::Contains(holder) ||
          holder.GetHeap()->GcSafeCodeContains(holder, old_pc));
@@ -680,7 +680,7 @@ StackFrame::Type StackFrame::ComputeType(const StackFrameIteratorBase* iterator,
         case CodeKind::BUILTIN: {
           if (StackFrame::IsTypeMarker(marker)) break;
           // TODO(v8:11880): avoid unnecessary conversion to Code or CodeT.
-          Code code_obj = lookup_result.ToCode();
+          Code code_obj = lookup_result.ToCode(PtrComprCageBase(iterator->isolate()->code_cage_base()));
           if (code_obj.is_interpreter_trampoline_builtin() ||
               // Frames for baseline entry trampolines on the stack are still
               // interpreted frames.
@@ -1090,16 +1090,16 @@ void CommonFrame::IterateCompiledFrame(RootVisitor* v) const {
         isolate()->inner_pointer_to_code_cache()->GetCacheEntry(inner_pointer);
     if (!entry->safepoint_entry.is_initialized()) {
       entry->safepoint_entry =
-          entry->code.ToCode().GetSafepointEntry(isolate(), inner_pointer);
+          entry->code.ToCode(PtrComprCageBase(isolate()->code_cage_base())).GetSafepointEntry(isolate(), inner_pointer);
       DCHECK(entry->safepoint_entry.is_initialized());
     } else {
-      DCHECK_EQ(entry->safepoint_entry, entry->code.ToCode().GetSafepointEntry(
+      DCHECK_EQ(entry->safepoint_entry, entry->code.ToCode(PtrComprCageBase(isolate()->code_cage_base())).GetSafepointEntry(
                                             isolate(), inner_pointer));
     }
 
     CHECK(entry->code.IsFound());
     code_lookup_result = entry->code;
-    Code code = entry->code.ToCode();
+    Code code = entry->code.ToCode(PtrComprCageBase(isolate()->code_cage_base()));
     safepoint_entry = entry->safepoint_entry;
     stack_slots = code.stack_slots();
 
@@ -1900,7 +1900,7 @@ DeoptimizationData OptimizedFrame::GetDeoptimizationData(
     CodeLookupResult lookup_result =
         isolate()->heap()->GcSafeFindCodeForInnerPointer(pc());
     CHECK(lookup_result.IsFound());
-    code = lookup_result.ToCode();
+    code = lookup_result.ToCode(PtrComprCageBase(isolate()->code_cage_base()));
   }
   DCHECK(!code.is_null());
   DCHECK(CodeKindCanDeoptimize(code.kind()));
@@ -2459,7 +2459,7 @@ void InternalFrame::Iterate(RootVisitor* v) const {
   // This is used for the WasmCompileLazy builtin, where we actually pass
   // untagged arguments and also store untagged values on the stack.
   // TODO(v8:11880): avoid unnecessary conversion to Code or CodeT.
-  if (code.ToCode().has_tagged_outgoing_params()) IterateExpressions(v);
+  if (code.ToCode(PtrComprCageBase(isolate()->code_cage_base())).has_tagged_outgoing_params()) IterateExpressions(v);
 }
 
 // -------------------------------------------------------------------------

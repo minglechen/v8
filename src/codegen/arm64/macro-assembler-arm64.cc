@@ -1283,7 +1283,11 @@ void MacroAssembler::PushCalleeSavedRegisters() {
 
   static_assert(
       EntryFrameConstants::kCalleeSavedRegisterBytesPushedBeforeFpLrPair ==
+#if defined(__CHERI_PURE_CAPABILITY__)
+      18 * kSystemPointerAddrSize);
+#else
       18 * kSystemPointerSize);
+#endif
 
 #ifdef V8_ENABLE_CONTROL_FLOW_INTEGRITY
     // Use the stack pointer's value immediately before pushing the LR as the
@@ -1378,16 +1382,19 @@ void TurboAssembler::CopyDoubleWords(Register dst, Register src, Register count,
   }
 
 #if defined(__CHERI_PURE_CAPABILITY__)
-  // TODO: codegen is not expected to cpompile or work correctly for purecap.
-  // Pragmatic choice to ignore the static assert for now.
+  static_assert(kSystemPointerAddrSize == kDRegSize,
 #else
   static_assert(kSystemPointerSize == kDRegSize,
-                "pointers must be the same size as doubles");
 #endif
+                "pointers must be the same size as doubles");
 
   if (mode == kDstLessThanSrcAndReverse) {
     Add(src, src, Operand(count, LSL, kSystemPointerSizeLog2));
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Sub(src, src, kSystemPointerAddrSize);
+#else
     Sub(src, src, kSystemPointerSize);
+#endif
   }
 
   int src_direction = (mode == kDstLessThanSrc) ? 1 : -1;
@@ -1400,29 +1407,58 @@ void TurboAssembler::CopyDoubleWords(Register dst, Register src, Register count,
   Label pairs, loop, done;
 
   Tbz(count, 0, &pairs);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Ldr(temp0, MemOperand(src, src_direction * kSystemPointerAddrSize, PostIndex));
+#else
   Ldr(temp0, MemOperand(src, src_direction * kSystemPointerSize, PostIndex));
+#endif
   Sub(count, count, 1);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Str(temp0, MemOperand(dst, dst_direction * kSystemPointerAddrSize, PostIndex));
+#else
   Str(temp0, MemOperand(dst, dst_direction * kSystemPointerSize, PostIndex));
+#endif
 
   Bind(&pairs);
   if (mode == kSrcLessThanDst) {
     // Adjust pointers for post-index ldp/stp with negative offset:
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Sub(dst, dst, kSystemPointerAddrSize);
+    Sub(src, src, kSystemPointerAddrSize);
+#else
     Sub(dst, dst, kSystemPointerSize);
     Sub(src, src, kSystemPointerSize);
+#endif
   } else if (mode == kDstLessThanSrcAndReverse) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Sub(src, src, kSystemPointerAddrSize);
+#else
     Sub(src, src, kSystemPointerSize);
+#endif
   }
   Bind(&loop);
   Cbz(count, &done);
   Ldp(temp0, temp1,
+#if defined(__CHERI_PURE_CAPABILITY__)
+      MemOperand(src, 2 * src_direction * kSystemPointerAddrSize, PostIndex));
+#else
       MemOperand(src, 2 * src_direction * kSystemPointerSize, PostIndex));
+#endif
   Sub(count, count, 2);
   if (mode == kDstLessThanSrcAndReverse) {
     Stp(temp1, temp0,
+#if defined(__CHERI_PURE_CAPABILITY__)
+        MemOperand(dst, 2 * dst_direction * kSystemPointerAddrSize, PostIndex));
+#else
         MemOperand(dst, 2 * dst_direction * kSystemPointerSize, PostIndex));
+#endif
   } else {
     Stp(temp0, temp1,
+#if defined(__CHERI_PURE_CAPABILITY__)
+        MemOperand(dst, 2 * dst_direction * kSystemPointerAddrSize, PostIndex));
+#else
         MemOperand(dst, 2 * dst_direction * kSystemPointerSize, PostIndex));
+#endif
   }
   B(&loop);
 
@@ -2158,9 +2194,6 @@ void TurboAssembler::LoadCodeDataContainerCodeNonBuiltin(
   ASM_CODE_COMMENT(this);
   CHECK(V8_EXTERNAL_CODE_SPACE_BOOL);
   // Given the fields layout we can read the Code reference as a full word.
-  static_assert(!V8_EXTERNAL_CODE_SPACE_BOOL ||
-                (CodeDataContainer::kCodeCageBaseUpper32BitsOffset ==
-                 CodeDataContainer::kCodeOffset + kTaggedSize));
   Ldr(destination, FieldMemOperand(code_data_container_object,
                                    CodeDataContainer::kCodeOffset));
 }
@@ -2227,7 +2260,11 @@ void TurboAssembler::StoreReturnAddressAndCall(Register target) {
   Label return_location;
   Adr(x17, &return_location);
 #ifdef V8_ENABLE_CONTROL_FLOW_INTEGRITY
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Add(x16, sp, kSystemPointerAddrSize);
+#else
   Add(x16, sp, kSystemPointerSize);
+#endif
   Pacib1716();
 #endif
   Poke(x17, 0);
@@ -2383,7 +2420,11 @@ void MacroAssembler::InvokePrologue(Register formal_parameter_count,
     Mov(count, extra_argument_count);
     Bind(&loop);
     Str(undefined_value,
+#if defined(__CHERI_PURE_CAPABILITY__)
+        MemOperand(pointer_next_value, kSystemPointerAddrSize, PostIndex));
+#else
         MemOperand(pointer_next_value, kSystemPointerSize, PostIndex));
+#endif
     Subs(count, count, 1);
     Cbnz(count, &loop);
   }
@@ -2665,7 +2706,11 @@ void TurboAssembler::EnterFrame(StackFrame::Type type) {
     Mov(type_reg, StackFrame::TypeToMarker(type));
     Push<TurboAssembler::kSignLR>(lr, fp, type_reg, padreg);
     const int kFrameSize =
+#if defined(__CHERI_PURE_CAPABILITY__)
+        TypedFrameConstants::kFixedFrameSizeFromFp + kSystemPointerAddrSize;
+#else
         TypedFrameConstants::kFixedFrameSizeFromFp + kSystemPointerSize;
+#endif
     Add(fp, sp, kFrameSize);
     // sp[3] : lr
     // sp[2] : fp
@@ -2696,7 +2741,11 @@ void TurboAssembler::EnterFrame(StackFrame::Type type) {
     // The context pointer isn't part of the fixed frame, so add an extra slot
     // to account for it.
     Add(fp, sp,
+#if defined(__CHERI_PURE_CAPABILITY__)
+        TypedFrameConstants::kFixedFrameSizeFromFp + kSystemPointerAddrSize);
+#else
         TypedFrameConstants::kFixedFrameSizeFromFp + kSystemPointerSize);
+#endif
     // sp[3] : lr
     // sp[2] : fp
     // sp[1] : type
@@ -2758,13 +2807,23 @@ void MacroAssembler::EnterExitFrame(bool save_doubles, const Register& scratch,
   //    fp -> fp[0]: CallerFP (old fp)
   //          fp[-8]: STUB marker
   //    sp -> fp[-16]: Space reserved for SPOffset.
-  static_assert((2 * kSystemPointerSize) ==
+#if defined(__CHERI_PURE_CAPABILITY__)
+    static_assert((2 * kSystemPointerAddrSize) ==
+                ExitFrameConstants::kCallerSPOffset);
+  static_assert((1 * kSystemPointerAddrSize) ==
+                ExitFrameConstants::kCallerPCOffset);
+  static_assert((0 * kSystemPointerAddrSize) ==
+                ExitFrameConstants::kCallerFPOffset);
+static_assert((-2 * kSystemPointerAddrSize) == ExitFrameConstants::kSPOffset);
+#else
+   static_assert((2 * kSystemPointerSize) ==
                 ExitFrameConstants::kCallerSPOffset);
   static_assert((1 * kSystemPointerSize) ==
                 ExitFrameConstants::kCallerPCOffset);
   static_assert((0 * kSystemPointerSize) ==
                 ExitFrameConstants::kCallerFPOffset);
-  static_assert((-2 * kSystemPointerSize) == ExitFrameConstants::kSPOffset);
+ static_assert((-2 * kSystemPointerSize) == ExitFrameConstants::kSPOffset);
+#endif
 
   // Save the frame pointer and context pointer in the top frame.
   Mov(scratch,
@@ -2773,8 +2832,11 @@ void MacroAssembler::EnterExitFrame(bool save_doubles, const Register& scratch,
   Mov(scratch,
       ExternalReference::Create(IsolateAddressId::kContextAddress, isolate()));
   Str(cp, MemOperand(scratch));
-
+#if defined(__CHERI_PURE_CAPABILITY__)
+  static_assert((-2 * kSystemPointerAddrSize) ==
+#else
   static_assert((-2 * kSystemPointerSize) ==
+#endif
                 ExitFrameConstants::kLastExitFrameField);
   if (save_doubles) {
     ExitFramePreserveFPRegs();
@@ -3723,7 +3785,11 @@ void TurboAssembler::ComputeCodeStartAddress(const Register& rd) {
 }
 
 void TurboAssembler::RestoreFPAndLR() {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  static_assert(StandardFrameConstants::kCallerFPOffset + kSystemPointerAddrSize ==
+#else
   static_assert(StandardFrameConstants::kCallerFPOffset + kSystemPointerSize ==
+#endif
                     StandardFrameConstants::kCallerPCOffset,
                 "Offsets must be consecutive for ldp!");
 #ifdef V8_ENABLE_CONTROL_FLOW_INTEGRITY
@@ -3746,7 +3812,11 @@ void TurboAssembler::StoreReturnAddressInWasmExitFrame(Label* return_location) {
   temps.Exclude(x16, x17);
   Adr(x17, return_location);
 #ifdef V8_ENABLE_CONTROL_FLOW_INTEGRITY
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Add(x16, fp, WasmExitFrameConstants::kCallingPCOffset + kSystemPointerAddrSize);
+#else
   Add(x16, fp, WasmExitFrameConstants::kCallingPCOffset + kSystemPointerSize);
+#endif
   Pacib1716();
 #endif
   Str(x17, MemOperand(fp, WasmExitFrameConstants::kCallingPCOffset));

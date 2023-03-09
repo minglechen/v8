@@ -14,6 +14,88 @@ namespace internal {
 
 #ifdef V8_COMPRESS_POINTERS
 
+//
+// V8HeapCompressionScheme
+//
+
+// static
+Address V8HeapCompressionScheme::GetPtrComprCageBaseAddress(
+    Address on_heap_addr) {
+  return RoundDown<kPtrComprCageBaseAlignment>(on_heap_addr);
+}
+
+// static
+Address V8HeapCompressionScheme::GetPtrComprCageBaseAddress(
+    PtrComprCageBase cage_base) {
+  Address base = cage_base.address();
+  base = reinterpret_cast<Address>(V8_ASSUME_ALIGNED(
+      reinterpret_cast<void*>(base), kPtrComprCageBaseAlignment));
+  return base;
+}
+
+#ifdef V8_COMPRESS_POINTERS_IN_SHARED_CAGE
+
+// static
+void V8HeapCompressionScheme::InitBase(Address base) {
+  CHECK_EQ(base, GetPtrComprCageBaseAddress(base));
+  base_ = base;
+}
+
+// static
+Address V8HeapCompressionScheme::base() {
+  return reinterpret_cast<Address>(V8_ASSUME_ALIGNED(
+      reinterpret_cast<void*>(base_), kPtrComprCageBaseAlignment));
+}
+#endif  // V8_COMPRESS_POINTERS_IN_SHARED_CAGE
+
+// static
+Tagged_t V8HeapCompressionScheme::CompressTagged(Address tagged) {
+  return static_cast<Tagged_t>(static_cast<uint32_t>(tagged));
+}
+
+// static
+Address V8HeapCompressionScheme::DecompressTaggedSigned(Tagged_t raw_value) {
+  // For runtime code the upper 32-bits of the Smi value do not matter.
+  return static_cast<Address>(raw_value);
+}
+
+// static
+template <typename TOnHeapAddress>
+Address V8HeapCompressionScheme::DecompressTaggedPointer(
+    TOnHeapAddress on_heap_addr, Tagged_t raw_value) {
+#if defined(V8_COMPRESS_POINTERS_IN_SHARED_CAGE) && \
+    !defined(V8_COMPRESS_POINTERS_DONT_USE_GLOBAL_BASE)
+  Address cage_base = base();
+#else
+  Address cage_base = GetPtrComprCageBaseAddress(on_heap_addr);
+#endif
+  return cage_base + static_cast<Address>(raw_value);
+}
+
+// static
+template <typename TOnHeapAddress>
+Address V8HeapCompressionScheme::DecompressTaggedAny(
+    TOnHeapAddress on_heap_addr, Tagged_t raw_value) {
+  return DecompressTaggedPointer(on_heap_addr, raw_value);
+}
+
+// static
+template <typename ProcessPointerCallback>
+void V8HeapCompressionScheme::ProcessIntermediatePointers(
+    PtrComprCageBase cage_base, Address raw_value,
+    ProcessPointerCallback callback) {
+  // If pointer compression is enabled, we may have random compressed pointers
+  // on the stack that may be used for subsequent operations.
+  // Extract, decompress and trace both halfwords.
+  Address decompressed_low = V8HeapCompressionScheme::DecompressTaggedPointer(
+      cage_base, static_cast<Tagged_t>(raw_value));
+  callback(decompressed_low);
+  Address decompressed_high = V8HeapCompressionScheme::DecompressTaggedPointer(
+      cage_base,
+      static_cast<Tagged_t>(raw_value >> (sizeof(Tagged_t) * CHAR_BIT)));
+  callback(decompressed_high);
+}
+
 #ifdef V8_EXTERNAL_CODE_SPACE
 
 //

@@ -3903,6 +3903,11 @@ bool Isolate::Init(SnapshotData* startup_snapshot_data,
                    SnapshotData* read_only_snapshot_data,
                    SnapshotData* shared_heap_snapshot_data, bool can_rehash) {
   TRACE_ISOLATE(init);
+  
+#ifdef V8_COMPRESS_POINTERS_IN_SHARED_CAGE
+  CHECK_EQ(V8HeapCompressionScheme::base(), cage_base());
+#endif  // V8_COMPRESS_POINTERS_IN_SHARED_CAGE
+
   const bool create_heap_objects = (read_only_snapshot_data == nullptr);
   // We either have all or none.
   DCHECK_EQ(create_heap_objects, startup_snapshot_data == nullptr);

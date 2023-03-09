@@ -70,6 +70,15 @@ class CodeDataContainer : public HeapObject {
   DECL_GETTER(code, Code)
   DECL_RELAXED_GETTER(code, Code)
 
+  // When V8_EXTERNAL_CODE_SPACE is enabled, Code objects are allocated in
+  // a separate pointer compression cage instead of the cage where all the
+  // other objects are allocated.
+  // This helper method returns code cage base value which is used for
+  // decompressing the reference to respective Code. It loads the Isolate from
+  // the page header (since the CodeDataContainer objects are always writable)
+  // and then the code cage base value from there.
+  inline PtrComprCageBase code_cage_base() const;
+  
   // Cached value of code().InstructionStart().
   // Available only when V8_EXTERNAL_CODE_SPACE is defined.
   DECL_GETTER(code_entry_point, Address)
@@ -190,6 +199,12 @@ class CodeDataContainer : public HeapObject {
 
   DEFINE_FIELD_OFFSET_CONSTANTS(HeapObject::kHeaderSize, CODE_DATA_FIELDS)
 #undef CODE_DATA_FIELDS
+
+#ifdef V8_EXTERNAL_CODE_SPACE
+  template <typename T>
+  using ExternalCodeField =
+      TaggedField<T, kCodeOffset, ExternalCodeCompressionScheme>;
+#endif  // V8_EXTERNAL_CODE_SPACE
 
   class BodyDescriptor;
 

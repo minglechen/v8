@@ -1011,26 +1011,41 @@ RELAXED_INT32_ACCESSORS(CodeDataContainer, kind_specific_flags,
                         kKindSpecificFlagsOffset)
 
 Object CodeDataContainer::raw_code(PtrComprCageBase cage_base) const {
-  CHECK(V8_EXTERNAL_CODE_SPACE_BOOL);
-  Object value = TaggedField<Object, kCodeOffset>::load(cage_base, *this);
-  return value;
+#ifdef V8_EXTERNAL_CODE_SPACE
+  return ExternalCodeField<Object>::load(cage_base, *this);
+#else
+  UNREACHABLE();
+#endif // V8_EXTERNAL_CODE_SPACE
 }
 
 void CodeDataContainer::set_raw_code(Object value, WriteBarrierMode mode) {
-  CHECK(V8_EXTERNAL_CODE_SPACE_BOOL);
-  TaggedField<Object, kCodeOffset>::store(*this, value);
+#ifdef V8_EXTERNAL_CODE_SPACE
+  ExternalCodeField<Object>::Release_Store(*this, value);
   CONDITIONAL_WRITE_BARRIER(*this, kCodeOffset, value, mode);
+#else
+  UNREACHABLE();
+#endif // V8_EXTERNAL_CODE_SPACE
 }
 
 Object CodeDataContainer::raw_code(PtrComprCageBase cage_base,
                                    RelaxedLoadTag) const {
-  Object value =
-      TaggedField<Object, kCodeOffset>::Relaxed_Load(cage_base, *this);
-  CHECK(V8_EXTERNAL_CODE_SPACE_BOOL);
-  return value;
+#ifdef V8_EXTERNAL_CODE_SPACE
+  return ExternalCodeField<Object>::Relaxed_Load(cage_base, *this);
+#else
+  UNREACHABLE();
+#endif // V8_EXTERNAL_CODE_SPACE
 }
 
 ACCESSORS(CodeDataContainer, next_code_link, Object, kNextCodeLinkOffset)
+
+PtrComprCageBase CodeDataContainer::code_cage_base() const {
+#ifdef V8_EXTERNAL_CODE_SPACE
+  Isolate* isolate = GetIsolateFromWritableObject(*this);
+  return PtrComprCageBase(isolate->code_cage_base());
+#else
+  return GetPtrComprCageBase(*this);
+#endif  // V8_EXTERNAL_CODE_SPACE
+}
 
 void CodeDataContainer::AllocateExternalPointerEntries(Isolate* isolate) {
   CHECK(V8_EXTERNAL_CODE_SPACE_BOOL);
@@ -1042,8 +1057,12 @@ Code CodeDataContainer::code() const {
   return CodeDataContainer::code(cage_base);
 }
 Code CodeDataContainer::code(PtrComprCageBase cage_base) const {
-  CHECK(V8_EXTERNAL_CODE_SPACE_BOOL);
-  return Code::cast(raw_code(cage_base));
+#ifdef V8_EXTERNAL_CODE_SPACE
+  DCHECK(!is_off_heap_trampoline());
+  return ExternalCodeField<Code>::load(cage_base, *this);
+#else
+  UNREACHABLE();
+#endif  // V8_EXTERNAL_CODE_SPACE
 }
 
 Code CodeDataContainer::code(RelaxedLoadTag tag) const {

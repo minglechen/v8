@@ -8,6 +8,8 @@ namespace v8::internal {
 
 #ifdef V8_COMPRESS_POINTERS_IN_SHARED_CAGE
 
+uintptr_t V8HeapCompressionScheme::base_ = kNullAddress;
+
 #ifdef V8_EXTERNAL_CODE_SPACE
 uintptr_t ExternalCodeCompressionScheme::base_ = kNullAddress;
 #endif  // V8_EXTERNAL_CODE_SPACE

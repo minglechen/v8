@@ -957,9 +957,6 @@ inline constexpr bool IsSharedAllocationType(AllocationType kind) {
 }
 
 enum AllocationAlignment {
-#if defined(__CHERI_PURE_CAPABILITY__)
-  kSystemPointerAligned,
-#endif
   // The allocated address is kTaggedSize aligned (this is default for most of
   // the allocations).
   kTaggedAligned,
@@ -978,11 +975,7 @@ enum AllocationAlignment {
 // unaligned access since both x64 and arm64 architectures (where pointer
 // compression is supported) allow unaligned access to doubles and full words.
 #endif  // V8_COMPRESS_POINTERS
-#if defined(__CHERI_PURE_CAPABILITY__)
-#define USE_ALLOCATION_ALIGNMENT_BOOL true
-#else
 #define USE_ALLOCATION_ALIGNMENT_BOOL false
-#endif  // __CHERI_PURE_CAPABILITY__
 #endif  // V8_HOST_ARCH_32_BIT
 
 enum class AccessMode { ATOMIC, NON_ATOMIC };

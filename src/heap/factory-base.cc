@@ -78,11 +78,7 @@ Handle<CodeDataContainer> FactoryBase<Impl>::NewCodeDataContainer(
   Map map = read_only_roots().code_data_container_map();
   int size = map.instance_size();
   CodeDataContainer data_container = CodeDataContainer::cast(
-#if defined(__CHERI_PURE_CAPABILITY__)
-      AllocateRawWithImmortalMap(size, allocation, map, kSystemPointerAligned));
-#else
       AllocateRawWithImmortalMap(size, allocation, map));
-#endif
   DisallowGarbageCollection no_gc;
   data_container.set_next_code_link(read_only_roots().undefined_value(),
                                     SKIP_WRITE_BARRIER);

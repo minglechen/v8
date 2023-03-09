@@ -3140,10 +3140,6 @@ static_assert(!USE_ALLOCATION_ALIGNMENT_BOOL ||
 
 int Heap::GetMaximumFillToAlign(AllocationAlignment alignment) {
   switch (alignment) {
-#if defined(__CHERI_PURE_CAPABILITY__)
-    case kSystemPointerAligned:
-      return kSystemPointerSize - kTaggedSize;
-#endif
     case kTaggedAligned:
       return 0;
     case kDoubleAligned:
@@ -3156,10 +3152,6 @@ int Heap::GetMaximumFillToAlign(AllocationAlignment alignment) {
 
 // static
 int Heap::GetFillToAlign(Address address, AllocationAlignment alignment) {
-#if defined(__CHERI_PURE_CAPABILITY__)
-  if (alignment == kSystemPointerAligned && (address & kPointerAlignmentMask) != 0)
-    return kSystemPointerSize - (address & kPointerAlignmentMask);
-#endif
   if (alignment == kDoubleAligned && (address & kDoubleAlignmentMask) != 0)
     return kTaggedSize;
   if (alignment == kDoubleUnaligned && (address & kDoubleAlignmentMask) == 0)

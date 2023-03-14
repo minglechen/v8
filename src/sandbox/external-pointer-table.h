@@ -150,13 +150,13 @@ class V8_EXPORT_PRIVATE ExternalPointerTable {
 
   // Atomically loads the value at the given index.
   inline Address load_atomic(uint32_t index) const {
-    auto addr = reinterpret_cast<base::Atomic64*>(entry_address(index));
+    auto addr = reinterpret_cast<base::AtomicIntPtr*>(entry_address(index));
     return base::Relaxed_Load(addr);
   }
 
   // Atomically stores the provided value at the given index.
   inline void store_atomic(uint32_t index, Address value) {
-    auto addr = reinterpret_cast<base::Atomic64*>(entry_address(index));
+    auto addr = reinterpret_cast<base::AtomicIntPtr*>(entry_address(index));
     base::Relaxed_Store(addr, value);
   }
 

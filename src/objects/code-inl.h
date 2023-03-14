@@ -312,10 +312,7 @@ inline MaybeHandle<CodeT> ToCodeT(MaybeHandle<Code> maybe_code,
 
 inline Code FromCodeT(CodeT code) {
 #ifdef V8_EXTERNAL_CODE_SPACE
-  DCHECK(!code.is_off_heap_trampoline());
-  // Compute the Code object pointer from the code entry point.
-  Address ptr = code.code_entry_point() - Code::kHeaderSize + kHeapObjectTag;
-  return Code::cast(Object(ptr));
+  return code.code();
 #else
   return code;
 #endif
@@ -323,10 +320,6 @@ inline Code FromCodeT(CodeT code) {
 
 inline Code FromCodeT(CodeT code, PtrComprCageBase code_cage_base, RelaxedLoadTag tag) {
 #ifdef V8_EXTERNAL_CODE_SPACE
-  DCHECK(!code.is_off_heap_trampoline());
-  // Since the code entry point field is not aligned we can't load it atomically
-  // and use for Code object pointer calaculation. So, we load and decpompress
-  // the code field.
   return code.code(code_cage_base, tag);
 #else
   return code;
@@ -1058,7 +1051,6 @@ Code CodeDataContainer::code() const {
 }
 Code CodeDataContainer::code(PtrComprCageBase cage_base) const {
 #ifdef V8_EXTERNAL_CODE_SPACE
-  DCHECK(!is_off_heap_trampoline());
   return ExternalCodeField<Code>::load(cage_base, *this);
 #else
   UNREACHABLE();

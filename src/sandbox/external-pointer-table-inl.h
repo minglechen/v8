@@ -84,7 +84,7 @@ Address ExternalPointerTable::Get(uint32_t index,
   Address entry_tag = load_atomic(index + 1);
   DCHECK(!is_free(entry_tag));
 
-  return entry & ~(entry_tag & ~tag); 
+  return (ptraddr_t) (entry_tag & ~tag) == 0 ? entry : (Address) nullptr; 
 #else
   DCHECK_LT(index, capacity_);
 

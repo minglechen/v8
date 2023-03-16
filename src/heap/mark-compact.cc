@@ -3390,6 +3390,14 @@ MaybeObject MakeSlotValue<FullMaybeObjectSlot, HeapObjectReferenceType::STRONG>(
   return HeapObjectReference::Strong(heap_object);
 }
 
+#ifdef V8_EXTERNAL_CODE_SPACE
+template <>
+Object MakeSlotValue<CodeObjectSlot, HeapObjectReferenceType::STRONG>(
+    HeapObject heap_object) {
+  return heap_object;
+}
+#endif  // V8_EXTERNAL_CODE_SPACE
+
 // The following specialization
 //   MakeSlotValue<FullMaybeObjectSlot, HeapObjectReferenceType::WEAK>()
 // is not used.
@@ -3405,9 +3413,10 @@ static inline SlotCallbackResult UpdateSlot(PtrComprCageBase cage_base,
                     std::is_same<TSlot, ObjectSlot>::value ||
                     std::is_same<TSlot, FullMaybeObjectSlot>::value ||
                     std::is_same<TSlot, MaybeObjectSlot>::value ||
-                    std::is_same<TSlot, OffHeapObjectSlot>::value,
-                "Only [Full|OffHeap]ObjectSlot and [Full]MaybeObjectSlot are "
-                "expected here");
+                    std::is_same<TSlot, OffHeapObjectSlot>::value ||
+		    std::is_same<TSlot, CodeObjectSlot>::value,
+                "Only [Full|OffHeap]ObjectSlot and [Full]MaybeObjectSlot "
+                "or CodeObjectSlot are expected here");
   MapWord map_word = heap_obj.map_word(cage_base, kRelaxedLoad);
   if (map_word.IsForwardingAddress()) {
     DCHECK_IMPLIES(!Heap::InFromPage(heap_obj),

@@ -27,13 +27,34 @@ int FreeSpace::Size() { return size(kRelaxedLoad); }
 
 FreeSpace FreeSpace::next() {
   DCHECK(IsValid());
+#ifdef V8_EXTERNAL_CODE_SPACE
+  intptr_t diff_to_next =
+      static_cast<intptr_t>(TaggedField<Smi, kNextOffset>::load(*this).value());
+  if (diff_to_next == 0) {
+    return FreeSpace();
+  }
+  Address next_ptr = ptr() + diff_to_next * kObjectAlignment;
+  return FreeSpace::unchecked_cast(Object(next_ptr));
+#else
   return FreeSpace::unchecked_cast(
       TaggedField<Object, kNextOffset>::load(*this));
+#endif
 }
 
 void FreeSpace::set_next(FreeSpace next) {
   DCHECK(IsValid());
-  RELAXED_WRITE_FIELD(*this, kNextOffset, next);
+#ifdef V8_EXTERNAL_CODE_SPACE
+   if (next.is_null()) {
+    TaggedField<Smi, kNextOffset>::Relaxed_Store(*this, Smi::zero());
+    return;
+  }
+  intptr_t diff_to_next = next.ptr() - ptr();
+  DCHECK(IsAligned(diff_to_next, kObjectAlignment));
+  TaggedField<Smi, kNextOffset>::Relaxed_Store(
+      *this, Smi::FromIntptr(diff_to_next / kObjectAlignment));
+#else
+ RELAXED_WRITE_FIELD(*this, kNextOffset, next);
+#endif
 }
 
 FreeSpace FreeSpace::cast(HeapObject o) {

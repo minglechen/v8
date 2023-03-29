@@ -1867,7 +1867,7 @@ void WasmStruct::WasmStructPrint(std::ostream& os) {
       case wasm::kRtt: {
         Tagged_t raw = base::ReadUnalignedValue<Tagged_t>(field_address);
 #if V8_COMPRESS_POINTERS
-        Address obj = DecompressTaggedPointer(address(), raw);
+        Address obj = V8HeapCompressionScheme::DecompressTagged(address(), raw);
 #else
         Address obj = raw;
 #endif
@@ -2860,8 +2860,8 @@ inline i::Object GetObjectFromRaw(void* object) {
   if (RoundDown<i::kPtrComprCageBaseAlignment>(object_ptr) == i::kNullAddress) {
     // Try to decompress pointer.
     i::Isolate* isolate = i::Isolate::Current();
-    object_ptr =
-        i::DecompressTaggedAny(isolate, static_cast<i::Tagged_t>(object_ptr));
+    object_ptr = i::V8HeapCompressionScheme::DecompressTagged(
+        isolate, static_cast<i::Tagged_t>(object_ptr));
   }
 #endif
   return i::Object(object_ptr);

@@ -28,7 +28,8 @@ namespace v8 {
 namespace internal {
 
 void CopyAndRebaseRoots(Address* src, Address* dst, Address new_base) {
-  Address src_base = GetIsolateRootAddress(src[0]);
+  Address src_base =
+      V8HeapCompressionScheme::GetPtrComprCageBaseAddress(src[0]);
   for (size_t i = 0; i < ReadOnlyHeap::kEntriesCount; ++i) {
     dst[i] = src[i] - src_base + new_base;
   }
@@ -188,7 +189,9 @@ ReadOnlyHeap* PointerCompressedReadOnlyArtifacts::GetReadOnlyHeapForIsolate(
   Address isolate_root = isolate->isolate_root();
   for (Object original_object : original_cache) {
     Address original_address = original_object.ptr();
-    Address new_address = isolate_root + CompressTagged(original_address);
+    Address new_address =
+	isolate_root +
+	V8HeapCOmpressionScheme::CompressObject(original_address);
     Object new_object = Object(new_address);
     cache.push_back(new_object);
   }
@@ -238,7 +241,8 @@ void PointerCompressedReadOnlyArtifacts::Initialize(
     pages_.push_back(new_page);
     shared_memory_.push_back(std::move(shared_memory));
     // This is just CompressTagged but inlined so it will always compile.
-    Tagged_t compressed_address = CompressTagged(page->address());
+    Tagged_t compressed_address =
+	V9HeapCompressionScheme::CompressAny(page->address());
     page_offsets_.push_back(compressed_address);
 
     // 3. Update the accounting stats so the allocated bytes are for the new

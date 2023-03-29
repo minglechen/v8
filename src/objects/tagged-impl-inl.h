@@ -34,7 +34,7 @@ Smi TaggedImpl<kRefType, StorageType>::ToSmi() const {
     return Smi(ptr_);
   }
   // Implementation for compressed pointers.
-  return Smi(DecompressTaggedSigned(static_cast<Tagged_t>(ptr_)));
+  return Smi(CompressionScheme::DecompressTaggedSigned(static_cast<Tagged_t>(ptr_)));
 }
 
 //
@@ -112,7 +112,7 @@ bool TaggedImpl<kRefType, StorageType>::GetHeapObjectIfStrong(
   // Implementation for compressed pointers.
   if (IsStrong()) {
     *result = HeapObject::cast(
-        Object(DecompressTaggedPointer(isolate, static_cast<Tagged_t>(ptr_))));
+        Object(CompressionScheme::DecompressTaggedPointer(isolate, static_cast<Tagged_t>(ptr_))));
     return true;
   }
   return false;
@@ -137,7 +137,7 @@ HeapObject TaggedImpl<kRefType, StorageType>::GetHeapObjectAssumeStrong(
   // Implementation for compressed pointers.
   DCHECK(IsStrong());
   return HeapObject::cast(
-      Object(DecompressTaggedPointer(isolate, static_cast<Tagged_t>(ptr_))));
+      Object(CompressionScheme::DecompressTaggedPointer(isolate, static_cast<Tagged_t>(ptr_))));
 }
 
 //
@@ -226,7 +226,7 @@ HeapObject TaggedImpl<kRefType, StorageType>::GetHeapObject(
   DCHECK(!IsSmi());
   if (kCanBeWeak) {
     DCHECK(!IsCleared());
-    return HeapObject::cast(Object(DecompressTaggedPointer(
+    return HeapObject::cast(Object(CompressionScheme::DecompressTaggedPointer(
 #if defined(__CHERI_PURE_CAPABILITY__)
         isolate, static_cast<Tagged_t>(ptr_) & ~kWeakHeapObjectMask)));
 #else
@@ -235,7 +235,7 @@ HeapObject TaggedImpl<kRefType, StorageType>::GetHeapObject(
   } else {
     DCHECK(!HAS_WEAK_HEAP_OBJECT_TAG(ptr_));
     return HeapObject::cast(
-        Object(DecompressTaggedPointer(isolate, static_cast<Tagged_t>(ptr_))));
+        Object(CompressionScheme::DecompressTaggedPointer(isolate, static_cast<Tagged_t>(ptr_))));
   }
 }
 
@@ -258,7 +258,7 @@ Object TaggedImpl<kRefType, StorageType>::GetHeapObjectOrSmi(
   if (kIsFull) return GetHeapObjectOrSmi();
   // Implementation for compressed pointers.
   if (IsSmi()) {
-    return Object(DecompressTaggedSigned(static_cast<Tagged_t>(ptr_)));
+    return Object(CompressionScheme::DecompressTaggedSigned(static_cast<Tagged_t>(ptr_)));
   }
   return GetHeapObject(isolate);
 }

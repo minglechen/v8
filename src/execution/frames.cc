@@ -1232,8 +1232,8 @@ void CommonFrame::IterateCompiledFrame(RootVisitor* v) const {
         Address value = *spill_slot.location();
         if (!HAS_SMI_TAG(value) && value <= 0xffffffff) {
           // We don't need to update smi values or full pointers.
-          *spill_slot.location() =
-              DecompressTaggedPointer(cage_base, static_cast<Tagged_t>(value));
+          *spill_slot.location() = V8HeapCompressionScheme::DecompressTaggedAny(
+	      cage_base, static_cast<Tagged_t>(value));
           if (DEBUG_BOOL) {
             // Ensure that the spill slot contains correct heap object.
             HeapObject raw = HeapObject::cast(Object(*spill_slot.location()));
@@ -1259,8 +1259,8 @@ void CommonFrame::IterateCompiledFrame(RootVisitor* v) const {
             static_cast<Tagged_t>(*spill_slot.location());
         if (!HAS_SMI_TAG(compressed_value)) {
           // We don't need to update smi values.
-          *spill_slot.location() =
-              DecompressTaggedPointer(cage_base, compressed_value);
+          *spill_slot.location() = V8HeapCompressionScheme::DecompressTaggedANy(
+	      cage_base, compressed_value);
         }
       }
 #endif

@@ -392,7 +392,11 @@ base::AddressRegion Isolate::GetShortBuiltinsCallRegion() {
 
   DCHECK_LT(CurrentEmbeddedBlobCodeSize(), radius);
   Address embedded_blob_code_start =
+#if defined(__CHERI_PURE_CAPABILITY__)
+      reinterpret_cast<ptraddr_t>(CurrentEmbeddedBlobCode());
+#else
       reinterpret_cast<Address>(CurrentEmbeddedBlobCode());
+#endif
   if (embedded_blob_code_start == kNullAddress) {
     // Return empty region if there's no embedded blob.
     return base::AddressRegion(kNullAddress, 0);
@@ -757,7 +761,7 @@ class CallSiteBuilder {
     Handle<Object> receiver(combinator->native_context().promise_function(),
                             isolate_);
     // TODO(v8:11880): avoid roundtrips between cdc and code.
-    Handle<Code> code(FromCodeT(combinator->code(), isolate_);
+    Handle<Code> code(FromCodeT(combinator->code()), isolate_);
 
     // TODO(mmarchini) save Promises list from the Promise combinator
     Handle<FixedArray> parameters = isolate_->factory()->empty_fixed_array();

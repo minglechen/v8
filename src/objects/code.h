@@ -81,7 +81,7 @@ class CodeDataContainer : public HeapObject {
   
   // Cached value of code().InstructionStart().
   // Available only when V8_EXTERNAL_CODE_SPACE is defined.
-  DECL_GETTER(code_entry_point, Address)
+  inline Address code_entry_point() const;
 
   inline void SetCodeAndEntryPoint(
       Isolate* isolate_for_sandbox, Code code,
@@ -204,10 +204,6 @@ class CodeDataContainer : public HeapObject {
   template <typename T>
   using ExternalCodeField =
       TaggedField<T, kCodeOffset, ExternalCodeCompressionScheme>;
-
-  template <typename T>
-  using ExternalCodeEntryPointField =
-      TaggedField<T, kCodeEntryPointOffset, ExternalCodeCompressionScheme>;
 #endif  // V8_EXTERNAL_CODE_SPACE
 
   class BodyDescriptor;

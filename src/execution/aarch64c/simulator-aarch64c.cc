@@ -1843,6 +1843,9 @@ void Simulator::VisitAddSubImmediate(Instruction* instr) {
   }
 }
 
+void Simulator::VisitMorelloAddSubImmediate(Instruction* instr) {
+}
+
 void Simulator::VisitAddSubExtended(Instruction* instr) {
   Extend ext = static_cast<Extend>(instr->ExtendMode());
   unsigned left_shift = instr->ImmExtendShift();

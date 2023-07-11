@@ -18,6 +18,7 @@ namespace internal {
 #define VISITOR_LIST(V)                 \
   V(PCRelAddressing)                    \
   V(AddSubImmediate)                    \
+  V(MorelloAddSubImmediate)             \
   V(LogicalImmediate)                   \
   V(MoveWideImmediate)                  \
   V(Bitfield)                           \

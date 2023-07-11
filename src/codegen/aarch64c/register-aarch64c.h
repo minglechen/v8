@@ -5,7 +5,7 @@
 #ifndef V8_CODEGEN_ARM64_REGISTER_ARM64_H_
 #define V8_CODEGEN_ARM64_REGISTER_ARM64_H_
 
-#include "src/codegen/arm64/utils-arm64.h"
+#include "src/codegen/aarch64c/utils-aarch64c.h"
 #include "src/codegen/register-base.h"
 #include "src/common/globals.h"
 
@@ -47,6 +47,12 @@ namespace internal {
 
 #define MAGLEV_SCRATCH_GENERAL_REGISTERS(R)               \
   R(x16) R(x17)
+
+#define CAPABILITY_REGISTERS(C)                           \
+  C(c0)  C(c1)  C(c2)  C(c3)  C(c4)  C(c5)  C(c6)  C(c7)  \
+  C(c8)  C(c9)  C(c10) C(c11) C(c12) C(c13) C(c14) C(c15) \
+  C(c16) C(c17) C(c18) C(c19) C(c20) C(c21) C(c22) C(c23) \
+  C(c24) C(c25) C(c26) C(c27) C(c28) C(c29) C(c30) C(c31)
 
 #define FLOAT_REGISTERS(V)                                \
   V(s0)  V(s1)  V(s2)  V(s3)  V(s4)  V(s5)  V(s6)  V(s7)  \
@@ -161,8 +167,17 @@ class CPURegister : public RegisterBase<CPURegister, kRegAfterLast> {
 
   bool IsFPRegister() const { return IsS() || IsD(); }
 
+  // 2.2 Capability Registers
+  //
+  // General-purpose | Access view provided (bits) | Register names
+  // register name   |                             | based on access view
+  // --------------------------------------------------------------------
+  // Rn              | 64                          | Xn
+  //                 | 32                          | Wn
+  //                 | 129                         | Cn
   bool IsW() const { return IsRegister() && Is32Bits(); }
   bool IsX() const { return IsRegister() && Is64Bits(); }
+  bool IsC() const { return IsRegister() && Is128Bits(); }
 
   // These assertions ensure that the size and type of the register are as
   // described. They do not consider the number of lanes that make up a vector.
@@ -182,6 +197,7 @@ class CPURegister : public RegisterBase<CPURegister, kRegAfterLast> {
 
   Register X() const;
   Register W() const;
+  Register C() const;
   VRegister V() const;
   VRegister B() const;
   VRegister H() const;
@@ -216,8 +232,8 @@ class CPURegister : public RegisterBase<CPURegister, kRegAfterLast> {
       : RegisterBase(code), reg_size_(size), reg_type_(type) {}
 
   static constexpr bool IsValidRegister(int code, int size) {
-    return (size == kWRegSizeInBits || size == kXRegSizeInBits) &&
-           (code < kNumberOfRegisters || code == kSPRegInternalCode);
+    return (size == kWRegSizeInBits || size == kXRegSizeInBits || size == kCRegSizeInBits) &&
+           (code < kNumberOfRegisters || code == kSPRegInternalCode); // kCSPRegInternalCode
   }
 
   static constexpr bool IsValidVRegister(int code, int size) {

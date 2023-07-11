@@ -44,6 +44,10 @@ constexpr int kNumberOfVRegisters = 32;
 constexpr int kNumberOfCalleeSavedRegisters = 10;
 // Callee saved FP registers are d8-d15.
 constexpr int kNumberOfCalleeSavedVRegisters = 8;
+constexpr int kCRegSizeInBits = 128;
+constexpr int kCRegSizeInBitsLog2 = 7;
+constexpr int kCRegSize = kCRegSizeInBits >> 3;
+constexpr int kCRegSizeLog2 = kCRegSizeInBitsLog2 - 3;
 constexpr int kWRegSizeInBits = 32;
 constexpr int kWRegSizeInBitsLog2 = 5;
 constexpr int kWRegSize = kWRegSizeInBits >> 3;

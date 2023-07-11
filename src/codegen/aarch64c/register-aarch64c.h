@@ -48,12 +48,6 @@ namespace internal {
 #define MAGLEV_SCRATCH_GENERAL_REGISTERS(R)               \
   R(x16) R(x17)
 
-#define CAPABILITY_REGISTERS(C)                           \
-  C(c0)  C(c1)  C(c2)  C(c3)  C(c4)  C(c5)  C(c6)  C(c7)  \
-  C(c8)  C(c9)  C(c10) C(c11) C(c12) C(c13) C(c14) C(c15) \
-  C(c16) C(c17) C(c18) C(c19) C(c20) C(c21) C(c22) C(c23) \
-  C(c24) C(c25) C(c26) C(c27) C(c28) C(c29) C(c30) C(c31)
-
 #define FLOAT_REGISTERS(V)                                \
   V(s0)  V(s1)  V(s2)  V(s3)  V(s4)  V(s5)  V(s6)  V(s7)  \
   V(s8)  V(s9)  V(s10) V(s11) V(s12) V(s13) V(s14) V(s15) \
@@ -267,6 +261,7 @@ class Register : public CPURegister {
 
   static Register XRegFromCode(unsigned code);
   static Register WRegFromCode(unsigned code);
+  static Register CRegFromCode(unsigned code);
 
   static constexpr Register from_code(int code) {
     // Always return an X register.
@@ -289,8 +284,12 @@ static_assert(sizeof(Register) <= sizeof(int),
 constexpr int ArgumentPaddingSlots(int argument_count) {
   // Stack frames are aligned to 16 bytes.
   constexpr int kStackFrameAlignment = 16;
+#if __has_builtin(__builtin_align_up)
+  return __builtin_align_up(argument_count, kStackFrameAlignment);
+#else
   constexpr int alignment_mask = kStackFrameAlignment / kSystemPointerSize - 1;
   return argument_count & alignment_mask;
+#endif
 }
 
 constexpr AliasingKind kFPAliasing = AliasingKind::kOverlap;
@@ -489,6 +488,7 @@ GENERAL_REGISTER_CODE_LIST(DEFINE_REGISTERS)
 
 DEFINE_REGISTER(Register, wsp, kSPRegInternalCode, kWRegSizeInBits);
 DEFINE_REGISTER(Register, sp, kSPRegInternalCode, kXRegSizeInBits);
+DEFINE_REGISTER(Register, csp, kSPRegInternalCode, kCRegSizeInBits);
 
 #define DEFINE_VREGISTERS(N)                            \
   DEFINE_REGISTER(VRegister, b##N, N, kBRegSizeInBits); \

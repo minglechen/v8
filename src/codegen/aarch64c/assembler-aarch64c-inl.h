@@ -109,6 +109,15 @@ inline Register Register::WRegFromCode(unsigned code) {
   }
 }
 
+inline Register Register::CRegFromCode(unsigned code) {
+  if (code == kSPRegInternalCode) {
+    return csp;
+  } else {
+    DCHECK_LT(code, static_cast<unsigned>(kNumberOfRegisters));
+    return Register::Create(code, kCRegSizeInBits);
+  }
+}
+
 inline VRegister VRegister::BRegFromCode(unsigned code) {
   DCHECK_LT(code, static_cast<unsigned>(kNumberOfVRegisters));
   return VRegister::Create(code, kBRegSizeInBits);
@@ -157,6 +166,11 @@ inline VRegister CPURegister::VReg() const {
 inline Register CPURegister::X() const {
   DCHECK(IsRegister());
   return Register::XRegFromCode(code());
+}
+
+inline Register CPURegister::C() const {
+  DCHECK(IsRegister());
+  return Register::CRegFromCode(code());
 }
 
 inline VRegister CPURegister::V() const {

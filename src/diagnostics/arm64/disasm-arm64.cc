@@ -3579,6 +3579,12 @@ void DisassemblingDecoder::VisitUnallocated(Instruction* instr) {
   Format(instr, "unallocated", "(Unallocated)");
 }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+void DisassemblingDecoder::VisitMorelloAddSubCapability(Instruction* instr) {
+  Format(instr, "Morello ad/sub capability", "(Unimplemented)");
+}
+#endif
+
 void DisassemblingDecoder::ProcessOutput(Instruction* /*instr*/) {
   // The base disasm does nothing more than disassembling into a buffer.
 }

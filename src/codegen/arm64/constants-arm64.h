@@ -280,6 +280,12 @@ using float16 = uint16_t;
   V_(ImmNEONImmh, 22, 19, Bits)                         \
   V_(ImmNEONImmb, 18, 16, Bits)
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define MORELLO_INSTRUCTION_FIELDS_LIST(V_)             \
+  /* Morello add/subtract capability immediate */       \
+  V_(ImmCapAddSub, 21, 10, Bits)
+#endif // defined(__CHERI_PURE_CAPABILITY__)
+
 #define SYSTEM_REGISTER_FIELDS_LIST(V_, M_) \
   /* NZCV */                                \
   V_(Flags, 31, 28, Bits, uint32_t)         \
@@ -304,6 +310,9 @@ using float16 = uint16_t;
 #define DECLARE_INSTRUCTION_FIELDS_OFFSETS(Name, HighBit, LowBit, unused_1) \
   DECLARE_FIELDS_OFFSETS(Name, HighBit, LowBit, unused_1, unused_2)
 INSTRUCTION_FIELDS_LIST(DECLARE_INSTRUCTION_FIELDS_OFFSETS)
+#if defined(__CHERI_PURE_CAPABILITY__)
+MORELLO_INSTRUCTION_FIELDS_LIST(DECLARE_INSTRUCTION_FIELDS_OFFSETS)
+#endif // defined(__CHERI_PURE_CAPABILITY__)
 SYSTEM_REGISTER_FIELDS_LIST(DECLARE_FIELDS_OFFSETS, NOTHING)
 #undef DECLARE_FIELDS_OFFSETS
 #undef DECLARE_INSTRUCTION_FIELDS_OFFSETS
@@ -2131,6 +2140,20 @@ enum UnallocatedOp : uint32_t {
   UnallocatedFixed = 0x00000000,
   UnallocatedFMask = 0x00000000
 };
+
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define ADD_SUB_CAP_OP_LIST(V) V(CAPADD), V(CAP_SUB)
+
+// Morello Add/sub capability
+enum MorelloAddSubCapabilityOp : uint32_t {
+  MorelloAddSubCapabilityFixed = 0x02000000,
+  MorelloAddSubCapabilityFMask = 0xFF000000,
+  MorelloAddSubCapabilityMask = 0x04000000,
+  CAP_ADD = MorelloAddSubCapabilityFixed | 0x00000000,
+  CAP_SUB = MorelloAddSubCapabilityFixed | 0x00800000,
+};
+
+#endif // defined(__CHERI_PURE_CAPABILITY__)
 
 }  // namespace internal
 }  // namespace v8

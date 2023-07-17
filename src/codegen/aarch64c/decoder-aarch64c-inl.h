@@ -419,10 +419,9 @@ void Decoder<V>::DecodeAddSubImmediate(Instruction* instr) {
 }
 template <typename V>
 void Decoder<V>::DecodeMorelloAddSubImmediate(Instruction* instr) {
-  DCHECK_EQ(0x0, instr->Bits(31, 2r94));
+  DCHECK_EQ(0x0, instr->Bits(31, 29));
   V::VisitMorelloAddSubImmediate(instr);
 }
-
 
 template <typename V>
 void Decoder<V>::DecodeDataProcessing(Instruction* instr) {
@@ -538,7 +537,7 @@ void Decoder<V>::DecodeDataProcessing(Instruction* instr) {
 }
 
 template <typename V>
-void Decoder<V>::DecodeMorrelo(Instruction* instr) {
+void Decoder<V>::DecodeMorelo(Instruction* instr) {
   DCHECK_EQ(0x2, instr->Bits(28, 24));
   // Morello encodings: [31-29 op0][0 0 0 1 0][23-21 op1][20-16][15 op2][14-13][12-10 op3][9-0]
   switch (instr->Bits(31, 29)) {
@@ -571,21 +570,52 @@ void Decoder<V>::DecodeMorrelo(Instruction* instr) {
       break;
     case 0x6:
       if (instr->Bit(23) == 0) {
-        // op0: 110 op1: 0xx Morello load store misc4
+        // op0: 110 op1: 0xx Morello load unsigned offset
       } else {
 	switch (instr->Bits(22, 21)) {
 	  case 0x0:
-	    // op0: 110 op1: 100 Morello load store misc4
+	    // op0: 110 op1: 100 Morello get/set system register
 	    break;
 	  case 0x1:
-	    // op0: 110 op1: 101 Morello load store misc4
+	    // op0: 110 op1: 101 Morello ADD (extended register)
 	  default:
-	    // op0: 110 op1: 11x Morello load store misc4
+	    // op0: 110 op1: 11x Morello morello_misc 
+	    DecodeMorelloMisc(instr);
 	    break
       }
       break;
     // op0: 111 Morello load/store unsacled immediate via alternative base
     case 0x7:
+      break;
+  }
+}
+
+template <typename V>
+void Decoder<V>::DecodeMoreloMisc(Instruction* instr) {
+  DCHECK((instr->Bits(31, 15) == 0x2)); // TODO
+
+}
+
+template <typename V>
+void Decoder<V>::DecodeMoreloBranch(Instruction* instr) {
+  DCHECK((instr->Bits(31, 15) == 0x2)); // TODO
+  auto opc = instr->Bits(14, 13);
+  switch (opc) {
+    case 0x0:
+      // BR (indirect)
+      break;
+    case 0x1:
+      // BLR (indirect)
+      break;
+    case 0x2:
+      // RET
+      break;
+    case 0x3:
+      // BX 
+      DCHECK((instr->Bits(5, 9) == 0x1F));
+      break;
+    default:
+      // Fatal
       break;
   }
 }

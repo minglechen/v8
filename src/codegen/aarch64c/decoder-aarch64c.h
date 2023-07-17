@@ -188,6 +188,20 @@ class Decoder : public V {
   // On entry, instruction bits 27:24 = {0x1, 0xA, 0xB}.
   void DecodeDataProcessing(Instruction* instr);
 
+  // Decode the Morello add/subtract immediate instruction, and call the
+  // corresponding  visitors.
+  // On entry, instruction bits 27:24 = 0x2.
+  void DecodeMorello(Instruction* instr);
+
+  // Decode the Morello add/subtract immediate instruction, and call the
+  // corresponding  visitors.
+  void DecodeMorelloMisc(Instruction* instr);
+
+  // Decode the Morello add/subtract immediate instruction, and call the
+  // corresponding  visitors.
+  // On entry, instruction bits 27:24 = 0x1.
+  void DecodeMorelloAddSubImmediate(Instruction* instr);
+
   // Decode the floating point parts of the instruction tree, and call the
   // corresponding visitors.
   // On entry, instruction bits 27:24 = {0xE, 0xF}.

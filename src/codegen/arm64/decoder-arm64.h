@@ -14,8 +14,16 @@ namespace v8 {
 namespace internal {
 
 // List macro containing all visitors needed by the decoder class.
-
+#if defined(__CHERI_PURE_CAPABILITY__)
 #define VISITOR_LIST(V)                 \
+	ARM64_VISITOR_LIST(V)		\
+	V(MorelloAddSubImmediate)
+#else
+#define VISITOR_LIST(V)                 \
+	ARM64_VISITOR_LIST(V)
+#endif
+
+#define ARM64_VISITOR_LIST(V)           \
   V(PCRelAddressing)                    \
   V(AddSubImmediate)                    \
   V(LogicalImmediate)                   \
@@ -206,6 +214,25 @@ class Decoder : public V {
   // instruction tree, and call the corresponding visitors.
   // On entry, instruction bits 28:25 = 0xF.
   void DecodeNEONScalarDataProcessing(Instruction* instr);
+
+#if defined(__CHERI_PURE_CAPABILITY__)
+  // Decode the Morello add/subtract immediate instruction, and call the
+  // corresponding  visitors.
+  // On entry, instruction bits 27:24 = 0x2.
+  void DecodeMorello(Instruction* instr);
+
+  // Decode the Morello add/subtract immediate instruction, and call the
+  // corresponding  visitors.
+  void DecodeMorelloAddSubImmediate(Instruction* instr);
+
+  // Decode the Morello msic instructions, and call the
+  // corresponding  visitors.
+  void DecodeMorelloMisc(Instruction* instr);
+
+  // Decode the Morello branch immediate instruction, and call the
+  // corresponding  visitors.
+  void DecodeMorelloBranch(Instruction* instr);
+#endif
 };
 
 }  // namespace internal

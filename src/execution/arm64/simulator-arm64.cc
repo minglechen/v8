@@ -6390,6 +6390,12 @@ void Simulator::VisitNEONPerm(Instruction* instr) {
   }
 }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+void Simulator::VisitMorelloAddSubImmediate(Instruction* instr) {
+}
+
+#endif
+
 void Simulator::DoPrintf(Instruction* instr) {
   DCHECK((instr->Mask(ExceptionMask) == HLT) &&
          (instr->ImmException() == kImmExceptionIsPrintf));

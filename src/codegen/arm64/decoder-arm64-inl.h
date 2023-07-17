@@ -14,8 +14,22 @@ namespace internal {
 // Top-level instruction decode function.
 template <typename V>
 void Decoder<V>::Decode(Instruction* instr) {
+  // Top-level encodings for A64 [31-29][28-24 op0][23-0]
   if (instr->Bits(28, 27) == 0) {
-    V::VisitUnallocated(instr);
+    switch (instr->Bits(27, 24)) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+      // op0: 00010 Morello encodings
+      case 0x2:
+	DecodeMorello(instr);
+	break
+#endif
+      // op0: 0000x Reserved
+      // op0: 00011 UNALLOCATED
+      // op0: 001xx UNALLOCATED
+      default:
+	V::VisitUnallocated(instr);
+	break;
+    }
   } else {
     switch (instr->Bits(27, 24)) {
       // 0:   PC relative addressing.
@@ -821,6 +835,99 @@ void Decoder<V>::DecodeNEONScalarDataProcessing(Instruction* instr) {
     }
   }
 }
+
+#if defined(__CHERI_PURE_CAPABILITY__)
+template <typename V>
+void Decoder<V>::DecodeMorello(Instruction* instr) {
+  DCHECK_EQ(0x2, instr->Bits(28, 24));
+  // Morello encodings: [31-29 op0][0 0 0 1 0][23-21 op1][20-16][15 op2][14-13][12-10 op3][9-0]
+  switch (instr->Bits(31, 29)) {
+    case 0x0:
+      // op0: 000 Morello add/subtract capability
+      DecodeMorelloAddSubImmediate(instr);
+      break;
+    // op0: 001 Morello load store misc1
+    case 0x1:
+      break;
+    // op0: 010 Morello load store misc2
+    case 0x2:
+      break;
+    // op0: 011 Morello load store misc1
+    case 0x3:
+      break;
+    case 0x4:
+        if (instr->Bit(23) == 0) {
+          if (instr->Bit(23) == 0) {
+	    // op0: 100 op1: 00x: LDR (literal)
+	  } else {
+	    // op0: 100 op1: 01x: Morello load/store unsigned offset via alternaitve base
+	  }
+	} else  {
+	  // op0: 100 op1: 1xx: Morello load/store register via alternative base
+	}
+      break;
+    // op0: 101 Morello load store misc4
+    case 0x5:
+      break;
+    case 0x6:
+      if (instr->Bit(23) == 0) {
+        // op0: 110 op1: 0xx Morello load unsigned offset
+      } else {
+	switch (instr->Bits(22, 21)) {
+	  case 0x0:
+	    // op0: 110 op1: 100 Morello get/set system register
+	    break;
+	  case 0x1:
+	    // op0: 110 op1: 101 Morello ADD (extended register)
+	  default:
+	    // op0: 110 op1: 11x Morello morello_misc 
+	    DecodeMorelloMisc(instr);
+	    break
+      }
+      break;
+    // op0: 111 Morello load/store unsacled immediate via alternative base
+    case 0x7:
+      break;
+  }
+}
+
+template <typename V>
+void Decoder<V>::DecodeMorelloAddSubImmediate(Instruction* instr) {
+  DCHECK_EQ(0x0, instr->Bits(31, 29));
+  V::VisitMorelloAddSubImmediate(instr);
+}
+
+
+template <typename V>
+void Decoder<V>::DecodeMorelloMisc(Instruction* instr) {
+  DCHECK((instr->Bits(31, 15) == 0x2)); // TODO
+
+}
+
+template <typename V>
+void Decoder<V>::DecodeMorelloBranch(Instruction* instr) {
+  DCHECK((instr->Bits(31, 15) == 0x2)); // TODO
+  auto opc = instr->Bits(14, 13);
+  switch (opc) {
+    case 0x0:
+      // BR (indirect)
+      break;
+    case 0x1:
+      // BLR (indirect)
+      break;
+    case 0x2:
+      // RET
+      break;
+    case 0x3:
+      // BX 
+      DCHECK((instr->Bits(5, 9) == 0x1F));
+      break;
+    default:
+      // Fatal
+      break;
+  }
+}
+#endif
 
 }  // namespace internal
 }  // namespace v8

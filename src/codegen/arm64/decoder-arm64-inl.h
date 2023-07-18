@@ -840,73 +840,78 @@ void Decoder<V>::DecodeNEONScalarDataProcessing(Instruction* instr) {
 template <typename V>
 void Decoder<V>::DecodeMorello(Instruction* instr) {
   DCHECK_EQ(0x2, instr->Bits(28, 24));
-  // Morello encodings: [31-29 op0][0 0 0 1 0][23-21 op1][20-16][15 op2][14-13][12-10 op3][9-0]
+  // Morello encodings: [31-29 op0][0 0010][23-21 op1][20-16][15 op2][14-13][12-10 op3][9-0]
   switch (instr->Bits(31, 29)) {
     case 0x0:
       // op0: 000 Morello add/subtract capability
-      DecodeMorelloAddSubImmediate(instr);
+      DecodeMorelloAddSubCapability(instr);
       break;
-    // op0: 001 Morello load store misc1
     case 0x1:
+       // op0: 001 Morello load store misc1
+       DecodeMorelloLoadStoreMisc1(instr);
       break;
-    // op0: 010 Morello load store misc2
     case 0x2:
+      // op0: 010 Morello load store misc2
+       DecodeMorelloLoadStoreMisc2(instr);
       break;
-    // op0: 011 Morello load store misc1
     case 0x3:
+      // op0: 011 Morello load store misc3
+       DecodeMorelloLoadStoreMisc3(instr);
       break;
     case 0x4:
         if (instr->Bit(23) == 0) {
           if (instr->Bit(23) == 0) {
 	    // op0: 100 op1: 00x: LDR (literal)
+	    DecodeMorelloLdrLiteral(inst);
 	  } else {
 	    // op0: 100 op1: 01x: Morello load/store unsigned offset via alternaitve base
+	    DecodeMorelloLoadStoreUnsignedOffsetViaAlternativeBase(instr);
 	  }
 	} else  {
 	  // op0: 100 op1: 1xx: Morello load/store register via alternative base
+	  DecodeMorelloLoadStoreRegisterViaAlternativeBase(instr);
 	}
       break;
-    // op0: 101 Morello load store misc4
     case 0x5:
+      // op0: 101 Morello load store misc4
+       DecodeMorelloLoadStoreMisc4(instr);
       break;
     case 0x6:
       if (instr->Bit(23) == 0) {
         // op0: 110 op1: 0xx Morello load unsigned offset
+	DecodeMorelloLoadStoreUnsignedOffset(instr);
       } else {
 	switch (instr->Bits(22, 21)) {
 	  case 0x0:
 	    // op0: 110 op1: 100 Morello get/set system register
+	    DecodeMorelloGetSetSystemRegister(instr);
 	    break;
 	  case 0x1:
 	    // op0: 110 op1: 101 Morello ADD (extended register)
+	    DecodeMorelloAddExtendedRegister(instr) {
+	    break;
 	  default:
 	    // op0: 110 op1: 11x Morello morello_misc 
 	    DecodeMorelloMisc(instr);
 	    break
       }
       break;
-    // op0: 111 Morello load/store unsacled immediate via alternative base
     case 0x7:
+      // op0: 111 Morello load/store unscaled immediate via alternative base
+      DecodeMorelloLoadStoreUnscaledImmediateViaAlternateBase(instr);
       break;
   }
 }
 
 template <typename V>
-void Decoder<V>::DecodeMorelloAddSubImmediate(Instruction* instr) {
-  DCHECK_EQ(0x0, instr->Bits(31, 29));
-  V::VisitMorelloAddSubImmediate(instr);
-}
-
-
-template <typename V>
-void Decoder<V>::DecodeMorelloMisc(Instruction* instr) {
-  DCHECK((instr->Bits(31, 15) == 0x2)); // TODO
-
+void Decoder<V>::DecodeMorelloAddSubCapability(Instruction* instr) {
+  DCHECK_EQ(0x02, instr->Bits(31, 24)); // [0000 0010][A][sh][imm12][Cn][Cd]
+  V::VisitMorelloAddSubCapability(instr);
 }
 
 template <typename V>
 void Decoder<V>::DecodeMorelloBranch(Instruction* instr) {
-  DCHECK((instr->Bits(31, 15) == 0x2)); // TODO
+  DCHECK_EQ(0x2, instr->Bits(31, 15)); // TODO
   auto opc = instr->Bits(14, 13);
   switch (opc) {
     case 0x0:
@@ -920,11 +925,464 @@ void Decoder<V>::DecodeMorelloBranch(Instruction* instr) {
       break;
     case 0x3:
       // BX 
-      DCHECK((instr->Bits(5, 9) == 0x1F));
+      DCHECK_EQ(0x1F, instr->Bits(5, 9));
       break;
     default:
       // Fatal
       break;
+  }
+}
+
+template <typename V>
+void Decoder<V>::DecodeMorelloAddExtendedRegister(Instruction* instr) {
+  DCHECK_EQ(0x615, instr->Bits(31, 21)); // [110 0001 0101][Rm][option][imm3][Cn][Cd]
+}
+
+template <typename V>
+void Decoder<V>::DecodeMorelloGetSetSystemRegister(Instruction* instr) {
+  DCHECK_EQ(0x314, instr->Bits(31, 21)); // [110 0001 0100][L][o0][op1][CRn][CRm][op2][Ct] 
+  if (instr->Bit(20) == 0) {
+     // L: 0 MSR
+  } else {
+     // L: 1 MSR
+  }
+}
+
+template <typename V>
+void Decoder<V>::DecodeMorelloLdrLiteral(Instruction* instr) {
+  DCHECK_EQ(0x208, instr->Bits(31, 22) == 0x2)); // [10 0000 1000][imm17][Ct]
+}
+
+template <typename V>
+void Decoder<V>::DecodeMorelloLoadStoreMisc1(Instruction* instr) {
+  DCHECK_EQ(0x42, instr->Bits(31, 24)); //  [0010 0010][L][op][Rs][o2][Ct2][Rn][Ct]
+  if (instr->Bit(23) == 0) {
+    // op0: 0 Morello load/ exclusive
+    if (instr->Bit(22) == 0) {
+      if (instr->Bit(21) == 0) {
+        DCHECK_EQ(0x1F, instr->Bits(14,10)); // Ct2: 11111
+        if (instr->Bit(15) == 0) {
+          // L: 0, op: 0, o2: 0 STXR
+	} else {
+          // L: 0, op: 0, o2: 1 STLXR
+	}
+      } else {
+        if (instr->Bit(15) == 0) {
+          // L: 0, op: 1, o2: 0 STXP
+        } else {
+          // L: 0, op: 1, o2: 1 STLXP
+        }
+      }
+    } else {
+      DCHECK_EQ(0x1F, instr-Bits(20, 16)); // Rs: 11111
+      if (instr->Bit(21) == 0) {
+        DCHECK_EQ(0x1F, instr->Bits(14, 10)); // Ct2: 11111
+        if (instr->Bit(15) == 0) {
+          // L: 1, op: 0, o2: 0 LDXR 
+        } else {
+          // L: 1, op: 0, o2: 1 LDAXR
+        }
+      } else {
+        if (instr->Bit(15) == 0) {
+          // L: 1, op: 1, o2: 0 LDXP
+        } else {
+          // L: 1, op: 1, o2: 1 LDAXP 
+        }
+      }
+    }:w
+
+  } else {
+    // op0: 1 Morello load/store pair postindex
+    if (instr->Bit(22) == 0) {
+      // L: 0 STP
+    } else {
+      // L: 1 LDP
+    }
+  }
+}
+
+template <typename V>
+void Decoder<V>::DecodeMorelloLoadStoreMisc2(Instruction* instr) {
+  DCHECK_EQ(0x84, instr->Bits(31, 24)); // [0 1000 0100][L][0][Rs][0][Ct2][Rn][Ct]
+  if (instr->Bits(23) == 0) {
+    if (instr->Bit(21) == 0) {
+      if (instr->Bit(15) == 0) {
+	// op0: 0, op1: 0, op2: 0 Morello load/store acquire/release capability via alternative base
+	DCHECK_EQ(0x1F, instr->Bits(20, 16)); // Rs: 11111
+	DCHECK_EQ(0x1F, instr->Bits(14, 10)); // Ct2: 11111
+	if (instr->Bit(22) == 0) {
+	  // L: 0 STLR (capability, alternative base)
+	} else {
+	  // L: 1 LDAR (capability, alternative base)
+	}
+      } else {
+	// op0: 0, op1: 0, op2: 1 Morello load/store acquire/release
+	DCHECK_EQ(0x1F, instr->Bits(20, 16)); // Rs: 11111
+	DCHECK_EQ(0x1F, instr->Bits(14, 10)); // Ct2: 11111
+ 	if (instr->Bit(22) == 0) {
+	  // L: 0 STLR (capability, normal base)
+	} else {
+	  // L: 1 LDAR (capability, normal base)
+	}
+     }
+    } else {
+      // op0: 0, op1: 1 Morello load/store acquire/release via alternative base
+      DCHECK_EQ(0x1F, instr->Bits(20, 16)); // Rs: 11111
+      DCHECK_EQ(0x1F, instr->Bits(14, 10)); // Rt2: 11111
+      if (instr->Bit(22) == 0) {
+        if (instr->Bit(15) == 0) {
+	  // L: 0, op: 0 STLRB
+	} else {
+	  // L: 0, op: 1 STLR (integer)
+	}
+      } else {
+        if (instr->Bit(15) == 0) {
+	  // L: 1, op: 0 LDARB 
+	} else {
+	  // L: 1, op: 1 LDAR (integer) 
+	}
+      } 
+    }
+  } else {
+    // op0: 1 Morello load/store pair
+    if (instr->Bit(22) == 0) {
+      // L: 0 STP (signed offset)
+    } else {
+      // L: 1 LDP (signed offset)
+    }
+  }
+}
+
+template <typename V>
+void Decoder<V>::DecodeMorelloLoadStoreMisc3(Instruction* instr) {
+  DCHECK_EQ(0xC4, instr->Bits(31, 23)); // [0 1100 0100][L][imm7][Ct2][Rn][Ct]
+  if (instr->Bit(23) == 0) {
+    // op0: 0 Morello load/store pair non-temporal
+    if (instr->Bit(22) == 0) {
+      // L: 0 STNP
+    } else {
+      // L: 1 LDNP
+    }
+  } else {
+    // op0: 1 Morello load/store pair preindex
+    if (instr->Bit(22) == 0) {
+      // L: 0 STP (pre-indexed)
+    } else {
+      // L: 1 LDP (pre-indexed)
+    }
+  }
+}
+
+template <typename V>
+void Decoder<V>::DecodeMorelloLoadStoreMisc4(Instruction* instr) {
+  DCHECK_EQ(0xA2, instr->Bits(31, 24))); // [1010 0010][][op0][][op1][]
+  if(instr->Bit(21) == 0) {
+    if (instr->Bits(10, 11) == 0x00) {
+      // op0: 0, op1: xxxx00 Morello load/store unscaled immediate
+    else if (instr->Bits(10, 11) == 0x01) {
+      // op0: 0, op1: xxxx01 Morello load/store immediate translated
+    else if (instr->Bits(10, 11) == 0x02) {
+      // op0: 0, op1: xxxx20 Morello load/store unscaled translated 
+    } else {
+      // op0: 0, op1: xxxx11 Morello load/store immediate preindex
+    }
+  } else {
+    // TODO
+  }
+}
+
+template <typename V>
+void Decoder<V>::DecodeMorelloLoadStoreRegisterViaAlternativeBase(Instruction* instr) {
+  DCHECK_EQ(0x105, instr->Bits(31, 23)); // [1 0000 0101][L][op][Rm][A][1][B][S][opc][Rn][Rt]
+  if (instr->Bit(22) == 0x00)  {
+    if (instr->Bit(21) == 0) {
+      if (instr->Bites(11, 10) == 0x00) {
+        // L: 0, op: 0, opc: 00 STRB (register offset)
+      } else if (instr->Bites(11, 10) == 0x01) {
+        // L: 0, op: 0, opc: 01 LDRSB -- doubleword
+      } else if (instr->Bites(11, 10) == 0x02) {
+        // L: 0, op: 0, opc: 10 LDRSH -- doubleword
+      } else {
+        // L: 0, op: 10 opc: 11 STH
+      }
+    } else {
+      if (instr->Bites(11, 10) == 0x00) {
+        // L: 0, op: 1, opc: 00 STR (register offset, integer) -- word
+      } else if (instr->Bites(11, 10) == 0x01) {
+        // L: 0, op: 1, opc: 01 STR (register offset, integer) -- double word
+      } else if (instr->Bites(11, 10) == 0x01) {
+        // L: 0, op: 1, opc: 10 STR (register offset, SIMD&FP) -- 64-bit 
+      } else {
+        // L: 0, op: 1, opc: 11 STR (register offset, SIMD&FP) -- 32-bit 
+      }
+    }
+  } else {
+    if (instr->Bit(21) == 0) {
+      if (instr->Bites(11, 10) == 0x00) {
+        // L: 1, op: 0, opc: 00 STRB (register offset)
+      } else if (instr->Bites(11, 10) == 0x01) {
+        // L: 1, op: 0, opc: 01 LDRSB -- doubleword
+      } else if (instr->Bites(11, 10) == 0x02) {
+        // L: 1, op: 0, opc: 10 LDRSH -- doubleword
+      } else {
+        // L: 1, op: 10 opc: 11 STH
+      }
+    } else {
+      if (instr->Bites(11, 10) == 0x00) {
+        // L: 1, op: 1, opc: 00 LDR (register offset, integer) -- word
+      } else if (instr->Bites(11, 10) == 0x01) {
+        // L: 1, op: 1, opc: 01 LDR (register offset, integer) -- double word
+      } else if (instr->Bites(11, 10) == 0x01) {
+        // L: 1, op: 1, opc: 10 LDR (register offset, SIMF&FP0 -- 64-bit
+      } else {
+        // L: 1, op: 1, opc: 11 LDR (register offset, SIMF&FP0 -- 32-bit
+      }
+    }
+  }
+}
+
+template <typename V>
+void Decoder<V>::DecodeMorelloLoadStoreUnsignedOffset(Instruction* instr) {
+  DCHECK_EQ(0x184, instr->Bits(31, 23)); // [1 1000 0100][L][imm12][Rn][Ct] 
+  if (instr->Bit(21) == 0) {
+    // L: 0 STR (unsigned offset, capability normal base)
+  } else {
+    // L: 1 LDR (unsigned offset, capability normal base)
+  }
+}
+
+template <typename V>
+void Decoder<V>::DecodeMorelloLoadStoreUnsignedOffsetViaAlternativeBase(Instruction* instr) {
+  DCHECK_EQ(0x209, instr->Bits(31, 22)); // [10 0000 1001][L][imm9][op][Rn][Rt] 
+  if (instr->Bit(21) == 0) {
+    if (instr->Bits(11, 10) == 0x00) {
+      // L: 0, op: 00 STR (unsigned offset, capability alternate base)
+    } else if (instr->Bits(11, 10) == 0x01) {
+      // L: 0, op: 01 STRB (unsigned offset)
+    } else if (instr->Bits(11, 10) == 0x02) {
+      // L: 0, op: 10 STR (unsigned offset, integer) -- word
+    } else {
+      // L: 0, op: 11 STR (unsigned offset, integer) -- double word
+    }
+  } else {
+    if (instr->Bits(11, 10) == 0x00) {
+      // L: 1, op: 00 LDR (unsigned offset, capability alternate base)
+    } else if (instr->Bits(11, 10) == 0x01) {
+      // L: 1, op: 01 LDRB (unsigned offset)
+    } else if (instr->Bits(11, 10) == 0x02) {
+      // L: 1, op: 10 STR (unsigned offset, integer) -- word
+    } else {
+      // L: 1, op: 11 LDR (unsigned offset, integer) -- double word
+    }
+   }
+}
+
+template <typename V>
+void Decoder<V>::DecodeMorelloLoadStoreUnscaledImmediateViaAlternateBase(Instruction* instr) {
+  DCHECK_EQ(0x02, instr->Bits(31, 24)); // [1110  0010][op1][V][imm9][op2][Rn][Rd] 
+  if (instr->Bits(23, 22) == 0x00) {
+    if (instr->Bit(21 == 0) {
+      if (instr->Bits(11, 10) == 0x00) {
+        // op1: 00, V: 0, op2: 00 STURB
+      } else if (instr->Bits(11, 10) == 0x01) {
+        // op1: 00, V: 0, op2: 01 LDURB
+      } else if (instr->Bits(11, 10) == 0x10) {
+        // op1: 00, V: 0, op2: 10 LDURSB -- doubleword 
+      } else {
+        DCHECK_EQ(0x03, instr->Bits(11, 10));
+        // op1: 00, V: 0, op2: 11 LDURSB -- word 
+      }
+    } else {
+      if (instr->Bits(11, 10) == 0x00) {
+        // op1: 00, V: 1, op2: 00 STUR (SIMD&FP) -- 8-bit
+      } else if (instr->Bits(11, 10) == 0x01) {
+        // op1: 00, V: 1, op2: 01 LDUR (SIMD&FP) -- 8-bit
+      } else if (instr->Bits(11, 10) == 0x10) {
+        // op1: 00, V: 1, op2: 10 STUR (SIMD&FP) -- 128-bit 
+      } else {
+        DCHECK_EQ(0x03, instr->Bits(11, 10));
+        // op1: 00, V: 1, op2: 11 LDUR (SIMD&FP) -- 128-bit
+      }
+    }
+  } else if (instr->Bits(23, 22) == 0x01) {
+    if (instr->Bit(21 == 0) {
+      if (instr->Bits(11, 10) == 0x00) {
+        // op1: 01, V: 0, op2: 00 STURH
+      } else if (instr->Bits(11, 10) == 0x01) {
+        // op1: 01, V: 0, op2: 01 LDURH
+      } else if (instr->Bits(11, 10) == 0x10) {
+        // op1: 01, V: 0, op2: 10 LDURSH -- doubleword
+      } else {
+        DCHECK_EQ(0x03, instr->Bits(11, 10));
+        // op1: 01, V: 0, op2: 11 LDURSH -- word
+      }
+    } else {
+      if (instr->Bits(11, 10) == 0x00) {
+        // op1: 01, V: 1, op2: 00 STUR (SIMD&FP) -- 16-bit
+      } else if (instr->Bits(11, 10) == 0x01) {
+        // op1: 01, V: 1, op2: 01 LDUR (SIMD&FP) -- 16-bit
+      } else {
+	V::VisitUnallocated(instr);
+      }
+    }
+  } else if (instr->Bits(23, 22) == 0x10) {
+    if (instr->Bit(21 == 0) {
+      if (instr->Bits(11, 10) == 0x00) {
+        // op1: 10, V: 0, op2: 00 STUR (integer) -- word
+      } else if (instr->Bits(11, 10) == 0x01) {
+        // op1: 10, V: 0, op2: 01 LDUR (integer) -- word
+      } else if (instr->Bits(11, 10) == 0x10) {
+        // op1: 10, V: 0, op2: 10 LDURSW
+      } else {
+        DCHECK_EQ(0x03, instr->Bits(11, 10));
+        // op1: 10, V: 0, op2: 11 STUR (capability, alternate base)
+      }
+    } else {
+      if (instr->Bits(11, 10) == 0x00) {
+        // op1: 10, V: 1, op2: 00 STUR (SIMD&FP) --32-bit 
+      } else if (instr->Bits(11, 10) == 0x01) {
+        // op1: 10, V: 1, op2: 01 LDUR (SIMD&FP) -- 32-bit 
+      } else {
+	V::VisitUnallocated(instr);
+      }
+    }
+  } else {
+    DCHECK_EQ(0x03, instr->Bits(23, 22));
+    if (instr->Bit(21 == 0) {
+      if (instr->Bits(11, 10) == 0x00) {
+        // op1: 11, V: 0, op2: 00 STUR (integer) -- doubleword
+      } else if (instr->Bits(11, 10) == 0x01) {
+        // op1: 11, V: 0, op2: 01 LDUR (integer) -- doubleword
+      } else if (instr->Bits(11, 10) == 0x11) {
+        // op1: 11, V: 0, op2: 11 LDUR (capability, alternate base) 
+      } else {
+	V::VisitUnallocated(instr);
+      }
+    } else {
+      if (instr->Bits(11, 10) == 0x00) {
+        // op1: 11, V: 1, op2: 00 STUR (SIMD&FP) -- 64-bit 
+      } else if (instr->Bits(11, 10) == 0x01) {
+        // op1: 11, V: 1, op2: 01 LDUR (SIMD&FP) -- 64-bit
+      } else {
+	V::VisitUnallocated(instr);
+      }
+    }
+  }
+}
+
+template <typename V>
+void Decoder<V>::DecodeMorelloMisc(Instruction* instr) {
+  DCHECK_EQ(0x20B, instr->Bits(31, 12)); // [11 0000 1011][op0][op1][op2][][op3] 
+  if (instr->Bit(21) == 0x0) {
+    if (instr->Bits(12, 11) == 0x0) {
+      if (instr->Bit(10) == 0x0) {
+        if (instr->Bits(15, 13) == 0x7) {
+          // op0: 0xxxxx111, op1: 00, op2: 0 SCFLGS
+        } else if (instr->Bits(15, 13) == 0x6) {
+          // op0: 0xxxxx110, op1: 00, op2: 0 CVT (to pointer) 
+        } else if (instr->Bit(15) == 0x1) {
+          // op0: 0xxxxx110, op1: 00, op2: 0 Morello set field 2
+        } else {
+          // op0: 0xxxxx0xx, op1: 00, op2: 0 Morello set field 1
+        }
+      } else {
+        DCHECK_EQ(0x1, instr->Bit(10));
+        if (instr->Bit(15) == 0x0) {
+          // op0: 0xxxxx0xx, op1: 00, op2: 1 Morello miscellaneous capability 1
+        } else {
+          DCHECK_EQ(0x0, instr->Bits(4, 1));
+    	  if (instr>Bit(0) == 0) {
+            // op0: 0xxxxx0xx, op1: 00, op2: 1 op3: 00000 Morello branch to sealed
+	  } else {
+            // op0: 0xxxxx0xx, op1: 00, op2: 1 op3: 00001 Morello 2 src cap
+	  }
+        }
+      }
+    } else if (instr->Bits(12, 11) == 0x1) {
+      DCHECK_EQ(0x1, inst->Bit(13));
+      // op0: 0xxxxx0xx, op1: 00, op2: 1 op3: 00001 Morello miscellaneous capability 2
+    } else if (instr->Bits(12, 11) == 0x2) {
+      DCHECK_EQ(0x0, instr->Bit(10));
+      if (instr->Bit(20) == 0x0) {
+        DCHECK_EQ(0x0, instr->Bit(19));
+	if (instr->Bit(18) == 0x0) {
+	  if (instr->Bit(17) == 0x0) {
+            if (instr->Bits(16, 15) == 0x2) {
+	      // op0: 0000010xx, op1: 10, op2: 0 Morello get field 2
+	    } else if (instr->Bits(16, 15) == 0x3) {
+	      // op0: 0000011xx, op1: 10, op2: 0 Morello miscellaneous capability 0
+	    } else {
+	      CHECK_EQ(0x0, instr->Bit(16));
+	      // op0: 000000xxx, op1: 10, op2: 0 Morello get field 1
+	    }
+	  } else {
+	    DCHECK_EQ(0x1, instr->Bit(17));
+	    DCHECK_EQ(0x0, instr->Bits(16, 15));
+	    if (instr->Bits(4, 0) == 0x0) {
+	      // op0: 0000100xx, op1: 10, op2: 0 op3: 00000 Morello branch
+              DecodeMorelloBranch(instr);
+	    } else if (instr->Bits(4, 0) == 0x1) {
+	      // op0: 0000100xx, op1: 10, op2: 0 op3: 00001 Morello checks
+	    } else if (instr->Bits(4, 0) == 0x2) {
+	      // op0: 0000100xx, op1: 10, op2: 0 op3: 00010 Morello branch sealed direct 
+	    } else {
+	      DCHECK(0x3, instr->Bits(4, 0));
+	      // op0: 0000100xx, op1: 10, op2: 0 op3: 00011 Morello branch sealed restricted 
+	    }
+	  }
+	} else {
+	  DCHECK_EQ(0x1, instr->Bit(18));
+	  if (instr->Bit(16) == 0x0) {
+	    if (instr->Bit(17) == 0x0) {
+	      if (instr->Bit(15) == 0x0) {
+	        // op0: 0001000xx, op1: 10, op2: 0 Morello load pair and branch
+	      } else {
+	        // op0: 0001001xx, op1: 10, op2: 0 Morello load/store tags
+	      }
+	    } else {
+	      DCHECK_EQ(0x1, instr->Bit(17));
+	      DCHECK_EQ(0x0, instr->Bit(15));
+	      // op0: 0001110xx, op1: 10, op2: 0 Morello 1 src 1 dest
+	    }
+	  } else {
+	    DCHECK_EQ(0x1, instr->Bit(16)),
+	    if (instr->Bit(17) == 0x0) {
+	      if (instr->Bit(15) == 0x0) {
+	        // op0: 0001010xx, op1: 10, op2: 0 Morello convert to pointer
+	      } else {
+	        // op0: 0001011xx, op1: 10, op2: 0 Morello convert to capability with implicit operand
+	      }
+	    } else {
+	      DCHECK_EQ(0x1, instr->Bit(17));
+	      // op0: 000110xxx, op1: 10, op2: 0 CLRPERM (immediate)
+	    }
+	  }
+	}
+      } else {
+        DCHECK_EQ(0x0, instr->Bits(4 ,1));
+        // op0: 01xxxxxxx, op1: 10, op2: 0, op3: 0000x Morello brach sealed indirect
+      }
+    }
+  } else {
+    DCHECK(0x1, instr->Bit(21));
+    if (instr->Bits(12, 11) == 0x3) {
+      if (instr->Bit(10) == 0x0) {
+        DCHECK_EQ(0x0, instr->Bit(13));
+        // op0: 1xxxxx0x0, op1: = 11 op2: 0 Morello convert capability
+      } else {
+        DCHECK_EQ(0x1, instr->Bit(10));
+        DCHECK_EQ(0x0, instr->Bits(14, 13));
+        // op0: 1xxxxx100, op1: = 11 op2: 0  SUBS
+      }
+    } else {
+      if (instr->Bit(10) == 0x0) {
+        DCHECK_EQ(0x1, instr->Bits(14));
+        // op0: 1xxxxxxxx, op1: != 11 op2: 0  Morello logical immediate
+      } else {
+        DCHECK_EQ(0x1, instr->Bit(10));
+        // op0: 1xxxxxx1x, op2: 1 Morello load/store capability via alternate base
+      }
+    }
   }
 }
 #endif

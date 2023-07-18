@@ -1843,7 +1843,7 @@ void Simulator::VisitAddSubImmediate(Instruction* instr) {
   }
 }
 
-void Simulator::VisitMorelloAddSubImmediate(Instruction* instr) {
+void Simulator::VisitMorelloAddSubCapability(Instruction* instr) {
 }
 
 void Simulator::VisitAddSubExtended(Instruction* instr) {

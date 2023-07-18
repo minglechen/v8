@@ -17,7 +17,7 @@ namespace internal {
 #if defined(__CHERI_PURE_CAPABILITY__)
 #define VISITOR_LIST(V)                 \
 	ARM64_VISITOR_LIST(V)		\
-	V(MorelloAddSubImmediate)
+	V(MorelloAddSubCapability)
 #else
 #define VISITOR_LIST(V)                 \
 	ARM64_VISITOR_LIST(V)
@@ -221,17 +221,61 @@ class Decoder : public V {
   // On entry, instruction bits 27:24 = 0x2.
   void DecodeMorello(Instruction* instr);
 
-  // Decode the Morello add/subtract immediate instruction, and call the
-  // corresponding  visitors.
-  void DecodeMorelloAddSubImmediate(Instruction* instr);
+  // Decode the Morello add/subtract capability instruction,
+  // and call the corresponding visitors.
+  void DecodeMorelloAddSubCapability(Instruction* instr);
 
-  // Decode the Morello msic instructions, and call the
-  // corresponding  visitors.
-  void DecodeMorelloMisc(Instruction* instr);
+  // Decode the Morello add extended register instruction,
+  // and call the corresponding visitors.
+  void DecodeMorelloAddExtendedRegister(Instruction* instr);
 
-  // Decode the Morello branch immediate instruction, and call the
-  // corresponding  visitors.
+  // Decode the Morello branch immediate instruction,
+  // and call the corresponding visitors.
   void DecodeMorelloBranch(Instruction* instr);
+
+  // Decode the Morello get/set system register instruction,
+  // and call the corresponding visitors.
+  void DecodeMorelloGetSetSystemRegister(Instruction* instr);
+
+  // Decode the Morello LDR literal instruction,
+  // and call the corresponding visitors.
+  void DecodeMorelloLdrLiteral(Instruction* instr);
+
+  // Decode the Morello load_store_misc1 instructions,
+  // and call the corresponding visitors.
+  void DecodeMorelloLoadStoreMisc1(Instruction* instr);
+
+  // Decode the Morello load_store_misc2 instructions,
+  // and call the // corresponding visitors.
+  void DecodeMorelloLoadStoreMisc2(Instruction* instr);
+
+  // Decode the Morello load_store_misc3 instructions,
+  // and call the // corresponding visitors.
+  void DecodeMorelloLoadStoreMisc3(Instruction* instr);
+
+  // Decode the Morello load_store_misc4 instructions,
+  // and call the corresponding visitors.
+  void DecodeMorelloLoadStoreMisc4(Instruction* instr);
+  
+  // Decode the Morello load/store register via laternative base instructions,
+  // and call the corresponding visitors.
+  void DecodeMorelloLoadStoreRegisterViaAlternativeBase(Instruction* instr);
+ 
+  // Decode the Morello load/store unsigned offset instructions,
+  // and call the corresponding visitors.
+  void DecodeMorelloLoadStoreUnsignedOffset(Instruction* instr);
+  
+  // Decode the Morello load/store unsigned offset voa alternative base instructions,
+  // and call the corresponding visitors.
+  void DecodeMorelloLoadStoreUnsignedOffsetViaAlternativeBase(Instruction* instr);
+  
+  // Decode the Morello load/store unscaled immediate via altenative base instructions,
+  // and call the corresponding visitors.
+  void DecodeMorelloLoadStoreUnscaledImmediateViaAlternateBase(Instruction* instr);
+	    
+  // Decode the Morello misc instructions,
+  // and call the corresponding visitors.
+  void DecodeMorelloMisc(Instruction* instr);
 #endif
 };
 

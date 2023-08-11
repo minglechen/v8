@@ -144,10 +144,10 @@ void Generate_JSBuiltinsConstructStubHelper(MacroAssembler* masm) {
       __ SlotAddress(dst, 0);
       // Poke the hole (receiver).
       __ Str(x4, MemOperand(dst));
-      __ Add(dst, dst, kSystemPointerSize);  // Skip receiver.
+      __ Add(dst, dst, kSystemPointerAddrSize);  // Skip receiver.
       __ Add(src, fp,
              StandardFrameConstants::kCallerSPOffset +
-                 kSystemPointerSize);  // Skip receiver.
+                 kSystemPointerAddrSize);  // Skip receiver.
       __ Sub(count, argc, kJSArgcReceiverSlots);
       __ CopyDoubleWords(dst, src, count);
     }
@@ -157,24 +157,24 @@ void Generate_JSBuiltinsConstructStubHelper(MacroAssembler* masm) {
     //  --                           x1: constructor function
     //  --                           x3: new target
     // If argc is odd:
-    //  --     sp[0*kSystemPointerSize]: the hole (receiver)
-    //  --     sp[1*kSystemPointerSize]: argument 1
+    //  --     sp[0*kSystemPointerAddrSize]: the hole (receiver)
+    //  --     sp[1*kSystemPointerAddrSize]: argument 1
     //  --             ...
-    //  -- sp[(n-1)*kSystemPointerSize]: argument (n - 1)
-    //  -- sp[(n+0)*kSystemPointerSize]: argument n
-    //  -- sp[(n+1)*kSystemPointerSize]: padding
-    //  -- sp[(n+2)*kSystemPointerSize]: padding
-    //  -- sp[(n+3)*kSystemPointerSize]: number of arguments (tagged)
-    //  -- sp[(n+4)*kSystemPointerSize]: context (pushed by FrameScope)
+    //  -- sp[(n-1)*kSystemPointerAddrSize]: argument (n - 1)
+    //  -- sp[(n+0)*kSystemPointerAddrSize]: argument n
+    //  -- sp[(n+1)*kSystemPointerAddrSize]: padding
+    //  -- sp[(n+2)*kSystemPointerAddrSize]: padding
+    //  -- sp[(n+3)*kSystemPointerAddrSize]: number of arguments (tagged)
+    //  -- sp[(n+4)*kSystemPointerAddrSize]: context (pushed by FrameScope)
     // If argc is even:
-    //  --     sp[0*kSystemPointerSize]: the hole (receiver)
-    //  --     sp[1*kSystemPointerSize]: argument 1
+    //  --     sp[0*kSystemPointerAddrSize]: the hole (receiver)
+    //  --     sp[1*kSystemPointerAddrSize]: argument 1
     //  --             ...
-    //  -- sp[(n-1)*kSystemPointerSize]: argument (n - 1)
-    //  -- sp[(n+0)*kSystemPointerSize]: argument n
-    //  -- sp[(n+1)*kSystemPointerSize]: padding
-    //  -- sp[(n+2)*kSystemPointerSize]: number of arguments (tagged)
-    //  -- sp[(n+3)*kSystemPointerSize]: context (pushed by FrameScope)
+    //  -- sp[(n-1)*kSystemPointerAddrSize]: argument (n - 1)
+    //  -- sp[(n+0)*kSystemPointerAddrSize]: argument n
+    //  -- sp[(n+1)*kSystemPointerAddrSize]: padding
+    //  -- sp[(n+2)*kSystemPointerAddrSize]: number of arguments (tagged)
+    //  -- sp[(n+3)*kSystemPointerAddrSize]: context (pushed by FrameScope)
     // -----------------------------------
 
     // Call the function.
@@ -233,11 +233,11 @@ void Builtins::Generate_JSConstructStubGeneric(MacroAssembler* masm) {
   __ Push(x0, x1, padreg, x3);
 
   // ----------- S t a t e -------------
-  //  --        sp[0*kSystemPointerSize]: new target
-  //  --        sp[1*kSystemPointerSize]: padding
-  //  -- x1 and sp[2*kSystemPointerSize]: constructor function
-  //  --        sp[3*kSystemPointerSize]: number of arguments (tagged)
-  //  --        sp[4*kSystemPointerSize]: context (pushed by FrameScope)
+  //  --        sp[0*kSystemPointerAddrSize]: new target
+  //  --        sp[1*kSystemPointerAddrSize]: padding
+  //  -- x1 and sp[2*kSystemPointerAddrSize]: constructor function
+  //  --        sp[3*kSystemPointerAddrSize]: number of arguments (tagged)
+  //  --        sp[4*kSystemPointerAddrSize]: context (pushed by FrameScope)
   // -----------------------------------
 
   __ LoadTaggedPointerField(
@@ -260,11 +260,11 @@ void Builtins::Generate_JSConstructStubGeneric(MacroAssembler* masm) {
 
   // ----------- S t a t e -------------
   //  --                                x0: receiver
-  //  -- Slot 4 / sp[0*kSystemPointerSize]: new target
-  //  -- Slot 3 / sp[1*kSystemPointerSize]: padding
-  //  -- Slot 2 / sp[2*kSystemPointerSize]: constructor function
-  //  -- Slot 1 / sp[3*kSystemPointerSize]: number of arguments (tagged)
-  //  -- Slot 0 / sp[4*kSystemPointerSize]: context
+  //  -- Slot 4 / sp[0*kSystemPointerAddrSize]: new target
+  //  -- Slot 3 / sp[1*kSystemPointerAddrSize]: padding
+  //  -- Slot 2 / sp[2*kSystemPointerAddrSize]: constructor function
+  //  -- Slot 1 / sp[3*kSystemPointerAddrSize]: number of arguments (tagged)
+  //  -- Slot 0 / sp[4*kSystemPointerAddrSize]: context
   // -----------------------------------
   // Deoptimizer enters here.
   masm->isolate()->heap()->SetConstructStubCreateDeoptPCOffset(
@@ -273,7 +273,7 @@ void Builtins::Generate_JSConstructStubGeneric(MacroAssembler* masm) {
   __ Bind(&post_instantiation_deopt_entry);
 
   // Restore new target from the top of the stack.
-  __ Peek(x3, 0 * kSystemPointerSize);
+  __ Peek(x3, 0 * kSystemPointerAddrSize);
 
   // Restore constructor function and argument count.
   __ Ldr(x1, MemOperand(fp, ConstructFrameConstants::kConstructorOffset));
@@ -297,14 +297,14 @@ void Builtins::Generate_JSConstructStubGeneric(MacroAssembler* masm) {
   // ----------- S t a t e -------------
   //  --                              x3: new target
   //  --                             x12: number of arguments (untagged)
-  //  --        sp[0*kSystemPointerSize]: implicit receiver (overwrite if argc
+  //  --        sp[0*kSystemPointerAddrSize]: implicit receiver (overwrite if argc
   //  odd)
-  //  --        sp[1*kSystemPointerSize]: implicit receiver
-  //  --        sp[2*kSystemPointerSize]: implicit receiver
-  //  --        sp[3*kSystemPointerSize]: padding
-  //  -- x1 and sp[4*kSystemPointerSize]: constructor function
-  //  --        sp[5*kSystemPointerSize]: number of arguments (tagged)
-  //  --        sp[6*kSystemPointerSize]: context
+  //  --        sp[1*kSystemPointerAddrSize]: implicit receiver
+  //  --        sp[2*kSystemPointerAddrSize]: implicit receiver
+  //  --        sp[3*kSystemPointerAddrSize]: padding
+  //  -- x1 and sp[4*kSystemPointerAddrSize]: constructor function
+  //  --        sp[5*kSystemPointerAddrSize]: number of arguments (tagged)
+  //  --        sp[6*kSystemPointerAddrSize]: context
   // -----------------------------------
 
   // Round the number of arguments down to the next even number, and claim
@@ -333,7 +333,7 @@ void Builtins::Generate_JSConstructStubGeneric(MacroAssembler* masm) {
     __ Poke(x0, 0);          // Add the receiver.
     __ SlotAddress(dst, 1);  // Skip receiver.
     __ Add(src, fp,
-           StandardFrameConstants::kCallerSPOffset + kSystemPointerSize);
+           StandardFrameConstants::kCallerSPOffset + kSystemPointerAddrSize);
     __ CopyDoubleWords(dst, src, count);
   }
 
@@ -342,11 +342,11 @@ void Builtins::Generate_JSConstructStubGeneric(MacroAssembler* masm) {
   __ InvokeFunctionWithNewTarget(x1, x3, x0, InvokeType::kCall);
 
   // ----------- S t a t e -------------
-  //  -- sp[0*kSystemPointerSize]: implicit receiver
-  //  -- sp[1*kSystemPointerSize]: padding
-  //  -- sp[2*kSystemPointerSize]: constructor function
-  //  -- sp[3*kSystemPointerSize]: number of arguments
-  //  -- sp[4*kSystemPointerSize]: context
+  //  -- sp[0*kSystemPointerAddrSize]: implicit receiver
+  //  -- sp[1*kSystemPointerAddrSize]: padding
+  //  -- sp[2*kSystemPointerAddrSize]: constructor function
+  //  -- sp[3*kSystemPointerAddrSize]: number of arguments
+  //  -- sp[4*kSystemPointerAddrSize]: context
   // -----------------------------------
 
   // Store offset of return address for deoptimizer.
@@ -365,7 +365,7 @@ void Builtins::Generate_JSConstructStubGeneric(MacroAssembler* masm) {
   // Throw away the result of the constructor invocation and use the
   // on-stack receiver as the result.
   __ Bind(&use_receiver);
-  __ Peek(x0, 0 * kSystemPointerSize);
+  __ Peek(x0, 0 * kSystemPointerAddrSize);
   __ CompareRoot(x0, RootIndex::kTheHoleValue);
   __ B(eq, &do_throw);
 
@@ -517,7 +517,7 @@ void Builtins::Generate_ResumeGeneratorTrampoline(MacroAssembler* masm) {
 
   // Store padding (which might be replaced by the last argument).
   __ Sub(x11, x11, 1);
-  __ Poke(padreg, Operand(x11, LSL, kSystemPointerSizeLog2));
+  __ Poke(padreg, Operand(x11, LSL, kSystemPointerAddrSizeLog2));
 
   // Poke receiver into highest claimed slot.
   __ LoadTaggedPointerField(
@@ -546,7 +546,7 @@ void Builtins::Generate_ResumeGeneratorTrampoline(MacroAssembler* masm) {
     __ Bind(&loop);
     __ Sub(x10, x10, 1);
     __ LoadAnyTaggedField(x11, MemOperand(x5, -kTaggedSize, PreIndex));
-    __ Str(x11, MemOperand(x12, -kSystemPointerSize, PostIndex));
+    __ Str(x11, MemOperand(x12, -kSystemPointerAddrSize, PostIndex));
     __ Cbnz(x10, &loop);
     __ Bind(&done);
   }
@@ -790,7 +790,7 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
   __ Call(trampoline_code, RelocInfo::CODE_TARGET);
 
   // Pop the stack handler and unlink this frame from the handler chain.
-  static_assert(StackHandlerConstants::kNextOffset == 0 * kSystemPointerSize,
+  static_assert(StackHandlerConstants::kNextOffset == 0 * kSystemPointerAddrSize,
                 "Unexpected offset for StackHandlerConstants::kNextOffset");
   __ Pop(x10, padreg);
   __ Mov(x11, ExternalReference::Create(IsolateAddressId::kHandlerAddress,
@@ -829,9 +829,9 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
 
   // Reset the stack to the callee saved registers.
   static_assert(
-      EntryFrameConstants::kFixedFrameSize % (2 * kSystemPointerSize) == 0,
+      EntryFrameConstants::kFixedFrameSize % (2 * kSystemPointerAddrSize) == 0,
       "Size of entry frame is not a multiple of 16 bytes");
-  __ Drop(EntryFrameConstants::kFixedFrameSize / kSystemPointerSize);
+  __ Drop(EntryFrameConstants::kFixedFrameSize / kSystemPointerAddrSize);
   // Restore the callee-saved registers and return.
   __ PopCalleeSavedRegisters();
   __ Ret();
@@ -900,7 +900,7 @@ static void Generate_JSEntryTrampolineHelper(MacroAssembler* masm,
 
     // Store padding (which might be overwritten).
     __ SlotAddress(scratch, slots_to_claim);
-    __ Str(padreg, MemOperand(scratch, -kSystemPointerSize));
+    __ Str(padreg, MemOperand(scratch, -kSystemPointerAddrSize));
 
     // Store receiver on the stack.
     __ Poke(receiver, 0);
@@ -922,11 +922,11 @@ static void Generate_JSEntryTrampolineHelper(MacroAssembler* masm,
     __ SlotAddress(x0, 1);  // Skips receiver.
     __ Bind(&loop);
     // Load the handle.
-    __ Ldr(x11, MemOperand(argv, kSystemPointerSize, PostIndex));
+    __ Ldr(x11, MemOperand(argv, kSystemPointerAddrSize, PostIndex));
     // Dereference the handle.
     __ Ldr(x11, MemOperand(x11));
     // Poke the result into the stack.
-    __ Str(x11, MemOperand(x0, kSystemPointerSize, PostIndex));
+    __ Str(x11, MemOperand(x0, kSystemPointerAddrSize, PostIndex));
     // Loop if we've not reached the end of copy marker.
     __ Cmp(x0, scratch);
     __ B(lt, &loop);
@@ -1018,7 +1018,7 @@ static void LeaveInterpreterFrame(MacroAssembler* masm, Register scratch1,
   // Compute the size of the actual parameters + receiver (in bytes).
   __ Ldr(actual_params_size,
          MemOperand(fp, StandardFrameConstants::kArgCOffset));
-  __ lsl(actual_params_size, actual_params_size, kSystemPointerSizeLog2);
+  __ lsl(actual_params_size, actual_params_size, kSystemPointerAddrSizeLog2);
 
   // If actual is bigger than formal, then we should use it to free up the stack
   // arguments.
@@ -1033,10 +1033,10 @@ static void LeaveInterpreterFrame(MacroAssembler* masm, Register scratch1,
 
   // Drop receiver + arguments.
   if (FLAG_debug_code) {
-    __ Tst(params_size, kSystemPointerSize - 1);
+    __ Tst(params_size, kSystemPointerAddrSize - 1);
     __ Check(eq, AbortReason::kUnexpectedValue);
   }
-  __ Lsr(params_size, params_size, kSystemPointerSizeLog2);
+  __ Lsr(params_size, params_size, kSystemPointerAddrSizeLog2);
   __ DropArguments(params_size);
 }
 
@@ -1508,7 +1508,7 @@ void Builtins::Generate_InterpreterEntryTrampoline(MacroAssembler* masm) {
     // Note: there should always be at least one stack slot for the return
     // register in the register file.
     Label loop_header;
-    __ Lsr(x11, x11, kSystemPointerSizeLog2);
+    __ Lsr(x11, x11, kSystemPointerAddrSizeLog2);
     // Round down (since we already have an undefined in the stack) the number
     // of registers to a multiple of 2, to align the stack to 16 bytes.
     __ Bic(x11, x11, 1);
@@ -1524,7 +1524,7 @@ void Builtins::Generate_InterpreterEntryTrampoline(MacroAssembler* masm) {
                kInterpreterBytecodeArrayRegister,
                BytecodeArray::kIncomingNewTargetOrGeneratorRegisterOffset));
   __ Cbz(x10, &no_incoming_new_target_or_generator_register);
-  __ Str(x3, MemOperand(fp, x10, LSL, kSystemPointerSizeLog2));
+  __ Str(x3, MemOperand(fp, x10, LSL, kSystemPointerAddrSizeLog2));
   __ Bind(&no_incoming_new_target_or_generator_register);
 
   // Perform interrupt stack check.
@@ -1546,7 +1546,7 @@ void Builtins::Generate_InterpreterEntryTrampoline(MacroAssembler* masm) {
       ExternalReference::interpreter_dispatch_table_address(masm->isolate()));
   __ Ldrb(x23, MemOperand(kInterpreterBytecodeArrayRegister,
                           kInterpreterBytecodeOffsetRegister));
-  __ Mov(x1, Operand(x23, LSL, kSystemPointerSizeLog2));
+  __ Mov(x1, Operand(x23, LSL, kSystemPointerAddrSizeLog2));
   __ Ldr(kJavaScriptCallCodeStartRegister,
          MemOperand(kInterpreterDispatchTableRegister, x1));
   __ Call(kJavaScriptCallCodeStartRegister);
@@ -1688,7 +1688,7 @@ static void GenerateInterpreterPushArgs(MacroAssembler* masm, Register num_args,
     UseScratchRegisterScope temps(masm);
     Register scratch = temps.AcquireX();
     __ Sub(scratch, slots_to_claim, 1);
-    __ Poke(padreg, Operand(scratch, LSL, kSystemPointerSizeLog2));
+    __ Poke(padreg, Operand(scratch, LSL, kSystemPointerAddrSizeLog2));
   }
 
   const bool skip_receiver =
@@ -1701,12 +1701,12 @@ static void GenerateInterpreterPushArgs(MacroAssembler* masm, Register num_args,
   __ SlotAddress(stack_addr, skip_receiver ? 1 : 0);
 
   __ Sub(last_arg_addr, first_arg_index,
-         Operand(slots_to_copy, LSL, kSystemPointerSizeLog2));
-  __ Add(last_arg_addr, last_arg_addr, kSystemPointerSize);
+         Operand(slots_to_copy, LSL, kSystemPointerAddrSizeLog2));
+  __ Add(last_arg_addr, last_arg_addr, kSystemPointerAddrSize);
 
   // Load the final spread argument into spread_arg_out, if necessary.
   if (mode == InterpreterPushArgsMode::kWithFinalSpread) {
-    __ Ldr(spread_arg_out, MemOperand(last_arg_addr, -kSystemPointerSize));
+    __ Ldr(spread_arg_out, MemOperand(last_arg_addr, -kSystemPointerAddrSize));
   }
 
   __ CopyDoubleWords(stack_addr, last_arg_addr, slots_to_copy,
@@ -1835,7 +1835,7 @@ static void Generate_InterpreterEnterBytecode(MacroAssembler* masm) {
   // Dispatch to the target bytecode.
   __ Ldrb(x23, MemOperand(kInterpreterBytecodeArrayRegister,
                           kInterpreterBytecodeOffsetRegister));
-  __ Mov(x1, Operand(x23, LSL, kSystemPointerSizeLog2));
+  __ Mov(x1, Operand(x23, LSL, kSystemPointerAddrSizeLog2));
   __ Ldr(kJavaScriptCallCodeStartRegister,
          MemOperand(kInterpreterDispatchTableRegister, x1));
 
@@ -1948,7 +1948,7 @@ void Generate_ContinueToBuiltinHelper(MacroAssembler* masm,
                    (allocatable_register_count +
                     BuiltinContinuationFrameConstants::PaddingSlotCount(
                         allocatable_register_count)) *
-                       kSystemPointerSize;
+                       kSystemPointerAddrSize;
 
   UseScratchRegisterScope temps(masm);
   Register scratch = temps.AcquireX();  // Temp register is not allocatable.
@@ -1969,14 +1969,14 @@ void Generate_ContinueToBuiltinHelper(MacroAssembler* masm,
 
   // Restore registers in pairs.
   int offset = -BuiltinContinuationFrameConstants::kFixedFrameSizeFromFp -
-               allocatable_register_count * kSystemPointerSize;
+               allocatable_register_count * kSystemPointerAddrSize;
   for (int i = allocatable_register_count - 1; i > 0; i -= 2) {
     int code1 = config->GetAllocatableGeneralCode(i);
     int code2 = config->GetAllocatableGeneralCode(i - 1);
     Register reg1 = Register::from_code(code1);
     Register reg2 = Register::from_code(code2);
     __ Ldp(reg1, reg2, MemOperand(fp, offset));
-    offset += 2 * kSystemPointerSize;
+    offset += 2 * kSystemPointerAddrSize;
   }
 
   // Restore first register separately, if number of registers is odd.
@@ -1993,10 +1993,10 @@ void Generate_ContinueToBuiltinHelper(MacroAssembler* masm,
     // from LAZY is always the last argument.
     constexpr int return_offset =
         BuiltinContinuationFrameConstants::kCallerSPOffset /
-            kSystemPointerSize -
+            kSystemPointerAddrSize -
         kJSArgcReceiverSlots;
     __ add(x0, x0, return_offset);
-    __ Str(scratch, MemOperand(fp, x0, LSL, kSystemPointerSizeLog2));
+    __ Str(scratch, MemOperand(fp, x0, LSL, kSystemPointerAddrSizeLog2));
     // Recover argument count.
     __ sub(x0, x0, return_offset);
   }
@@ -2193,9 +2193,9 @@ void Builtins::Generate_FunctionPrototypeApply(MacroAssembler* masm) {
     __ Peek(receiver, 0);
     __ Cmp(argc, Immediate(JSParameterCount(1)));
     __ B(lt, &done);
-    __ Peek(this_arg, kSystemPointerSize);
+    __ Peek(this_arg, kSystemPointerAddrSize);
     __ B(eq, &done);
-    __ Peek(arg_array, 2 * kSystemPointerSize);
+    __ Peek(arg_array, 2 * kSystemPointerAddrSize);
     __ bind(&done);
   }
   __ DropArguments(argc, TurboAssembler::kCountIncludesReceiver);
@@ -2275,7 +2275,7 @@ void Builtins::Generate_FunctionPrototypeCall(MacroAssembler* masm) {
     // Shift arguments one slot down on the stack (overwriting the original
     // receiver).
     __ SlotAddress(copy_from, 1);
-    __ Sub(copy_to, copy_from, kSystemPointerSize);
+    __ Sub(copy_to, copy_from, kSystemPointerAddrSize);
     __ CopyDoubleWords(copy_to, copy_from, count);
     // Overwrite the duplicated remaining last argument.
     __ Poke(padreg, Operand(argc_without_receiver, LSL, kXRegSizeLog2));
@@ -2285,7 +2285,7 @@ void Builtins::Generate_FunctionPrototypeCall(MacroAssembler* masm) {
     // receiver and padding.
     __ Bind(&even);
     __ SlotAddress(copy_from, count);
-    __ Add(copy_to, copy_from, kSystemPointerSize);
+    __ Add(copy_to, copy_from, kSystemPointerAddrSize);
     __ CopyDoubleWords(copy_to, copy_from, count,
                        TurboAssembler::kSrcLessThanDst);
     __ Drop(2);
@@ -2327,12 +2327,12 @@ void Builtins::Generate_ReflectApply(MacroAssembler* masm) {
     __ Mov(arguments_list, undefined_value);
     __ Cmp(argc, Immediate(JSParameterCount(1)));
     __ B(lt, &done);
-    __ Peek(target, kSystemPointerSize);
+    __ Peek(target, kSystemPointerAddrSize);
     __ B(eq, &done);
-    __ Peek(this_argument, 2 * kSystemPointerSize);
+    __ Peek(this_argument, 2 * kSystemPointerAddrSize);
     __ Cmp(argc, Immediate(JSParameterCount(3)));
     __ B(lt, &done);
-    __ Peek(arguments_list, 3 * kSystemPointerSize);
+    __ Peek(arguments_list, 3 * kSystemPointerAddrSize);
     __ bind(&done);
   }
   __ DropArguments(argc, TurboAssembler::kCountIncludesReceiver);
@@ -2383,13 +2383,13 @@ void Builtins::Generate_ReflectConstruct(MacroAssembler* masm) {
     __ Mov(new_target, undefined_value);
     __ Cmp(argc, Immediate(JSParameterCount(1)));
     __ B(lt, &done);
-    __ Peek(target, kSystemPointerSize);
+    __ Peek(target, kSystemPointerAddrSize);
     __ B(eq, &done);
-    __ Peek(arguments_list, 2 * kSystemPointerSize);
+    __ Peek(arguments_list, 2 * kSystemPointerAddrSize);
     __ Mov(new_target, target);  // new.target defaults to target
     __ Cmp(argc, Immediate(JSParameterCount(3)));
     __ B(lt, &done);
-    __ Peek(new_target, 3 * kSystemPointerSize);
+    __ Peek(new_target, 3 * kSystemPointerAddrSize);
     __ bind(&done);
   }
 
@@ -2525,7 +2525,7 @@ void Builtins::Generate_CallOrConstructVarargs(MacroAssembler* masm,
     __ LoadAnyTaggedField(scratch, MemOperand(src, kTaggedSize, PostIndex));
     __ CmpTagged(scratch, the_hole_value);
     __ Csel(scratch, scratch, undefined_value, ne);
-    __ Str(scratch, MemOperand(dst, kSystemPointerSize, PostIndex));
+    __ Str(scratch, MemOperand(dst, kSystemPointerAddrSize, PostIndex));
     __ Cbnz(len, &loop);
   }
   __ Bind(&done);
@@ -2586,8 +2586,8 @@ void Builtins::Generate_CallOrConstructForwardVarargs(MacroAssembler* masm,
     Register dst = x13;
     // Point to the fist argument to copy from (skipping receiver).
     __ Add(args_fp, fp,
-           CommonFrameConstants::kFixedFrameSizeAboveFp + kSystemPointerSize);
-    __ lsl(start_index, start_index, kSystemPointerSizeLog2);
+           CommonFrameConstants::kFixedFrameSizeAboveFp + kSystemPointerAddrSize);
+    __ lsl(start_index, start_index, kSystemPointerAddrSizeLog2);
     __ Add(args_fp, args_fp, start_index);
     // Point to the position to copy to.
     __ SlotAddress(dst, argc);
@@ -2734,7 +2734,7 @@ void Generate_PushBoundArguments(MacroAssembler* masm) {
       // here which will cause x10 to become negative.
       __ Sub(x10, sp, x10);
       // Check if the arguments will overflow the stack.
-      __ Cmp(x10, Operand(bound_argc, LSL, kSystemPointerSizeLog2));
+      __ Cmp(x10, Operand(bound_argc, LSL, kSystemPointerAddrSizeLog2));
       __ B(gt, &done);
       __ TailCallRuntime(Runtime::kThrowStackOverflow);
       __ Bind(&done);
@@ -2753,7 +2753,7 @@ void Generate_PushBoundArguments(MacroAssembler* masm) {
     // Round up slots_to_claim to an even number if it is odd.
     __ Add(slots_to_claim, bound_argc, 1);
     __ Bic(slots_to_claim, slots_to_claim, 1);
-    __ Claim(slots_to_claim, kSystemPointerSize);
+    __ Claim(slots_to_claim, kSystemPointerAddrSize);
 
     __ Tbz(bound_argc, 0, &copy_bound_args);
     {
@@ -2768,12 +2768,12 @@ void Generate_PushBoundArguments(MacroAssembler* masm) {
         Register copy_from = x11;
         Register copy_to = x12;
         __ SlotAddress(copy_to, slots_to_claim);
-        __ Add(copy_from, copy_to, kSystemPointerSize);
+        __ Add(copy_from, copy_to, kSystemPointerAddrSize);
         __ CopyDoubleWords(copy_to, copy_from, argc);
       }
       // 2. Write a padding in the last slot.
       __ Add(scratch, total_argc, 1);
-      __ Str(padreg, MemOperand(sp, scratch, LSL, kSystemPointerSizeLog2));
+      __ Str(padreg, MemOperand(sp, scratch, LSL, kSystemPointerAddrSizeLog2));
       __ B(&copy_bound_args);
 
       __ Bind(&argc_even);
@@ -2788,7 +2788,7 @@ void Generate_PushBoundArguments(MacroAssembler* masm) {
         Register copy_from = x11;
         Register copy_to = x12;
         __ SlotAddress(copy_to, total_argc);
-        __ Sub(copy_from, copy_to, kSystemPointerSize);
+        __ Sub(copy_from, copy_to, kSystemPointerAddrSize);
         __ CopyDoubleWords(copy_to, copy_from, argc,
                            TurboAssembler::kSrcLessThanDst);
       }
@@ -2811,7 +2811,7 @@ void Generate_PushBoundArguments(MacroAssembler* masm) {
       __ Sub(counter, counter, 1);
       __ LoadAnyTaggedField(scratch,
                             MemOperand(bound_argv, kTaggedSize, PostIndex));
-      __ Str(scratch, MemOperand(copy_to, kSystemPointerSize, PostIndex));
+      __ Str(scratch, MemOperand(copy_to, kSystemPointerAddrSize, PostIndex));
       __ Cbnz(counter, &loop);
     }
     // Update argc.
@@ -3227,7 +3227,7 @@ void Builtins::Generate_CEntry(MacroAssembler* masm, int result_size,
   if (argv_mode == ArgvMode::kStack) {
     __ SlotAddress(temp_argv, x0);
     //  - Adjust for the receiver.
-    __ Sub(temp_argv, temp_argv, 1 * kSystemPointerSize);
+    __ Sub(temp_argv, temp_argv, 1 * kSystemPointerAddrSize);
   }
 
   // Reserve three slots to preserve x21-x23 callee-saved registers.
@@ -3239,9 +3239,9 @@ void Builtins::Generate_CEntry(MacroAssembler* masm, int result_size,
       builtin_exit_frame ? StackFrame::BUILTIN_EXIT : StackFrame::EXIT);
 
   // Poke callee-saved registers into reserved space.
-  __ Poke(argv, 1 * kSystemPointerSize);
-  __ Poke(argc, 2 * kSystemPointerSize);
-  __ Poke(target, 3 * kSystemPointerSize);
+  __ Poke(argv, 1 * kSystemPointerAddrSize);
+  __ Poke(argc, 2 * kSystemPointerAddrSize);
+  __ Poke(target, 3 * kSystemPointerAddrSize);
 
   // We normally only keep tagged values in callee-saved registers, as they
   // could be pushed onto the stack by called stubs and functions, and on the
@@ -3312,9 +3312,9 @@ void Builtins::Generate_CEntry(MacroAssembler* masm, int result_size,
   // Restore callee-saved registers x21-x23.
   __ Mov(x11, argc);
 
-  __ Peek(argv, 1 * kSystemPointerSize);
-  __ Peek(argc, 2 * kSystemPointerSize);
-  __ Peek(target, 3 * kSystemPointerSize);
+  __ Peek(argv, 1 * kSystemPointerAddrSize);
+  __ Peek(argc, 2 * kSystemPointerAddrSize);
+  __ Peek(target, 3 * kSystemPointerAddrSize);
 
   __ LeaveExitFrame(save_doubles == SaveFPRegsMode::kSave, x10, x9);
   if (argv_mode == ArgvMode::kStack) {
@@ -3402,7 +3402,7 @@ void Builtins::Generate_DoubleToI(MacroAssembler* masm) {
   DoubleRegister double_scratch = temps.AcquireD();
 
   // Account for saved regs.
-  const int kArgumentOffset = 2 * kSystemPointerSize;
+  const int kArgumentOffset = 2 * kSystemPointerAddrSize;
 
   __ Push(result, scratch1);  // scratch1 is also pushed to preserve alignment.
   __ Peek(double_scratch, kArgumentOffset);
@@ -3640,33 +3640,33 @@ void Builtins::Generate_CallApiCallback(MacroAssembler* masm) {
   // Set up FunctionCallbackInfo's implicit_args on the stack as follows:
   //
   // Target state:
-  //   sp[0 * kSystemPointerSize]: kHolder
-  //   sp[1 * kSystemPointerSize]: kIsolate
-  //   sp[2 * kSystemPointerSize]: undefined (kReturnValueDefaultValue)
-  //   sp[3 * kSystemPointerSize]: undefined (kReturnValue)
-  //   sp[4 * kSystemPointerSize]: kData
-  //   sp[5 * kSystemPointerSize]: undefined (kNewTarget)
+  //   sp[0 * kSystemPointerAddrSize]: kHolder
+  //   sp[1 * kSystemPointerAddrSize]: kIsolate
+  //   sp[2 * kSystemPointerAddrSize]: undefined (kReturnValueDefaultValue)
+  //   sp[3 * kSystemPointerAddrSize]: undefined (kReturnValue)
+  //   sp[4 * kSystemPointerAddrSize]: kData
+  //   sp[5 * kSystemPointerAddrSize]: undefined (kNewTarget)
 
   // Reserve space on the stack.
-  __ Claim(FCA::kArgsLength, kSystemPointerSize);
+  __ Claim(FCA::kArgsLength, kSystemPointerAddrSize);
 
   // kHolder.
-  __ Str(holder, MemOperand(sp, 0 * kSystemPointerSize));
+  __ Str(holder, MemOperand(sp, 0 * kSystemPointerAddrSize));
 
   // kIsolate.
   __ Mov(scratch, ExternalReference::isolate_address(masm->isolate()));
-  __ Str(scratch, MemOperand(sp, 1 * kSystemPointerSize));
+  __ Str(scratch, MemOperand(sp, 1 * kSystemPointerAddrSize));
 
   // kReturnValueDefaultValue and kReturnValue.
   __ LoadRoot(scratch, RootIndex::kUndefinedValue);
-  __ Str(scratch, MemOperand(sp, 2 * kSystemPointerSize));
-  __ Str(scratch, MemOperand(sp, 3 * kSystemPointerSize));
+  __ Str(scratch, MemOperand(sp, 2 * kSystemPointerAddrSize));
+  __ Str(scratch, MemOperand(sp, 3 * kSystemPointerAddrSize));
 
   // kData.
-  __ Str(call_data, MemOperand(sp, 4 * kSystemPointerSize));
+  __ Str(call_data, MemOperand(sp, 4 * kSystemPointerAddrSize));
 
   // kNewTarget.
-  __ Str(scratch, MemOperand(sp, 5 * kSystemPointerSize));
+  __ Str(scratch, MemOperand(sp, 5 * kSystemPointerAddrSize));
 
   // Keep a pointer to kHolder (= implicit_args) in a scratch register.
   // We use it below to set up the FunctionCallbackInfo object.
@@ -3683,16 +3683,16 @@ void Builtins::Generate_CallApiCallback(MacroAssembler* masm) {
 
   // FunctionCallbackInfo::implicit_args_ (points at kHolder as set up above).
   // Arguments are after the return address (pushed by EnterExitFrame()).
-  __ Str(scratch, MemOperand(sp, 1 * kSystemPointerSize));
+  __ Str(scratch, MemOperand(sp, 1 * kSystemPointerAddrSize));
 
   // FunctionCallbackInfo::values_ (points at the first varargs argument passed
   // on the stack).
   __ Add(scratch, scratch,
-         Operand((FCA::kArgsLength + 1) * kSystemPointerSize));
-  __ Str(scratch, MemOperand(sp, 2 * kSystemPointerSize));
+         Operand((FCA::kArgsLength + 1) * kSystemPointerAddrSize));
+  __ Str(scratch, MemOperand(sp, 2 * kSystemPointerAddrSize));
 
   // FunctionCallbackInfo::length_.
-  __ Str(argc, MemOperand(sp, 3 * kSystemPointerSize));
+  __ Str(argc, MemOperand(sp, 3 * kSystemPointerAddrSize));
 
   // We also store the number of slots to drop from the stack after returning
   // from the API function here.
@@ -3701,11 +3701,11 @@ void Builtins::Generate_CallApiCallback(MacroAssembler* masm) {
   // a multiple of two, and related helper functions (DropArguments) expect a
   // register containing the slot count.
   __ Add(scratch, argc, Operand(FCA::kArgsLength + 1 /*receiver*/));
-  __ Str(scratch, MemOperand(sp, 4 * kSystemPointerSize));
+  __ Str(scratch, MemOperand(sp, 4 * kSystemPointerAddrSize));
 
   // v8::InvocationCallback's argument.
   DCHECK(!AreAliased(x0, api_function_address));
-  __ add(x0, sp, Operand(1 * kSystemPointerSize));
+  __ add(x0, sp, Operand(1 * kSystemPointerAddrSize));
 
   ExternalReference thunk_ref = ExternalReference::invoke_function_callback();
 
@@ -3716,11 +3716,11 @@ void Builtins::Generate_CallApiCallback(MacroAssembler* masm) {
   // TODO(jgruber): Document what these arguments are.
   static constexpr int kStackSlotsAboveFCA = 2;
   MemOperand return_value_operand(
-      fp, (kStackSlotsAboveFCA + FCA::kReturnValueOffset) * kSystemPointerSize);
+      fp, (kStackSlotsAboveFCA + FCA::kReturnValueOffset) * kSystemPointerAddrSize);
 
   static constexpr int kSpillOffset = 1 + kApiStackSpace;
   static constexpr int kUseStackSpaceOperand = 0;
-  MemOperand stack_space_operand(sp, 4 * kSystemPointerSize);
+  MemOperand stack_space_operand(sp, 4 * kSystemPointerAddrSize);
 
   AllowExternalCallThatCantCauseGC scope(masm);
   CallApiFunctionAndReturn(masm, api_function_address, thunk_ref,
@@ -3770,7 +3770,7 @@ void Builtins::Generate_CallApiGetter(MacroAssembler* masm) {
 
   // Load address of v8::PropertyAccessorInfo::args_ array and name handle.
   __ Mov(x0, sp);                          // x0 = Handle<Name>
-  __ Add(x1, x0, 1 * kSystemPointerSize);  // x1 = v8::PCI::args_
+  __ Add(x1, x0, 1 * kSystemPointerAddrSize);  // x1 = v8::PCI::args_
 
   const int kApiStackSpace = 1;
 
@@ -3779,7 +3779,7 @@ void Builtins::Generate_CallApiGetter(MacroAssembler* masm) {
 
   // Create v8::PropertyCallbackInfo object on the stack and initialize
   // it's args_ field.
-  __ Poke(x1, 1 * kSystemPointerSize);
+  __ Poke(x1, 1 * kSystemPointerAddrSize);
   __ SlotAddress(x1, 1);
   // x1 = v8::PropertyCallbackInfo&
 
@@ -3800,7 +3800,7 @@ void Builtins::Generate_CallApiGetter(MacroAssembler* masm) {
   // +3 is to skip prolog, return address and name handle.
   MemOperand return_value_operand(
       fp,
-      (PropertyCallbackArguments::kReturnValueOffset + 3) * kSystemPointerSize);
+      (PropertyCallbackArguments::kReturnValueOffset + 3) * kSystemPointerAddrSize);
   MemOperand* const kUseStackSpaceConstant = nullptr;
   CallApiFunctionAndReturn(masm, api_function_address, thunk_ref,
                            kStackUnwindSpace, kUseStackSpaceConstant,
@@ -4010,7 +4010,7 @@ void Generate_DeoptimizationEntry(MacroAssembler* masm,
   // frame description.
   __ Add(x3, x1, FrameDescription::frame_content_offset());
   __ SlotAddress(x1, 0);
-  __ Lsr(unwind_limit, unwind_limit, kSystemPointerSizeLog2);
+  __ Lsr(unwind_limit, unwind_limit, kSystemPointerAddrSizeLog2);
   __ Mov(x5, unwind_limit);
   __ CopyDoubleWords(x3, x1, x5);
   // Since {unwind_limit} is the frame size up to the parameter count, we might
@@ -4039,15 +4039,15 @@ void Generate_DeoptimizationEntry(MacroAssembler* masm,
   Label outer_push_loop, outer_loop_header;
   __ Ldrsw(x1, MemOperand(x4, Deoptimizer::output_count_offset()));
   __ Ldr(x0, MemOperand(x4, Deoptimizer::output_offset()));
-  __ Add(x1, x0, Operand(x1, LSL, kSystemPointerSizeLog2));
+  __ Add(x1, x0, Operand(x1, LSL, kSystemPointerAddrSizeLog2));
   __ B(&outer_loop_header);
 
   __ Bind(&outer_push_loop);
   Register current_frame = x2;
   Register frame_size = x3;
-  __ Ldr(current_frame, MemOperand(x0, kSystemPointerSize, PostIndex));
+  __ Ldr(current_frame, MemOperand(x0, kSystemPointerAddrSize, PostIndex));
   __ Ldr(x3, MemOperand(current_frame, FrameDescription::frame_size_offset()));
-  __ Lsr(frame_size, x3, kSystemPointerSizeLog2);
+  __ Lsr(frame_size, x3, kSystemPointerAddrSizeLog2);
   __ Claim(frame_size);
 
   __ Add(x7, current_frame, FrameDescription::frame_content_offset());

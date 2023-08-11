@@ -20,7 +20,11 @@ namespace internal {
 class V8_EXPORT_PRIVATE AlignedSlotAllocator {
  public:
   // Slots are always multiples of pointer-sized units.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  static constexpr int kSlotSize = kSystemPointerAddrSize;
+#else
   static constexpr int kSlotSize = kSystemPointerSize;
+#endif
 
   static int NumSlotsForWidth(int bytes) {
     DCHECK_GT(bytes, 0);

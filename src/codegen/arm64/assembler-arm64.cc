@@ -4299,6 +4299,7 @@ void Assembler::GrowBuffer() {
 
   // Copy the data.
   ptrdiff_t pc_delta = pc_offset();
+  size_t old_pc_delta = reloc_info_writer.last_pc() - buffer_start_;
   size_t reloc_size = (buffer_start_ + old_size) - reloc_info_writer.pos();
   memmove(new_start, buffer_start_, pc_offset());
   memmove((new_start + new_size) - reloc_size, reloc_info_writer.pos(), reloc_size);
@@ -4307,8 +4308,8 @@ void Assembler::GrowBuffer() {
   buffer_ = std::move(new_buffer);
   buffer_start_ = new_start;
   pc_ = buffer_start_ + pc_delta;
-  reloc_info_writer.Reposition((buffer_start_ + new_size)  - reloc_size,
-                               buffer_start_ + pc_delta);
+  reloc_info_writer.Reposition((buffer_start_ + new_size) - reloc_size,
+                               buffer_start_ + old_pc_delta);
 
   // None of our relocation types are pc relative pointing outside the code
   // buffer nor pc absolute pointing inside the code buffer, so there is no need

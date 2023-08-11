@@ -1248,7 +1248,9 @@ void TurboAssembler::Claim(int64_t count, uint64_t unit_size) {
   if (size == 0) {
     return;
   }
+#if !defined(__CHERI_PURE_CAPABILITY__)
   DCHECK_EQ(size % 16, 0);
+#endif
 #ifdef V8_TARGET_OS_WIN
   while (size > kStackPageSize) {
     Sub(sp, sp, kStackPageSize);
@@ -1309,7 +1311,9 @@ void TurboAssembler::Drop(int64_t count, uint64_t unit_size) {
   }
 
   Add(sp, sp, size);
+#if !defined(__CHERI_PURE_CAPABILITY__)
   DCHECK_EQ(size % 16, 0);
+#endif
 }
 
 void TurboAssembler::Drop(const Register& count, uint64_t unit_size) {

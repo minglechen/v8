@@ -353,7 +353,11 @@ Immediate Operand::immediate() const {
   return immediate_;
 }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+intptr_t Operand::ImmediateValue() const {
+#else
 int64_t Operand::ImmediateValue() const {
+#endif
   DCHECK(IsImmediate());
   return immediate_.value();
 }
@@ -572,7 +576,11 @@ int Assembler::deserialization_special_target_size(Address location) {
     return kSpecialTargetSize;
   } else {
     DCHECK_EQ(instr->InstructionBits(), 0);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    return kSystemPointerAddrSize;
+#else
     return kSystemPointerSize;
+#endif
   }
 }
 
@@ -643,7 +651,11 @@ int RelocInfo::target_address_size() {
   } else {
     Instruction* instr = reinterpret_cast<Instruction*>(pc_);
     DCHECK(instr->IsLdrLiteralX() || instr->IsLdrLiteralW());
+#if defined(__CHERI_PURE_CAPABILITY__)
+    return instr->IsLdrLiteralW() ? kTaggedSize : kSystemPointerAddrSize;
+#else
     return instr->IsLdrLiteralW() ? kTaggedSize : kSystemPointerSize;
+#endif
   }
 }
 

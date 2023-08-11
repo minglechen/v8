@@ -153,7 +153,11 @@ const unsigned kFloat16ExponentBias = 15;
 // to take advantage of negative displacement values.
 // TODO(sigurds): Choose best value.
 // TODO(ishell): Choose best value for ptr-compr.
+#if defined(__CHERI_PURE_CAPABILITY__)
+constexpr int kRootRegisterBias = kSystemPointerAddrSize == kTaggedSize ? 256 : 0;
+#else
 constexpr int kRootRegisterBias = kSystemPointerSize == kTaggedSize ? 256 : 0;
+#endif
 
 using float16 = uint16_t;
 

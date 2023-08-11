@@ -50,11 +50,19 @@ class Immediate {
   template <typename T>
   inline Immediate(T value, RelocInfo::Mode rmode);
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  intptr_t value() const { return value_; }
+#else
   int64_t value() const { return value_; }
+#endif
   RelocInfo::Mode rmode() const { return rmode_; }
 
  private:
+#if defined(__CHERI_PURE_CAPABILITY__)
+  intptr_t value_;
+#else
   int64_t value_;
+#endif
   RelocInfo::Mode rmode_;
 };
 
@@ -109,7 +117,11 @@ class Operand {
   inline Operand ToW() const;
 
   inline Immediate immediate() const;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  inline intptr_t ImmediateValue() const;
+#else
   inline int64_t ImmediateValue() const;
+#endif
   inline RelocInfo::Mode ImmediateRMode() const;
   inline Register reg() const;
   inline Shift shift() const;

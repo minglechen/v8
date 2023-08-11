@@ -636,7 +636,11 @@ void CodeGenerator::AssembleTailCallAfterGap(Instruction* instr,
   InstructionOperandConverter g(this, instr);
   int optional_padding_offset = g.InputInt32(instr->InputCount() - 2);
   if (optional_padding_offset % 2) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Poke(padreg, optional_padding_offset * kSystemPointerAddrSize);
+#else
     __ Poke(padreg, optional_padding_offset * kSystemPointerSize);
+#endif
   }
 }
 
@@ -796,9 +800,17 @@ CodeGenerator::CodeGenResult CodeGenerator::AssembleArchInstruction(
              fp_mode_ == SaveFPRegsMode::kSave);
       // kReturnRegister0 should have been saved before entering the stub.
       int bytes = __ PushCallerSaved(fp_mode_, kReturnRegister0);
+#if defined(__CHERI_PURE_CAPABILITY__)
+      DCHECK(IsAligned(bytes, kSystemPointerAddrSize));
+#else
       DCHECK(IsAligned(bytes, kSystemPointerSize));
+#endif
       DCHECK_EQ(0, frame_access_state()->sp_delta());
+#if defined(__CHERI_PURE_CAPABILITY__)
+      frame_access_state()->IncreaseSPDelta(bytes / kSystemPointerAddrSize);
+#else
       frame_access_state()->IncreaseSPDelta(bytes / kSystemPointerSize);
+#endif
       DCHECK(!caller_registers_saved_);
       caller_registers_saved_ = true;
       break;
@@ -810,7 +822,11 @@ CodeGenerator::CodeGenResult CodeGenerator::AssembleArchInstruction(
              fp_mode_ == SaveFPRegsMode::kSave);
       // Don't overwrite the returned value.
       int bytes = __ PopCallerSaved(fp_mode_, kReturnRegister0);
+#if defined(__CHERI_PURE_CAPABILITY__)
+      frame_access_state()->IncreaseSPDelta(-(bytes / kSystemPointerAddrSize));
+#else
       frame_access_state()->IncreaseSPDelta(-(bytes / kSystemPointerSize));
+#endif
       DCHECK_EQ(0, frame_access_state()->sp_delta());
       DCHECK(caller_registers_saved_);
       caller_registers_saved_ = false;
@@ -858,7 +874,11 @@ CodeGenerator::CodeGenResult CodeGenerator::AssembleArchInstruction(
         //   kArchRestoreCallerRegisters;
         int bytes =
             __ RequiredStackSizeForCallerSaved(fp_mode_, kReturnRegister0);
+#if defined(__CHERI_PURE_CAPABILITY__)
+        frame_access_state()->IncreaseSPDelta(bytes / kSystemPointerAddrSize);
+#else
         frame_access_state()->IncreaseSPDelta(bytes / kSystemPointerSize);
+#endif
       }
       break;
     }
@@ -1494,7 +1514,11 @@ CodeGenerator::CodeGenResult CodeGenerator::AssembleArchInstruction(
       break;
     }
     case kArm64Poke: {
+#if defined(__CHERI_PURE_CAPABILITY__)
+      Operand operand(i.InputInt32(1) * kSystemPointerAddrSize);
+#else
       Operand operand(i.InputInt32(1) * kSystemPointerSize);
+#endif
       if (instr->InputAt(0)->IsSimd128Register()) {
         __ Poke(i.InputSimd128Register(0), operand);
       } else if (instr->InputAt(0)->IsFPRegister()) {
@@ -1508,10 +1532,18 @@ CodeGenerator::CodeGenResult CodeGenerator::AssembleArchInstruction(
       int slot = i.InputInt32(2) - 1;
       if (instr->InputAt(0)->IsFPRegister()) {
         __ PokePair(i.InputFloat64Register(1), i.InputFloat64Register(0),
+#if defined(__CHERI_PURE_CAPABILITY__)
+                    slot * kSystemPointerAddrSize);
+#else
                     slot * kSystemPointerSize);
+#endif
       } else {
         __ PokePair(i.InputRegister(1), i.InputRegister(0),
+#if defined(__CHERI_PURE_CAPABILITY__)
+                    slot * kSystemPointerAddrSize);
+#else
                     slot * kSystemPointerSize);
+#endif
       }
       break;
     }
@@ -3047,7 +3079,11 @@ void CodeGenerator::FinishFrame(Frame* frame) {
   if (saved_count != 0) {
     DCHECK(saves_fp.bits() == CPURegList::GetCalleeSavedV().bits());
     frame->AllocateSavedCalleeRegisterSlots(saved_count *
+#if defined(__CHERI_PURE_CAPABILITY__)
+                                            (kDoubleSize / kSystemPointerAddrSize));
+#else
                                             (kDoubleSize / kSystemPointerSize));
+#endif
   }
 
   CPURegList saves =
@@ -3082,8 +3118,8 @@ void CodeGenerator::AssembleConstructFrame() {
     // Link the frame
     if (call_descriptor->IsJSFunctionCall()) {
 #if defined(__CHERI_PURE_CAPABILITY__)
-      static_assert(InterpreterFrameConstants::kFixedFrameSize % 16 == 0);
-      DCHECK_EQ(required_slots % 2, 0);
+      static_assert(InterpreterFrameConstants::kFixedFrameSize % 16 == 8);
+      DCHECK_EQ(required_slots % 2, 1);
 #else
       static_assert(InterpreterFrameConstants::kFixedFrameSize % 16 == 8);
       DCHECK_EQ(required_slots % 2, 1);
@@ -3120,7 +3156,11 @@ void CodeGenerator::AssembleConstructFrame() {
     }
 
 #if V8_ENABLE_WEBASSEMBLY
+#if defined(__CHERI_PURE_CAPABILITY__)
+    if (info()->IsWasm() && required_slots * kSystemPointerAddrSize > 4 * KB) {
+#else
     if (info()->IsWasm() && required_slots * kSystemPointerSize > 4 * KB) {
+#endif
       // For WebAssembly functions with big frames we have to do the stack
       // overflow check before we construct the frame. Otherwise we may not
       // have enough space on the stack to call the runtime for the stack
@@ -3129,14 +3169,22 @@ void CodeGenerator::AssembleConstructFrame() {
       // If the frame is bigger than the stack, we throw the stack overflow
       // exception unconditionally. Thereby we can avoid the integer overflow
       // check in the condition code.
+#if defined(__CHERI_PURE_CAPABILITY__)
+      if (required_slots * kSystemPointerAddrSize < FLAG_stack_size * KB) {
+#else
       if (required_slots * kSystemPointerSize < FLAG_stack_size * KB) {
+#endif
         UseScratchRegisterScope scope(tasm());
         Register scratch = scope.AcquireX();
         __ Ldr(scratch, FieldMemOperand(
                             kWasmInstanceRegister,
                             WasmInstanceObject::kRealStackLimitAddressOffset));
         __ Ldr(scratch, MemOperand(scratch));
+#if defined(__CHERI_PURE_CAPABILITY__)
+        __ Add(scratch, scratch, required_slots * kSystemPointerAddrSize);
+#else
         __ Add(scratch, scratch, required_slots * kSystemPointerSize);
+#endif
         __ Cmp(sp, scratch);
         __ B(hs, &done);
       }
@@ -3437,7 +3485,11 @@ void CodeGenerator::MoveToTempLocation(InstructionOperand* source) {
           frame_access_state_->frame()->GetTotalFrameSlotCount() - 1;
       int sp_delta = frame_access_state_->sp_delta();
       int temp_slot = last_frame_slot_id + sp_delta + new_slots;
+#if defined(__CHERI_PURE_CAPABILITY__)
+      __ Sub(sp, sp, Operand(new_slots * kSystemPointerAddrSize));
+#else
       __ Sub(sp, sp, Operand(new_slots * kSystemPointerSize));
+#endif
       AllocatedOperand temp(LocationOperand::STACK_SLOT, rep, temp_slot);
       AssembleMove(source, &temp);
     }
@@ -3485,7 +3537,11 @@ void CodeGenerator::MoveTempLocationTo(InstructionOperand* dest,
       int temp_slot = last_frame_slot_id + sp_delta + new_slots;
       AllocatedOperand temp(LocationOperand::STACK_SLOT, rep, temp_slot);
       AssembleMove(&temp, dest);
+#if defined(__CHERI_PURE_CAPABILITY__)
+      __ Add(sp, sp, Operand(new_slots * kSystemPointerAddrSize));
+#else
       __ Add(sp, sp, Operand(new_slots * kSystemPointerSize));
+#endif
     }
   }
   // Restore the default state to release the {UseScratchRegisterScope} and to

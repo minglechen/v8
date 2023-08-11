@@ -256,7 +256,11 @@ static_assert(sizeof(Register) <= sizeof(int),
 constexpr int ArgumentPaddingSlots(int argument_count) {
   // Stack frames are aligned to 16 bytes.
   constexpr int kStackFrameAlignment = 16;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  constexpr int alignment_mask = kStackFrameAlignment / kSystemPointerAddrSize - 1;
+#else
   constexpr int alignment_mask = kStackFrameAlignment / kSystemPointerSize - 1;
+#endif
   return argument_count & alignment_mask;
 }
 

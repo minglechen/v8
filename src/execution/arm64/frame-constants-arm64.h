@@ -49,14 +49,23 @@ class EntryFrameConstants : public AllStatic {
  public:
   // This is the offset to where JSEntry pushes the current value of
   // Isolate::c_entry_fp onto the stack.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  static constexpr int kCallerFPOffset = -3 * kSystemPointerAddrSize;
+  static constexpr int kFixedFrameSize = 4 * kSystemPointerAddrSize;
+#else
   static constexpr int kCallerFPOffset = -3 * kSystemPointerSize;
   static constexpr int kFixedFrameSize = 4 * kSystemPointerSize;
+#endif
 
   // The following constants are defined so we can static-assert their values
   // near the relevant JSEntry assembly code, not because they're actually very
   // useful.
   static constexpr int kCalleeSavedRegisterBytesPushedBeforeFpLrPair =
+#if defined(__CHERI_PURE_CAPABILITY__)
+      18 * kSystemPointerAddrSize;
+#else
       18 * kSystemPointerSize;
+#endif
   static constexpr int kCalleeSavedRegisterBytesPushedAfterFpLrPair = 0;
   static constexpr int kOffsetToCalleeSavedRegisters = 0;
 
@@ -66,9 +75,17 @@ class EntryFrameConstants : public AllStatic {
       kCalleeSavedRegisterBytesPushedAfterFpLrPair +
       kOffsetToCalleeSavedRegisters;
   static constexpr int kDirectCallerPCOffset =
+#if defined(__CHERI_PURE_CAPABILITY__)
+      kDirectCallerFPOffset + 1 * kSystemPointerAddrSize;
+#else
       kDirectCallerFPOffset + 1 * kSystemPointerSize;
+#endif
   static constexpr int kDirectCallerSPOffset =
+#if defined(__CHERI_PURE_CAPABILITY__)
+      kDirectCallerPCOffset + 1 * kSystemPointerAddrSize +
+#else
       kDirectCallerPCOffset + 1 * kSystemPointerSize +
+#endif
       kCalleeSavedRegisterBytesPushedBeforeFpLrPair;
 };
 
@@ -86,7 +103,11 @@ class WasmCompileLazyFrameConstants : public TypedFrameConstants {
   static constexpr int kFixedFrameSizeFromFp =
       // Header is padded to 16 byte (see {MacroAssembler::EnterFrame}).
       RoundUp<16>(TypedFrameConstants::kFixedFrameSizeFromFp) +
+#if defined(__CHERI_PURE_CAPABILITY__)
+      kNumberOfSavedGpParamRegs * kSystemPointerAddrSize +
+#else
       kNumberOfSavedGpParamRegs * kSystemPointerSize +
+#endif
       kNumberOfSavedFpParamRegs * kSimd128Size;
 };
 
@@ -116,7 +137,11 @@ class WasmDebugBreakFrameConstants : public TypedFrameConstants {
   static constexpr int kLastPushedGpRegisterOffset =
       // Header is padded to 16 byte (see {MacroAssembler::EnterFrame}).
       -RoundUp<16>(TypedFrameConstants::kFixedFrameSizeFromFp) -
+#if defined(__CHERI_PURE_CAPABILITY__)
+      kSystemPointerAddrSize * kNumPushedGpRegisters;
+#else
       kSystemPointerSize * kNumPushedGpRegisters;
+#endif
   static constexpr int kLastPushedFpRegisterOffset =
       kLastPushedGpRegisterOffset - kSimd128Size * kNumPushedFpRegisters;
 
@@ -126,7 +151,11 @@ class WasmDebugBreakFrameConstants : public TypedFrameConstants {
     uint32_t lower_regs =
         kPushedGpRegs.bits() & ((uint32_t{1} << reg_code) - 1);
     return kLastPushedGpRegisterOffset +
+#if defined(__CHERI_PURE_CAPABILITY__)
+           base::bits::CountPopulation(lower_regs) * kSystemPointerAddrSize;
+#else
            base::bits::CountPopulation(lower_regs) * kSystemPointerSize;
+#endif
   }
 
   static int GetPushedFpRegisterOffset(int reg_code) {

@@ -40,6 +40,7 @@ constexpr size_t TB = size_t{GB} * 1024;
  * Configuration of tagging scheme.
  */
 const int kApiSystemPointerSize = sizeof(void*);
+const int kApiSystemPointerAddrSize = sizeof(ptraddr_t);
 const int kApiDoubleSize = sizeof(double);
 const int kApiInt32Size = sizeof(int32_t);
 const int kApiInt64Size = sizeof(int64_t);

@@ -1067,7 +1067,7 @@ Code CodeDataContainer::code(PtrComprCageBase cage_base,
   return Code::cast(raw_code(cage_base, tag));
 }
 
-DEF_GETTER(CodeDataContainer, code_entry_point, Address) {
+inline Address CodeDataContainer::code_entry_point() const {
   CHECK(V8_EXTERNAL_CODE_SPACE_BOOL);
   Isolate* isolate = GetIsolateForSandbox(*this);
   return ReadExternalPointerField(kCodeEntryPointOffset, isolate,

@@ -2860,7 +2860,7 @@ inline i::Object GetObjectFromRaw(void* object) {
   if (RoundDown<i::kPtrComprCageBaseAlignment>(object_ptr) == i::kNullAddress) {
     // Try to decompress pointer.
     i::Isolate* isolate = i::Isolate::Current();
-    object_ptr = i::V8HeapCompressionScheme::DecompressTagged(
+    object_ptr = i::V8HeapCompressionScheme::DecompressTaggedAny(
         isolate, static_cast<i::Tagged_t>(object_ptr));
   }
 #endif

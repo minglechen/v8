@@ -211,7 +211,8 @@ V8_INLINE Address GetPtrComprCageBaseAddress(PtrComprCageBase cage_base) {
 
 V8_INLINE constexpr PtrComprCageBase GetPtrComprCageBaseFromOnHeapAddress(
     Address address) {
-  return PtrComprCageBase(GetPtrComprCageBaseAddress(address));
+  return PtrComprCageBase(
+      V8HeapCompressionScheme::GetPtrComprCageBaseAddress(address));
 }
 
 // Decompresses smi value.

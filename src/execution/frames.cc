@@ -1259,7 +1259,7 @@ void CommonFrame::IterateCompiledFrame(RootVisitor* v) const {
             static_cast<Tagged_t>(*spill_slot.location());
         if (!HAS_SMI_TAG(compressed_value)) {
           // We don't need to update smi values.
-          *spill_slot.location() = V8HeapCompressionScheme::DecompressTaggedANy(
+          *spill_slot.location() = V8HeapCompressionScheme::DecompressTaggedAny(
 	      cage_base, compressed_value);
         }
       }

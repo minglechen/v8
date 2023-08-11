@@ -206,6 +206,12 @@ class CodeDataContainer : public HeapObject {
       TaggedField<T, kCodeOffset, ExternalCodeCompressionScheme>;
 #endif  // V8_EXTERNAL_CODE_SPACE
 
+#ifdef V8_EXTERNAL_CODE_SPACE
+  template <typename T>
+  using ExternalCodeField =
+      TaggedField<T, kCodeOffset, ExternalCodeCompressionScheme>;
+#endif  // V8_EXTERNAL_CODE_SPACE
+
   class BodyDescriptor;
 
   // Flags layout.

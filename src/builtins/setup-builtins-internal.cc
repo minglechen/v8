@@ -226,7 +226,7 @@ void SetupIsolateDelegate::ReplacePlaceholders(Isolate* isolate) {
   PtrComprCageBase cage_base(isolate);
   for (Builtin builtin = Builtins::kFirst; builtin <= Builtins::kLast;
        ++builtin) {
-    Code code = FromCodeT(builtins->code(builtin), isolate);
+    Code code = FromCodeT(builtins->code(builtin));
     isolate->heap()->UnprotectAndRegisterMemoryChunk(
         code, UnprotectMemoryOrigin::kMainThread);
     bool flush_icache = false;
@@ -349,7 +349,7 @@ void SetupIsolateDelegate::SetupBuiltinsInternal(Isolate* isolate) {
 
 // TODO(v8:11880): avoid roundtrips between cdc and code.
 #define SET_PROMISE_REJECTION_PREDICTION(Name) \
-  FromCodeT(builtins->code(Builtin::k##Name), isolate).set_is_promise_rejection(true);
+  FromCodeT(builtins->code(Builtin::k##Name)).set_is_promise_rejection(true);
 
   BUILTIN_PROMISE_REJECTION_PREDICTION_LIST(SET_PROMISE_REJECTION_PREDICTION)
 #undef SET_PROMISE_REJECTION_PREDICTION

@@ -309,6 +309,9 @@ void Isolate::SetEmbeddedBlob(const uint8_t* code, uint32_t code_size,
         "indicates that the embedded blob has been modified since compilation "
         "time.");
   }
+#if !defined(__CHERI_PURE_CAPABILITY__)
+  // mkgrokdump doesn't take the flag text_is_readable.
+  // Taking a checksum over the sentry causes a Capability Fault on CHERI.
   if (FLAG_text_is_readable) {
     if (d.EmbeddedBlobCodeHash() != d.CreateEmbeddedBlobCodeHash()) {
       FATAL(
@@ -318,6 +321,7 @@ void Isolate::SetEmbeddedBlob(const uint8_t* code, uint32_t code_size,
           "within builtin code.");
     }
   }
+#endif  // !defined(__CHERI_PURE_CAPABILITY__)
 #endif  // DEBUG
 }
 

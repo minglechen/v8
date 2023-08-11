@@ -620,7 +620,7 @@ class SlotSet {
 
 #ifdef DEBUG
   size_t* initial_buckets() { return reinterpret_cast<size_t*>(this) - 1; }
-  static const int kInitialBucketsSize = sizeof(size_t);
+  static const int kInitialBucketsSize = sizeof(size_t *);
 #else
   static const int kInitialBucketsSize = 0;
 #endif

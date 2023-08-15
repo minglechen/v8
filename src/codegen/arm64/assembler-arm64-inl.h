@@ -108,6 +108,17 @@ inline Register Register::WRegFromCode(unsigned code) {
   }
 }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+inline Register Register::CRegFromCode(unsigned code) {
+  if (code == kSPRegInternalCode) {
+    return csp;
+  } else {
+    DCHECK_LT(code, static_cast<unsigned>(kNumberOfRegisters));
+    return Register::Create(code, kCRegSizeInBits);
+  }
+}
+#endif
+
 inline VRegister VRegister::BRegFromCode(unsigned code) {
   DCHECK_LT(code, static_cast<unsigned>(kNumberOfVRegisters));
   return VRegister::Create(code, kBRegSizeInBits);
@@ -158,6 +169,13 @@ inline Register CPURegister::X() const {
   return Register::XRegFromCode(code());
 }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+inline Register CPURegister::C() const {
+  DCHECK(IsRegister());
+  return Register::CRegFromCode(code());
+}
+#endif
+
 inline VRegister CPURegister::V() const {
   DCHECK(IsVRegister());
   return VRegister::VRegFromCode(code());
@@ -200,7 +218,7 @@ struct ImmediateInitializer {
   }
 };
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#if defined(__CHERI_PURE_CAPABILITY__)
 template <>
 struct ImmediateInitializer<intptr_t> {
   static inline RelocInfo::Mode rmode_for(intptr_t) { return RelocInfo::NO_INFO; }
@@ -530,7 +548,7 @@ AssemblerBase::EmbeddedObjectIndex
 Assembler::embedded_object_index_referenced_from(Address pc) {
   Instruction* instr = reinterpret_cast<Instruction*>(pc);
   if (instr->IsLdrLiteralX()) {
-#ifdef __CHERI_PURE_CAPABILITY__
+#if defined(__CHERI_PURE_CAPABILITY__)
     return Memory<EmbeddedObjectIndex>(static_cast<size_t>(target_pointer_address_at(pc)));
 #else
     static_assert(sizeof(EmbeddedObjectIndex) == sizeof(intptr_t));
@@ -1098,6 +1116,19 @@ Instr Assembler::FPScale(unsigned scale) {
   DCHECK(is_uint6(scale));
   return scale << FPScale_offset;
 }
+
+#if defined(__CHERI_PURE_CAPABILITY__)
+Instr Assembler::ImmAddSubCapability(int imm) {
+  DCHECK(IsImmAddSubCapability(imm));
+  if (is_uint12(imm)) {  // No shift required.
+    imm <<= ImmAddSubCapability_offset;
+  } else {
+    imm = ((imm >> 12) << ImmAddSubCapability_offset) | (1 << ShiftAddSubCapability_offset);
+  }
+  return imm;
+}
+
+#endif
 
 const Register& Assembler::AppropriateZeroRegFor(const CPURegister& reg) const {
   return reg.Is64Bits() ? xzr : wzr;

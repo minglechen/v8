@@ -51,6 +51,12 @@ const int kNumberOfVRegisters = 32;
 const int kNumberOfCalleeSavedRegisters = 10;
 // Callee saved FP registers are d8-d15.
 const int kNumberOfCalleeSavedVRegisters = 8;
+#if defined(__CHERI_PURE_CAPABILITY__)
+const int kCRegSizeInBits = 128;
+const int kCRegSizeInBitsLog2 = 7;
+const int kCRegSize = kCRegSizeInBits >> 3;
+const int kCRegSizeLog2 = kCRegSizeInBitsLog2 - 3;
+#endif
 const int kWRegSizeInBits = 32;
 const int kWRegSizeInBitsLog2 = 5;
 const int kWRegSize = kWRegSizeInBits >> 3;
@@ -161,7 +167,7 @@ constexpr int kRootRegisterBias = kSystemPointerSize == kTaggedSize ? 256 : 0;
 
 using float16 = uint16_t;
 
-#define INSTRUCTION_FIELDS_LIST(V_)                     \
+#define INSTRUCTION_FIELDS_LIST(V_)               \
   /* Register fields */                                 \
   V_(Rd, 4, 0, Bits)    /* Destination register.     */ \
   V_(Rn, 9, 5, Bits)    /* First source register.    */ \
@@ -281,9 +287,13 @@ using float16 = uint16_t;
   V_(ImmNEONImmb, 18, 16, Bits)
 
 #if defined(__CHERI_PURE_CAPABILITY__)
-#define MORELLO_INSTRUCTION_FIELDS_LIST(V_)             \
-  /* Morello add/subtract capability immediate */       \
-  V_(ImmCapAddSub, 21, 10, Bits)
+#define MORELLO_INSTRUCTION_FIELDS_LIST(V_)                             \
+  V_(Cd, 4, 0, Bits)    /* Destination capability register.     */ 	\
+  V_(Cn, 9, 5, Bits)    /* First source capability register.    */ 	\
+									\
+  /* Morello add/subtract capability immediate */                       \
+  V_(ImmAddSubCapability, 21, 10, Bits)                                 \
+  V_(ShiftAddSubCapability, 23, 22, Bits)
 #endif // defined(__CHERI_PURE_CAPABILITY__)
 
 #define SYSTEM_REGISTER_FIELDS_LIST(V_, M_) \
@@ -2149,8 +2159,8 @@ enum MorelloAddSubCapabilityOp : uint32_t {
   MorelloAddSubCapabilityFixed = 0x02000000,
   MorelloAddSubCapabilityFMask = 0xFF000000,
   MorelloAddSubCapabilityMask = 0x04000000,
-  CAP_ADD = MorelloAddSubCapabilityFixed | 0x00000000,
-  CAP_SUB = MorelloAddSubCapabilityFixed | 0x00800000,
+  ADD_CAP = MorelloAddSubCapabilityFixed | 0x00000000,
+  SUB_CAP = MorelloAddSubCapabilityFixed | 0x00800000,
 };
 
 #endif // defined(__CHERI_PURE_CAPABILITY__)

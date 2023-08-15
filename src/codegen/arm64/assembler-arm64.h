@@ -2169,6 +2169,19 @@ class V8_EXPORT_PRIVATE Assembler : public AssemblerBase {
     return (rn.code() & kRegCodeMask) << Rn_offset;
   }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  // Capability register encoding.
+  static Instr Cd(CPURegister cd) {
+    DCHECK_NE(cd.code(), kSPRegInternalCode);
+    return cd.code() << Cd_offset;
+  }
+
+  static Instr Cn(CPURegister cn) {
+    DCHECK_NE(cn.code(), kSPRegInternalCode);
+    return cn.code() << Cn_offset;
+  }
+#endif
+
   // Flags encoding.
   inline static Instr Flags(FlagsUpdate S);
   inline static Instr Cond(Condition cond);
@@ -2214,6 +2227,12 @@ class V8_EXPORT_PRIVATE Assembler : public AssemblerBase {
   inline static Instr ImmBarrierDomain(int imm2);
   inline static Instr ImmBarrierType(int imm2);
   inline static unsigned CalcLSDataSize(LoadStoreOp op);
+
+#if defined(__CHERI_PURE_CAPABILITY__)
+  static bool IsImmAddSubCapability(int64_t immediate);
+
+  inline static Instr ImmAddSubCapability(int imm);
+#endif
 
   // Instruction bits for vector format in data processing operations.
   static Instr VFormat(VRegister vd) {

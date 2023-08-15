@@ -3948,6 +3948,13 @@ bool Assembler::IsImmAddSub(int64_t immediate) {
          (is_uint12(immediate >> 12) && ((immediate & 0xFFF) == 0));
 }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+bool Assembler::IsImmAddSubCapability(int64_t immediate) {
+  return is_uint12(immediate) ||
+         (is_uint12(immediate >> 12) && ((immediate & 0xFFF) == 0));
+}
+#endif
+
 void Assembler::LoadStore(const CPURegister& rt, const MemOperand& addr,
                           LoadStoreOp op) {
   Instr memop = op | Rt(rt) | RnSP(addr.base());

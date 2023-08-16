@@ -2158,7 +2158,7 @@ enum UnallocatedOp : uint32_t {
 enum MorelloAddSubCapabilityOp : uint32_t {
   MorelloAddSubCapabilityFixed = 0x02000000,
   MorelloAddSubCapabilityFMask = 0xFF000000,
-  MorelloAddSubCapabilityMask = 0x04000000,
+  MorelloAddSubCapabilityMask = 0x02800000,
   ADD_CAP = MorelloAddSubCapabilityFixed | 0x00000000,
   SUB_CAP = MorelloAddSubCapabilityFixed | 0x00800000,
 };

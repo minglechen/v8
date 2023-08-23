@@ -531,7 +531,11 @@ class V8_EXPORT_PRIVATE InstructionSelector final {
   void MarkAsCompressed(Node* node) {
     MarkAsRepresentation(MachineRepresentation::kCompressed, node);
   }
-
+#if defined(__CHERI_PURE_CAPABILITY__)
+  void MarkAsCapability(Node* node) {
+    MarkAsRepresentation(MachineRepresentation::kCapability, node);
+  }
+#endif
   // Inform the register allocation of the representation of the unallocated
   // operand {op}.
   void MarkAsRepresentation(MachineRepresentation rep,
@@ -595,6 +599,9 @@ class V8_EXPORT_PRIVATE InstructionSelector final {
 
 #define DECLARE_GENERATOR(x) void Visit##x(Node* node);
   MACHINE_OP_LIST(DECLARE_GENERATOR)
+#if defined(__CHERI_PURE_CAPABILITY__)
+  MACHINE_CAP_OP_LIST(DECLARE_GENERATOR)
+#endif // __CHERI_PURE_CAPABILITY__
   MACHINE_SIMD_OP_LIST(DECLARE_GENERATOR)
 #undef DECLARE_GENERATOR
 

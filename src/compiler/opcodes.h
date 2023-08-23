@@ -1015,12 +1015,26 @@
   V(LoadLane)                    \
   V(StoreLane)
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+// Opcodes for capability operators.
+#define MACHINE_CAP_OP_LIST(V)   \
+  V(IntPtrAdd)
+
+#define VALUE_OP_LIST(V)  \
+  COMMON_OP_LIST(V)       \
+  SIMPLIFIED_OP_LIST(V)   \
+  MACHINE_OP_LIST(V)      \
+  MACHINE_SIMD_OP_LIST(V) \
+  MACHINE_CAP_OP_LIST(V)  \
+  JS_OP_LIST(V)
+#else
 #define VALUE_OP_LIST(V)  \
   COMMON_OP_LIST(V)       \
   SIMPLIFIED_OP_LIST(V)   \
   MACHINE_OP_LIST(V)      \
   MACHINE_SIMD_OP_LIST(V) \
   JS_OP_LIST(V)
+#endif // __CHERI_PURE_CAPABILITY__
 
 // The combination of all operators at all levels and the common operators.
 #define ALL_OP_LIST(V) \

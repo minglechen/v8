@@ -1607,6 +1607,11 @@ void InstructionSelector::VisitNode(Node* node) {
       return VisitUint64LessThanOrEqual(node);
     case IrOpcode::kUint64Mod:
       return MarkAsWord64(node), VisitUint64Mod(node);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    case IrOpcode::kIntPtrAdd:
+      return MarkAsCapability(node), VisitIntPtrAdd(node);
+      break;
+#endif
     case IrOpcode::kBitcastTaggedToWord:
     case IrOpcode::kBitcastTaggedToWordForTagAndSmiBits:
       return MarkAsRepresentation(MachineType::PointerRepresentation(), node),

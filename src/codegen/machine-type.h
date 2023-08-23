@@ -24,6 +24,9 @@ enum class MachineRepresentation : uint8_t {
   kWord16,
   kWord32,
   kWord64,
+#if defined(__CHERI_PURE_CAPABILITY__)
+  kCapability,
+#endif
   // (uncompressed) MapWord
   // kMapWord is the representation of a map word, i.e. a map in the header
   // of a HeapObject.
@@ -157,8 +160,12 @@ class MachineType {
                               : MachineRepresentation::kWord64;
   }
   constexpr static MachineRepresentation PointerRepresentation() {
+#if defined(__CHERI_PURE_CAPACITY__)
+    return MachineRepresentation::kCapability;
+#else
     return (kSystemPointerSize == 4) ? MachineRepresentation::kWord32
                                      : MachineRepresentation::kWord64;
+#endif
   }
   constexpr static MachineType UintPtr() {
     return (kSystemPointerSize == 4) ? Uint32() : Uint64();

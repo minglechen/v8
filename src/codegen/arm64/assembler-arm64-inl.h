@@ -51,6 +51,13 @@ inline bool CPURegister::IsSP() const {
   return IsRegister() && (code() == kSPRegInternalCode);
 }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+inline bool CPURegister::IsCSP() const {
+  DCHECK(is_valid());
+  return IsCRegister() && (code() == kCSPRegInternalCode);
+}
+#endif // __CHERI_PURE_CAPABILITY__
+
 inline void CPURegList::Combine(const CPURegList& other) {
   DCHECK(other.type() == type_);
   DCHECK(other.RegisterSizeInBits() == size_);
@@ -110,14 +117,14 @@ inline Register Register::WRegFromCode(unsigned code) {
 
 #if defined(__CHERI_PURE_CAPABILITY__)
 inline Register Register::CRegFromCode(unsigned code) {
-  if (code == kSPRegInternalCode) {
+  if (code == kCSPRegInternalCode) {
     return csp;
   } else {
     DCHECK_LT(code, static_cast<unsigned>(kNumberOfRegisters));
-    return Register::Create(code, kCRegSizeInBits);
+    return Register::Create(code, kCRegSizeInBits, kCRegister);
   }
 }
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
 
 inline VRegister VRegister::BRegFromCode(unsigned code) {
   DCHECK_LT(code, static_cast<unsigned>(kNumberOfVRegisters));
@@ -174,7 +181,7 @@ inline Register CPURegister::C() const {
   DCHECK(IsRegister());
   return Register::CRegFromCode(code());
 }
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
 
 inline VRegister CPURegister::V() const {
   DCHECK(IsVRegister());
@@ -238,7 +245,7 @@ struct ImmediateInitializer<Address> {
     return static_cast<uint64_t>(t);
   }
 };
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
 
 template <>
 struct ImmediateInitializer<Smi> {
@@ -290,6 +297,10 @@ Operand::Operand(Register reg, Shift shift, unsigned shift_amount)
       shift_amount_(shift_amount) {
   DCHECK(reg.Is64Bits() || (shift_amount < kWRegSizeInBits));
   DCHECK(reg.Is32Bits() || (shift_amount < kXRegSizeInBits));
+#if defined(__CHERI_PURE_CAPABILITY__)
+  DCHECK(reg.Is128Bits() || (shift_amount < kCRegSizeInBits));
+  DCHECK_IMPLIES(reg.IsCSP(), shift_amount == 0);
+#endif // __CHERI_PURE_CAPABILITY__
   DCHECK_IMPLIES(reg.IsSP(), shift_amount == 0);
 }
 
@@ -375,7 +386,7 @@ Immediate Operand::immediate() const {
 intptr_t Operand::ImmediateValue() const {
 #else
 int64_t Operand::ImmediateValue() const {
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
   DCHECK(IsImmediate());
   return immediate_.value();
 }
@@ -553,7 +564,7 @@ Assembler::embedded_object_index_referenced_from(Address pc) {
 #else
     static_assert(sizeof(EmbeddedObjectIndex) == sizeof(intptr_t));
     return Memory<EmbeddedObjectIndex>(target_pointer_address_at(pc));
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
   } else {
     DCHECK(instr->IsLdrLiteralW());
     return Memory<uint32_t>(target_pointer_address_at(pc));
@@ -598,7 +609,7 @@ int Assembler::deserialization_special_target_size(Address location) {
     return kSystemPointerAddrSize;
 #else
     return kSystemPointerSize;
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
   }
 }
 
@@ -673,7 +684,7 @@ int RelocInfo::target_address_size() {
     return instr->IsLdrLiteralW() ? kTaggedSize : kSystemPointerAddrSize;
 #else
     return instr->IsLdrLiteralW() ? kTaggedSize : kSystemPointerSize;
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
   }
 }
 
@@ -1127,8 +1138,7 @@ Instr Assembler::ImmAddSubCapability(int imm) {
   }
   return imm;
 }
-
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
 
 const Register& Assembler::AppropriateZeroRegFor(const CPURegister& reg) const {
   return reg.Is64Bits() ? xzr : wzr;

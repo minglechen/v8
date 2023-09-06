@@ -1302,6 +1302,16 @@ void Assembler::str(const CPURegister& rt, const MemOperand& src) {
   LoadStore(rt, src, StoreOpFor(rt));
 }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+void Assembler::strc(const CPURegister& ct, const MemOperand& src) {
+  LoadStoreCapability(ct, src);
+}
+
+void Assembler::addc(const CPURegister& ct, const CPURegister& cn) {
+  Emit(ADD_CAP | Ct(ct)| Cn(cn));
+}
+#endif // __CHERI_PURE_CAPABILITY__
+
 void Assembler::ldrsw(const Register& rt, const MemOperand& src) {
   DCHECK(rt.Is64Bits());
   LoadStore(rt, src, LDRSW_x);
@@ -3953,7 +3963,68 @@ bool Assembler::IsImmAddSubCapability(int64_t immediate) {
   return is_uint12(immediate) ||
          (is_uint12(immediate >> 12) && ((immediate & 0xFFF) == 0));
 }
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
+
+#if defined(__CHERI_PURE_CAPABILITY__)
+void Assembler::LoadStoreCapability(const CPURegister& ct, const MemOperand& addr) {
+  Instr memop = Ct(ct) | CnSP(addr.base());
+
+  // Pre-index and post-index modes.
+  DCHECK_NE(ct, addr.base());
+  if (addr.IsImmediateOffset()) {
+    // <imm> Is the optional unsigned immediate byte offset,
+    // a mulitple of 16 in the range 0 to 65520, defaulting to
+    // 0, encoded in the "imm12" field
+    constexpr unsigned size = 4;
+    if (IsImmLSScaled(addr.offset(), size)) {
+      int offset = static_cast<int>(addr.offset());
+      // Use the scaled addressing mode.
+      Emit(LDR_c_unsigned_cap_normal | ImmLSUnsigned(offset >> size));
+    } else if (IsImmLSUnscaled(addr.offset())) {
+      int offset = static_cast<int>(addr.offset());
+      // Use the unscaled addressing mode.
+      Emit(LDR_c_unscaled_capability_normal | ImmLS(offset));
+    } else {
+      // This case is handled in the macro assembler.
+      UNREACHABLE();
+    }
+  } else if (addr.IsRegisterOffset()) {
+    Extend ext = addr.extend();
+    Shift shift = addr.shift();
+    unsigned shift_amount = addr.shift_amount();
+
+    // LSL is encoded in the option field as UXTX.
+    if (shift == LSL) {
+      ext = UXTX;
+    }
+
+    // Shifts are encoded in one bit, indicating a left shift by the memory
+    // access size.
+
+    // <amount> is the index shift amount, encoded in "S"
+    // S = 0, <amount> = [absent]
+    // S = 1, <amount> = #4
+    DCHECK((shift_amount == 0) || (shift_amount == 4));
+    Emit(LDR_c_reg_offset_normal | Cm(addr.regoffset()) |
+         ExtendMode(ext) | ImmShiftLS((shift_amount > 0) ? 1 : 0));
+  } else {
+    // Pre-index and post-index modes.
+    DCHECK_NE(ct, addr.base());
+    if (IsImmLSUnscaled(addr.offset())) {
+      int offset = static_cast<int>(addr.offset());
+      if (addr.IsPreIndex()) {
+        Emit(LDR_c_pre | memop | ImmLS(offset));
+      } else {
+        DCHECK(addr.IsPostIndex());
+        Emit(LDR_c_post | memop | ImmLS(offset));
+      }
+    } else {
+      // This case is handled in the assembler.
+      UNREACHABLE();
+    }
+  }
+}
+#endif // __CHERI_PURE_CAPABILITY__
 
 void Assembler::LoadStore(const CPURegister& rt, const MemOperand& addr,
                           LoadStoreOp op) {
@@ -3986,10 +4057,8 @@ void Assembler::LoadStore(const CPURegister& rt, const MemOperand& addr,
 
     // Shifts are encoded in one bit, indicating a left shift by the memory
     // access size.
-#if !defined(__CHERI_PURE_CAPABILITY__)
     DCHECK((shift_amount == 0) ||
            (shift_amount == static_cast<unsigned>(CalcLSDataSize(op))));
-#endif
     Emit(LoadStoreRegisterOffsetFixed | memop | Rm(addr.regoffset()) |
          ExtendMode(ext) | ImmShiftLS((shift_amount > 0) ? 1 : 0));
   } else {

@@ -175,6 +175,9 @@ class CPURegister : public RegisterBase<CPURegister, kRegAfterLast> {
 
   bool IsZero() const;
   bool IsSP() const;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  bool IsCSP() const;
+#endif
 
   bool IsRegister() const { return reg_type_ == kRegister; }
 #if defined(__CHERI_PURE_CAPABILITY__)
@@ -242,7 +245,7 @@ class CPURegister : public RegisterBase<CPURegister, kRegAfterLast> {
 #if defined(__CHERI_PURE_CAPABILITY__)
   static constexpr bool IsValidCRegister(int code, int size) {
     return (size == kCRegSizeInBits) &&
-           (code < kNumberOfRegisters || code == kSPRegInternalCode);
+           (code < kNumberOfRegisters || code == kCSPRegInternalCode);
   }
 #endif
 
@@ -519,7 +522,7 @@ DEFINE_REGISTER(Register, sp, kSPRegInternalCode, kXRegSizeInBits);
   DEFINE_REGISTER(Register, c##N, N, kCRegSizeInBits, CPURegister::kCRegister);
 CAPABILITY_REGISTER_CODE_LIST(DEFINE_REGISTERS)
 #undef DEFINE_REGISTERS
-DEFINE_REGISTER(Register, csp, kSPRegInternalCode, kCRegSizeInBits, CPURegister::kCRegister);
+DEFINE_REGISTER(Register, csp, kCSPRegInternalCode, kCRegSizeInBits, CPURegister::kCRegister);
 #endif
 
 #define DEFINE_VREGISTERS(N)                            \

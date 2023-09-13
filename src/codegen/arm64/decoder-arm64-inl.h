@@ -888,7 +888,7 @@ void Decoder<V>::DecodeMorello(Instruction* instr) {
 template <typename V>
 void Decoder<V>::DecodeMorelloAddSubCapability(Instruction* instr) {
   DCHECK_EQ(0x02, instr->Bits(31, 24)); // [0000 0010][A][sh][imm12][Cn][Cd]
-  V::VisitMorelloAddSubCapability(instr);
+  V::VisitAddSubCapabilityImmediate(instr);
 }
 
 template <typename V>
@@ -1125,10 +1125,12 @@ void Decoder<V>::DecodeMorelloLoadStoreRegisterViaAlternativeBase(Instruction* i
 template <typename V>
 void Decoder<V>::DecodeMorelloLoadStoreUnsignedOffset(Instruction* instr) {
   DCHECK_EQ(0x184, instr->Bits(31, 23)); // [1 1000 0100][L][imm12][Rn][Ct] 
-  if (instr->Bit(21) == 0) {
+  if (instr->Bit(22) == 0) {
     // L: 0 STR (unsigned offset, capability normal base)
+    V::VisitLoadStoreCapUnsignedOffsetCapNormal(instr);
   } else {
     // L: 1 LDR (unsigned offset, capability normal base)
+    V::VisitLoadStoreCapUnsignedOffsetCapNormal(instr);
   }
 }
 
@@ -1253,7 +1255,7 @@ void Decoder<V>::DecodeMorelloLoadStoreUnscaledImmediateViaAlternateBase(Instruc
 
 template <typename V>
 void Decoder<V>::DecodeMorelloMisc(Instruction* instr) {
-  DCHECK_EQ(0x20B, instr->Bits(31, 12)); // [11 0000 1011][op0][op1][op2][][op3] 
+  DCHECK_EQ(0x30B, instr->Bits(31, 22)); // [11 0000 1011][op0][op1][op2][][op3] 
   if (instr->Bit(21) == 0x0) {
     if (instr->Bits(12, 11) == 0x0) {
       if (instr->Bit(10) == 0x0) {
@@ -1292,6 +1294,14 @@ void Decoder<V>::DecodeMorelloMisc(Instruction* instr) {
 	      // op0: 0000010xx, op1: 10, op2: 0 Morello get field 2
 	    } else if (instr->Bits(16, 15) == 0x3) {
 	      // op0: 0000011xx, op1: 10, op2: 0 Morello miscellaneous capability 0
+	      if (instr->Bits(14, 13) == 0x0) {
+		// opc: 00 CLRTAG
+	      } else if (instr->Bits(14, 13) == 0x2) {
+	        // opc: 10 MOV/CPY
+	        V::VisitCopyCapability(instr);
+	      } else {
+	        V::VisitUnallocated(instr);
+	      }
 	    } else {
 	      CHECK_EQ(0x0, instr->Bit(16));
 	      // op0: 000000xxx, op1: 10, op2: 0 Morello get field 1

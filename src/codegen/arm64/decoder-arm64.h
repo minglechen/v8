@@ -15,9 +15,11 @@ namespace internal {
 
 // List macro containing all visitors needed by the decoder class.
 #if defined(__CHERI_PURE_CAPABILITY__)
-#define VISITOR_LIST(V)                 \
-	ARM64_VISITOR_LIST(V)		\
-	V(MorelloAddSubCapability)
+#define VISITOR_LIST(V)                	        \
+	ARM64_VISITOR_LIST(V)		        \
+	V(AddSubCapabilityImmediate)            \
+	V(CopyCapability)                       \
+	V(LoadStoreCapUnsignedOffsetCapNormal)
 #else
 #define VISITOR_LIST(V)                 \
 	ARM64_VISITOR_LIST(V)

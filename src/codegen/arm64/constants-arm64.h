@@ -25,7 +25,7 @@ static_assert(sizeof(1L) == sizeof(int64_t));
 static_assert(sizeof(intmax_t) == sizeof(int64_t));
 #else
 static_assert(sizeof(void*) == sizeof(int64_t));
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
 static_assert(sizeof(1) == sizeof(int32_t));
 
 // Get the standard printf format macros for C99 stdint types.
@@ -56,7 +56,7 @@ const int kCRegSizeInBits = 128;
 const int kCRegSizeInBitsLog2 = 7;
 const int kCRegSize = kCRegSizeInBits >> 3;
 const int kCRegSizeLog2 = kCRegSizeInBitsLog2 - 3;
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
 const int kWRegSizeInBits = 32;
 const int kWRegSizeInBitsLog2 = 5;
 const int kWRegSize = kWRegSizeInBits >> 3;
@@ -117,6 +117,9 @@ const int kFramePointerRegCode = 29;
 const int kLinkRegCode = 30;
 const int kZeroRegCode = 31;
 const int kSPRegInternalCode = 63;
+#if defined(__CHERI_PURE_CAPABILITY__)
+const int kCSPRegInternalCode = 64;
+#endif // __CHERI_PURE_CAPABILITY__
 const unsigned kRegCodeMask = 0x1f;
 const unsigned kShiftAmountWRegMask = 0x1f;
 const unsigned kShiftAmountXRegMask = 0x3f;
@@ -163,7 +166,7 @@ const unsigned kFloat16ExponentBias = 15;
 constexpr int kRootRegisterBias = kSystemPointerAddrSize == kTaggedSize ? 256 : 0;
 #else
 constexpr int kRootRegisterBias = kSystemPointerSize == kTaggedSize ? 256 : 0;
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
 
 using float16 = uint16_t;
 
@@ -290,11 +293,13 @@ using float16 = uint16_t;
 #define MORELLO_INSTRUCTION_FIELDS_LIST(V_)                             \
   V_(Cd, 4, 0, Bits)    /* Destination capability register.     */ 	\
   V_(Cn, 9, 5, Bits)    /* First source capability register.    */ 	\
+  V_(Cm, 20, 16, Bits)  /* Second source register.   */                 \
+  V_(Ct, 4, 0, Bits)    /* Load dest / store source. */                 \
 									\
   /* Morello add/subtract capability immediate */                       \
   V_(ImmAddSubCapability, 21, 10, Bits)                                 \
   V_(ShiftAddSubCapability, 23, 22, Bits)
-#endif // defined(__CHERI_PURE_CAPABILITY__)
+#endif // __CHERI_PURE_CAPABILITY__
 
 #define SYSTEM_REGISTER_FIELDS_LIST(V_, M_) \
   /* NZCV */                                \
@@ -322,7 +327,7 @@ using float16 = uint16_t;
 INSTRUCTION_FIELDS_LIST(DECLARE_INSTRUCTION_FIELDS_OFFSETS)
 #if defined(__CHERI_PURE_CAPABILITY__)
 MORELLO_INSTRUCTION_FIELDS_LIST(DECLARE_INSTRUCTION_FIELDS_OFFSETS)
-#endif // defined(__CHERI_PURE_CAPABILITY__)
+#endif // __CHERI_PURE_CAPABILITY__
 SYSTEM_REGISTER_FIELDS_LIST(DECLARE_FIELDS_OFFSETS, NOTHING)
 #undef DECLARE_FIELDS_OFFSETS
 #undef DECLARE_INSTRUCTION_FIELDS_OFFSETS
@@ -696,6 +701,15 @@ enum MoveWideImmediateOp : uint32_t {
   MOVK_x = MoveWideImmediateFixed | MOVK | SixtyFourBits
 };
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+enum CopyCapabilityOp : uint32_t {
+  CopyCapabilityFixed = 0xC2C19000,
+  CopyCapabilityFMask = 0xFFFF9C00,
+  CopyCapabilityMask = 0xFFFFFC00,
+  CPY = CopyCapabilityFixed | 0x00004000,
+};
+#endif // __CHERI_PURE_CAPABILITY__
+
 // Bitfield.
 const int kBitfieldNOffset = 22;
 enum BitfieldOp : uint32_t {
@@ -894,6 +908,12 @@ enum LoadLiteralOp : uint32_t {
   LoadLiteralFixed = 0x18000000,
   LoadLiteralFMask = 0x3B000000,
   LoadLiteralMask = 0xFF000000,
+#if defined(__CHERI_PURE_CAPABILITY__)
+  // Load capability (literal) calculates an address from the PCC and an
+  // immediate offset, loads a capability from memory and writes it to a
+  // Capability register.
+  LDR_c_lit = 0x82000000,
+#endif // __CHERI_PURE_CAPABILITY__
   LDR_w_lit = LoadLiteralFixed | 0x00000000,
   LDR_x_lit = LoadLiteralFixed | 0x40000000,
   LDRSW_x_lit = LoadLiteralFixed | 0x80000000,
@@ -903,7 +923,6 @@ enum LoadLiteralOp : uint32_t {
 };
 
 // clang-format off
-
 #define LOAD_STORE_OP_LIST(V)  \
   V(ST, RB, w,  0x00000000),   \
   V(ST, RH, w,  0x40000000),   \
@@ -933,6 +952,48 @@ enum LoadLiteralOp : uint32_t {
 
 // Load/store unscaled offset.
 enum LoadStoreUnscaledOffsetOp : uint32_t {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  LoadStoreCapUnscaledOffsetAlternativeBaseFixed = 0xE2000000,
+  LoadStoreCapUnscaledOffsetAlternativeBaseFMask = 0xFF000000,
+  LoadStoreCapUnscaledOffsetAlternativeBaseMask = 0x00C00600,
+  LoadCapUnscaledOffsetAlternativeBase = 0x00C00C00,
+  StoreCapUnscaledOffsetAlternativeBase = 0x00800C00,
+  LoadStoreCapUnscaledOffsetNormalBaseFixed = 0xA2000000,
+  LoadStoreCapUnscaledOffsetNormalBaseFMask = 0xFF000000,
+  LoadStoreCapUnscaledOffsetNormalBaseMask = 0x00C00600,
+  LoadCapUnscaledOffsetNormalBase = 0x00400000,
+  StoreCapUnscaledOffsetNormalBase = 0x00000000,
+  LoadStoreCapUnscaledOffsetIntegerFixed = 0xA2000000,
+  LoadStoreCapUnscaledOffsetIntegerFMask = 0xFF000000,
+  LoadStoreCapUnscaledOffsetIntegerMask = 0x00C00600,
+  LoadCapUnscaledOffsetInteger = 0x00000400,
+  StoreCapUnscaledOffsetInteger = 0x00000000,
+  LoadStoreCapUnscaledOffsetIntegerDoubleword = 0x00C00000,
+  LoadStoreCapUnscaledOffsetIntegerWord = 0x00800000,
+
+  // 4.4.92 LDUR (capability, alternative base)
+  LDRU_c_capability_alternative = LoadStoreCapUnscaledOffsetAlternativeBaseFixed |
+	                          LoadCapUnscaledOffsetAlternativeBase,
+  // 4.4.93 LDUR (capability, normal base)
+  LDRU_c_capability_normal = LoadStoreCapUnscaledOffsetNormalBaseFixed |
+	                     LoadCapUnscaledOffsetNormalBase,
+  // 4.4.94 LDUR (integer)
+  LDRU_c_integer_w = LoadStoreCapUnscaledOffsetNormalBaseFixed |
+	             LoadCapUnscaledOffsetInteger | LoadStoreCapUnscaledOffsetIntegerWord,
+  LDRU_c_integer_d = LoadStoreCapUnscaledOffsetNormalBaseFixed |
+	             LoadCapUnscaledOffsetInteger | LoadStoreCapUnscaledOffsetIntegerDoubleword,
+  // 4.4.147 STUR (capability, alternative base)
+  STRU_c_capability_alternative = LoadStoreCapUnscaledOffsetAlternativeBaseFixed |
+	                          StoreCapUnscaledOffsetAlternativeBase,
+  // 4.4.148 STUR (capability, normal base)
+  STRU_c_unscaled_capability_normal = LoadStoreCapUnscaledOffsetNormalBaseFixed |
+	                              StoreCapUnscaledOffsetNormalBase,
+  // 4.4.149 STUR (integer)
+  STRU_c_integer_w = LoadStoreCapUnscaledOffsetNormalBaseFixed |
+	             StoreCapUnscaledOffsetInteger | LoadStoreCapUnscaledOffsetIntegerWord,
+  STRU_c_integer_d = LoadStoreCapUnscaledOffsetNormalBaseFixed |
+	             StoreCapUnscaledOffsetInteger | LoadStoreCapUnscaledOffsetIntegerWord,
+#endif // __CHERI_PURE_CAPABILITY
   LoadStoreUnscaledOffsetFixed = 0x38000000,
   LoadStoreUnscaledOffsetFMask = 0x3B200C00,
   LoadStoreUnscaledOffsetMask = 0xFFE00C00,
@@ -951,8 +1012,31 @@ enum LoadStoreOp : uint32_t {
   PRFM = 0xC0800000
 };
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+enum LoadStoreCapOp : uint32_t {
+  LoadCap,
+  StoreCap
+};
+#endif // __CHERI_PURE_CAPABILITY__
+
 // Load/store post index.
 enum LoadStorePostIndex : uint32_t {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  LoadStorePostCapIndexFixed = 0xA2000400,
+  LoadStorePostCapIndexFMask = 0xFF200400,
+  LoadStorePostCapIndexMask = 0xFFE00400,
+  LoadPostCapIndex = 0x00400000,
+  StorePostCapIndex = 0x00000000,
+  // 4.4.77 LDR (post-indexed)
+  // Load capability (immediate post-indexed) loads a capability from memory
+  // and writes it to a Capability Register.
+  LDR_c_post = LoadStorePostCapIndexFixed | LoadPostCapIndex,
+  // 4.4.134 STR (post-indexed)
+  // Store capability (immediate post-indexed_ determines the base register
+  // to be used, derives and address from the base register, and stores a
+  // capability to memory from a Capability register.
+  STR_c_post = LoadStorePostCapIndexFixed | StorePostCapIndex,
+#endif // __CHERI_PURE_CAPABILITY__
   LoadStorePostIndexFixed = 0x38000400,
   LoadStorePostIndexFMask = 0x3B200C00,
   LoadStorePostIndexMask = 0xFFE00C00,
@@ -964,17 +1048,87 @@ enum LoadStorePostIndex : uint32_t {
 
 // Load/store pre index.
 enum LoadStorePreIndex : uint32_t {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  LoadStorePreCapIndexFixed = 0xA2000C00,
+  LoadStorePreCapIndexFMask = 0xFF200C00,
+  LoadStorePreCapIndexMask = 0xFFC00C00,
+  LoadPreCapIndex = 0x00400000,
+  StorePreCapIndex = 0x00000000,
+  // 4.4.78 (pre-indexed)
+  // Load capability (immediate pre-indexed) loads a capability from memory
+  // and writes it to a Capability register.
+  LDR_c_pre = LoadStorePreCapIndexFixed | LoadPreCapIndex,
+  STR_c_pre = LoadStorePreCapIndexFixed | StorePreCapIndex,
+#endif // __CHERI_PURE_CAPABILITY__
   LoadStorePreIndexFixed = 0x38000C00,
   LoadStorePreIndexFMask = 0x3B200C00,
   LoadStorePreIndexMask = 0xFFE00C00,
 #define LOAD_STORE_PRE_INDEX(A, B, C, D) \
   A##B##_##C##_pre = LoadStorePreIndexFixed | D
-  LOAD_STORE_OP_LIST(LOAD_STORE_PRE_INDEX)
+  LOAD_STORE_OP_LIST(LOAD_STORE_PRE_INDEX),
 #undef LOAD_STORE_PRE_INDEX
 };
 
 // Load/store unsigned offset.
 enum LoadStoreUnsignedOffset : uint32_t {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  LoadStoreCapUnsignedOffsetCapAlternativeFixed = 0x82400000,
+  LoadStoreCapUnsignedOffsetCapAlternativeFMask = 0xFFC00000,
+  LoadStoreCapUnsignedOffsetCapAlternativeMask = 0xFFE00C00,
+  LoadCapUnsignedOffsetCapAlternative = 0x00200000,
+  StoreCapUnsignedOffsetCapAlternative = 0x00000000,
+  LoadStoreCapUnsignedOffsetCapNormalFixed = 0xC2000000,
+  LoadStoreCapUnsignedOffsetCapNormalFMask = 0xFF800000,
+  LoadStoreCapUnsignedOffsetCapNormalMask = 0xFFC00000,
+  LoadCapUnsignedOffsetCapNormal = 0x00400000,
+  StoreCapUnsignedOffsetCapNormal = 0x00000000,
+  LoadStoreCapUnsignedOffsetIntegerFixed = 0x82400000,
+  LoadStoreCapUnsignedOffsetIntegerFMask = 0xFFC00000,
+  LoadStoreCapUnsignedOffsetIntegerMask = 0xFFE00C00,
+  LoadCapUnsignedOffsetInteger = 0x00200000,
+  StoreCapUnsignedOffsetInteger = 0x00000000,
+  LoadStoreCapUnsignedOffsetIntegerWord = 0x00000800,
+  LoadStoreCapUnsignedOffsetIntegerDoubleword = 0x00000C00,
+  // 4.4.83 LDR (unsigned offset, capability, alternate base)
+  // Load capability (unsigned offset) via laternate base determeines the base
+  // register to be used, derives an address from the base register, loads a
+  // capability drom memory, and writes the result to the destination
+  // Cpability register.
+  LDR_c_unsigned_cap_alternate = LoadStoreCapUnsignedOffsetCapAlternativeFixed | LoadCapUnsignedOffsetCapAlternative,
+  // 4.4.84 LDR (unsigned offset, capability, normal base)
+  // Load capability (unsigned offset) determeines the base register to be
+  // used, derives an address from the base regsiter and an immediate
+  // offset, loads a capability from memory and writes the resutl to the
+  // destination Capability register.
+  LDR_c_unsigned_cap_normal = LoadStoreCapUnsignedOffsetCapNormalFixed | LoadCapUnsignedOffsetCapNormal,
+  // 4.4.85 LDR (unsiged offset, integer)
+  // Load Register (unsigned offset) via an alternative base determines the
+  // base register to be used, derives an address from the base register
+  // and an immediate offset, loads a 32-bit word or 64-bit doubleword
+  // from memory, zero-extends it, and writes the result to the destination
+  // register.
+  LDR_c_unsigned_d = LoadStoreCapUnsignedOffsetIntegerFixed |
+	             LoadCapUnsignedOffsetInteger | LoadStoreCapUnsignedOffsetIntegerDoubleword,
+  LDR_c_unsigned_w = LoadStoreCapUnsignedOffsetIntegerFixed |
+	             LoadCapUnsignedOffsetInteger | LoadStoreCapUnsignedOffsetIntegerWord,
+  // 4.4.141 STR (unsigned offset, capability, normal base)
+  // Store capability (unsigned offset) stores a capability to memory from a
+  // Capability register.
+  STR_c_unsigned_cap_alternate = LoadStoreCapUnsignedOffsetCapAlternativeFixed | StoreCapUnsignedOffsetCapAlternative,
+  // 4.4.141 STR (unsigned offset, capability, normal base)
+  // Store capability (unsigned offset) stores a capability to memory from
+  // a Capability register.
+  STR_c_unsigned_cap_normal = LoadStoreCapUnsignedOffsetCapNormalFixed | StoreCapUnsignedOffsetCapNormal,
+  // 4.4.142 STR (unsigned offset, integer)
+  // Store Register (unsigned offset) via alternate base determines the base
+  // register to be used, derives an address from the base register and an
+  // immeditae offset, and stores a 32-bit word or 64-bit doubleword to the
+  // calucluated address in memory.
+  STR_c_unsigned_d = LoadStoreCapUnsignedOffsetIntegerFixed |
+	             StoreCapUnsignedOffsetInteger | LoadStoreCapUnsignedOffsetIntegerDoubleword,
+  STR_c_unsigned_w = LoadStoreCapUnsignedOffsetIntegerFixed |
+	             StoreCapUnsignedOffsetInteger | LoadStoreCapUnsignedOffsetIntegerWord,
+#endif // __CHERI_PURE_CAPABILITY__
   LoadStoreUnsignedOffsetFixed = 0x39000000,
   LoadStoreUnsignedOffsetFMask = 0x3B000000,
   LoadStoreUnsignedOffsetMask = 0xFFC00000,
@@ -987,6 +1141,35 @@ enum LoadStoreUnsignedOffset : uint32_t {
 
 // Load/store register offset.
 enum LoadStoreRegisterOffset : uint32_t {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  LoadStoreCapRegisterOffsetAlternativeFixed = 0xC2E04400,
+  LoadStoreCapRegisterOffsetAlternativeFMask= 0xFFE04400,
+  LoadStoreCapRegisterOffsetAlternativeMask = 0xFFE04C00,
+  LoadStoreCapRegisterOffsetNormalFixed = 0xA2204800,
+  LoadStoreCapRegisterOffsetNormalFMask= 0xFF204C00,
+  LoadStoreCapRegisterOffsetNormalMask = 0xFFE04C00,
+  LoadStoreCapRegisterOffsetIntegerFixed = 0x82A04000,
+  LoadStoreCapRegisterOffsetIntegerFMask = 0xFFA04000,
+  LoadStoreCapRegisterOffsetIntegerMask = 0xFFE04C00,
+  // 4.4.79 LDR (register offset, capability, alternative base)
+  // Load capability (register) via alternative base determins the base
+  // register to be used, derives an address from the base register and
+  // an offset register, loads a capability from memory, and writes it
+  // to the destination Capability register
+  LDR_c_reg_offset_alternative = LoadStoreCapRegisterOffsetAlternativeFixed | 0x00000800,
+  // 4.4.80 LDR (register offset, capability, normal base)
+  LDR_c_reg_offset_normal = LoadStoreCapRegisterOffsetNormalFixed | 0xA0000000,
+  // 4.4.81 LDR (register offset, integer)
+  LDR_c_reg_offset_integer_d = LoadStoreCapRegisterOffsetIntegerFixed | 0x00400400,
+  LDR_c_reg_offset_integer_w = LoadStoreCapRegisterOffsetIntegerFixed | 0x00400000,
+  // 4.4.136 STR (register offset, capability, alternative base)
+  STR_c_reg_offset_alternative = LoadStoreCapRegisterOffsetAlternativeFixed | 0x00000000,
+  // 4.4.137 STR (register offset, capability, normal base)
+  STR_c_reg_offset_normal = LoadStoreCapRegisterOffsetNormalFixed | 0xA0000000,
+  // 4.4.137 STR (register offset, integer)
+  STR_c_reg_offset_integer_d = LoadStoreCapRegisterOffsetIntegerFixed | 0x00000C00,
+  STR_c_reg_offset_integer_w = LoadStoreCapRegisterOffsetIntegerFixed | 0x00000800,
+#endif // __CHERI_PURE_CAPABILITY
   LoadStoreRegisterOffsetFixed = 0x38200800,
   LoadStoreRegisterOffsetFMask = 0x3B200C00,
   LoadStoreRegisterOffsetMask = 0xFFE00C00,
@@ -2152,18 +2335,37 @@ enum UnallocatedOp : uint32_t {
 };
 
 #if defined(__CHERI_PURE_CAPABILITY__)
-#define ADD_SUB_CAP_OP_LIST(V) V(CAPADD), V(CAP_SUB)
 
-// Morello Add/sub capability
-enum MorelloAddSubCapabilityOp : uint32_t {
-  MorelloAddSubCapabilityFixed = 0x02000000,
-  MorelloAddSubCapabilityFMask = 0xFF000000,
-  MorelloAddSubCapabilityMask = 0x02800000,
-  ADD_CAP = MorelloAddSubCapabilityFixed | 0x00000000,
-  SUB_CAP = MorelloAddSubCapabilityFixed | 0x00800000,
+enum AddSubCapabilityOp : uint32_t {
+  ADDCAP = 0x00000000,
+  SUBCAP = 0x00800000
 };
 
-#endif // defined(__CHERI_PURE_CAPABILITY__)
+#define ADD_SUB_CAP_OP_LIST(V) V(ADDCAP), V(SUBCAP)
+
+enum AddSubCapabilityImmediateOp : uint32_t {
+  AddSubCapabilityImmediateFixed = 0x02000000,
+  AddSubCapabilityImmediateFMask = 0xFF000000,
+  AddSubCapabilityImmediateMask = 0x0FF80000,
+  // 4.4.2 ADD (Immediate)
+  // Add (immediate_ copies a cpability from the source Capability register
+  // to the destination Capability register with an optionally shifted
+  // immediate value added to the value field.
+#define ADD_SUB_CAP_IMMEDIATE(A)            \
+  A##_c_imm = AddSubCapabilityImmediateFixed | A
+  ADD_SUB_CAP_OP_LIST(ADD_SUB_CAP_IMMEDIATE)
+#undef ADD_SUB_IMMEDIATE
+};
+
+enum AddSubCapabilityExtendedOp : uint32_t {
+  AddSubCapabilityExtendedFixed = 0xC2A00000,
+  AddSubCapabilityExtendedFMask = 0xFFE00000,
+  AddSubCapabilityExtendedMask = 0x0FF80000,
+  ADDCAP_c_ext = AddSubCapabilityExtendedFixed,
+};
+
+
+#endif // __CHERI_PURE_CAPABILITY__
 
 }  // namespace internal
 }  // namespace v8

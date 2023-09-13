@@ -33,6 +33,12 @@
 namespace v8 {
 namespace internal {
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define LS_CAP_MACRO_LIST(V)                                 \
+  V(Strc, Register&, ct, StoreCap)                           \
+  V(Ldrc, Register&, ct, LoadCap)
+#endif // __CHERI_PURE_CAPABILITY__
+
 #define LS_MACRO_LIST(V)                                     \
   V(Ldrb, Register&, rt, LDRB_w)                             \
   V(Strb, Register&, rt, STRB_w)                             \
@@ -785,6 +791,18 @@ class V8_EXPORT_PRIVATE TurboAssembler : public TurboAssemblerBase {
   LS_MACRO_LIST(DECLARE_FUNCTION)
 #undef DECLARE_FUNCTION
 
+#define DECLARE_FUNCTION(FN, REGTYPE, REG, OP) \
+  inline void FN(const REGTYPE REG, const MemOperand& addr);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  LS_CAP_MACRO_LIST(DECLARE_FUNCTION)
+#endif // __CHERI_PURE_CAPABILITY__
+#undef DECLARE_FUNCTION
+
+#if defined(__CHERI_PURE_CAPABILITY__)
+  inline void Addc(const Register& cd, const Register& cn,
+                   const Operand& operand);
+#endif // __CHERI_PURE_CAPABILITY__
+
   // Push or pop up to 4 registers of the same width to or from the stack.
   //
   // If an argument register is 'NoReg', all further arguments are also assumed
@@ -1513,6 +1531,10 @@ class V8_EXPORT_PRIVATE TurboAssembler : public TurboAssemblerBase {
 
   void LoadStoreMacro(const CPURegister& rt, const MemOperand& addr,
                       LoadStoreOp op);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  void LoadStoreCapMacro(const Register& rt, const MemOperand& addr,
+		         const LoadStoreCapOp op);
+#endif // __CHERI_PURE_CAPABILITY__
 
   void LoadStorePairMacro(const CPURegister& rt, const CPURegister& rt2,
                           const MemOperand& addr, LoadStorePairOp op);

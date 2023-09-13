@@ -133,6 +133,14 @@ void TurboAssembler::Adds(const Register& rd, const Register& rn,
   }
 }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+void TurboAssembler::Addc(const Register& cd, const Register& cn,
+                          const Operand& operand) {
+  DCHECK(allow_macro_instructions());
+  addc(cd, cn, operand);
+}
+#endif // __CHERI_PURE_CAPABILITY__
+
 void TurboAssembler::Sub(const Register& rd, const Register& rn,
                          const Operand& operand) {
   DCHECK(allow_macro_instructions());
@@ -243,6 +251,16 @@ void TurboAssembler::Mvn(const Register& rd, uint64_t imm) {
   }
 LS_MACRO_LIST(DEFINE_FUNCTION)
 #undef DEFINE_FUNCTION
+
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define DEFINE_FUNCTION(FN, REGTYPE, REG, OP)                          \
+  void TurboAssembler::FN(const REGTYPE REG, const MemOperand& addr) { \
+    DCHECK(allow_macro_instructions());                                \
+    LoadStoreCapMacro(REG, addr, OP);                                  \
+  }
+LS_CAP_MACRO_LIST(DEFINE_FUNCTION)
+#undef DEFINE_FUNCTION
+#endif // __CHERI_PURE_CAPABILITY__
 
 #define DEFINE_FUNCTION(FN, REGTYPE, REG, REG2, OP)              \
   void TurboAssembler::FN(const REGTYPE REG, const REGTYPE REG2, \

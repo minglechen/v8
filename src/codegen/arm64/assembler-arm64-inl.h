@@ -1141,6 +1141,9 @@ Instr Assembler::ImmAddSubCapability(int imm) {
 #endif // __CHERI_PURE_CAPABILITY__
 
 const Register& Assembler::AppropriateZeroRegFor(const CPURegister& reg) const {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  if (reg.Is128Bits()) return czr;
+#endif // __CHERI_PURE_CAPABILITY__
   return reg.Is64Bits() ? xzr : wzr;
 }
 

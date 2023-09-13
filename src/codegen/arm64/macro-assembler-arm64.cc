@@ -887,6 +887,41 @@ void TurboAssembler::LoadStoreMacro(const CPURegister& rt,
   }
 }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+void TurboAssembler::LoadStoreCapMacro(const Register& ct,
+                                       const MemOperand& addr,
+				       const LoadStoreCapOp op) {
+  int64_t offset = addr.offset();
+  constexpr unsigned size = 4;
+
+  DCHECK_EQ(ct.type(), CPURegister::kCRegister);
+  DCHECK_EQ(ct.SizeInBits(), kCRegSizeInBits);
+  // Check if an immediate offset fits in the immediate field of the
+  // appropriate instruction. If not, emit two instructions to perform
+  // the operation.
+  if (addr.IsImmediateOffset() && !IsImmLSScaled(offset, size) &&
+      !IsImmLSUnscaled(offset)) {
+    // Immediate offset that can't be encoded using unsigned or unscaled
+    // addressing modes.
+    UseScratchRegisterScope temps(this);
+    Register temp = temps.AcquireSameSizeAs(addr.base());
+    Mov(temp, addr.offset());
+    LoadStoreCapability(ct, MemOperand(addr.base(), temp), op);
+  } else if (addr.IsPostIndex() && !IsImmLSUnscaled(offset)) {
+    // Post-index beyond unscaled addressing range.
+    LoadStoreCapability(ct, MemOperand(addr.base()), op);
+    add(addr.base(), addr.base(), offset);
+  } else if (addr.IsPreIndex() && !IsImmLSUnscaled(offset)) {
+    // Pre-index beyond unscaled addressing range.
+    add(addr.base(), addr.base(), offset);
+    LoadStoreCapability(ct, MemOperand(addr.base()), op);
+  } else {
+    // Encodable in one load/store instruction.
+    LoadStoreCapability(ct, addr, op);
+  }
+}
+#endif // __CHERI_PURE_CAPABILITY__
+
 void TurboAssembler::LoadStorePairMacro(const CPURegister& rt,
                                         const CPURegister& rt2,
                                         const MemOperand& addr,

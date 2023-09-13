@@ -124,6 +124,9 @@ class Instruction {
 #define DEFINE_GETTER(Name, HighBit, LowBit, Func) \
   int32_t Name() const { return Func(HighBit, LowBit); }
   INSTRUCTION_FIELDS_LIST(DEFINE_GETTER)
+#if defined(__CHERI_PURE_CAPABILITY__)
+  MORELLO_INSTRUCTION_FIELDS_LIST(DEFINE_GETTER)
+#endif
 #undef DEFINE_GETTER
 
   // ImmPCRel is a compound field (not present in INSTRUCTION_FIELDS_LIST),

@@ -817,10 +817,18 @@ class V8_EXPORT_PRIVATE Assembler : public AssemblerBase {
   void str(const CPURegister& rt, const MemOperand& dst);
 
 #if defined(__CHERI_PURE_CAPABILITY__)
-  // Store a capability register
-  void strc(const CPURegister& rt, const MemOperand& dst);
-
-  void addc(const CPURegister& ct, const CPURegister& cn);
+  // Add a capability
+  void addc(const Register& ct, const Register& cn,
+	    const Operand& operand);
+  // Store a capability
+  void strc(const Register& rt, const MemOperand& dst);
+  // Load a capability
+  void ldrc(const Register& rt, const MemOperand& dst);
+  // Copies a capability register
+  void cpy(const Register& ct, const Register& cn);
+  // Subtract a capability
+  void subc(const Register& ct, const Register& cn,
+	    const Operand& operand);
 #endif // __CHERI_PURE_CAPABILITY__
 
   // Load word with sign extension.
@@ -2177,12 +2185,17 @@ class V8_EXPORT_PRIVATE Assembler : public AssemblerBase {
   }
 
 #if defined(__CHERI_PURE_CAPABILITY__)
-  static Instr CnSP(Register cn) {
+  static Instr CdCSP(Register cn) {
+    DCHECK(!cn.IsZero());
+    return (cn.code() & kRegCodeMask) << Cd_offset;
+  }
+
+  static Instr CnCSP(Register cn) {
     DCHECK(!cn.IsZero());
     return (cn.code() & kRegCodeMask) << Cn_offset;
   }
 
- // Capability register encoding.
+  // Capability register encoding.
   static Instr Cd(CPURegister cd) {
     DCHECK_NE(cd.code(), kCSPRegInternalCode);
     return cd.code() << Cd_offset;
@@ -2511,7 +2524,10 @@ class V8_EXPORT_PRIVATE Assembler : public AssemblerBase {
 
   void LoadStore(const CPURegister& rt, const MemOperand& addr, LoadStoreOp op);
 #if defined(__CHERI_PURE_CAPABILITY__)
-  void LoadStoreCapability(const CPURegister& rt, const MemOperand& addr);
+  void LoadStoreCapability(const Register& ct, const MemOperand& addr,
+		           const LoadStoreCapOp op);
+  void AddSubCapability(const Register& cd, const Register& cn,
+                        const Operand& operand, AddSubCapabilityOp op);
 #endif // __CHERI_PURE_CAPABILITY__
   void LoadStorePair(const CPURegister& rt, const CPURegister& rt2,
                      const MemOperand& addr, LoadStorePairOp op);

@@ -69,6 +69,10 @@ class Arm64OperandConverter final : public InstructionOperandConverter {
 
   DoubleRegister OutputSimd128Register() { return OutputDoubleRegister().Q(); }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register OutputCapabilityRegister() { return OutputRegister().C(); }
+#endif // __CHERI_PURE_CAPABILITY__
+
   Register InputRegister32(size_t index) {
     return ToRegister(instr_->InputAt(index)).W();
   }
@@ -92,6 +96,21 @@ class Arm64OperandConverter final : public InstructionOperandConverter {
     }
     return InputRegister64(index);
   }
+
+#if defined(__CHERI_PURE_CAPABILITY__)
+   Register InputRegisterCapability(size_t index) {
+     return ToRegister(instr_->InputAt(index)).C();
+   }
+
+   Register InputOrZeroRegisterCapability(size_t index) {
+     DCHECK(instr_->InputAt(index)->IsRegister() ||
+           (instr_->InputAt(index)->IsImmediate() && (InputInt64(index) == 0)));
+     if (instr_->InputAt(index)->IsImmediate()) {
+       return czr;
+     }
+     return InputRegisterCapability(index);
+  }
+#endif // __CHERI_PURE_CAPABILITY__
 
   Operand InputOperand(size_t index) {
     return ToOperand(instr_->InputAt(index));
@@ -640,7 +659,7 @@ void CodeGenerator::AssembleTailCallAfterGap(Instruction* instr,
     __ Poke(padreg, optional_padding_offset * kSystemPointerAddrSize);
 #else
     __ Poke(padreg, optional_padding_offset * kSystemPointerSize);
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
   }
 }
 
@@ -682,6 +701,13 @@ CodeGenerator::CodeGenResult CodeGenerator::AssembleArchInstruction(
   InstructionCode opcode = instr->opcode();
   ArchOpcode arch_opcode = ArchOpcodeField::decode(opcode);
   switch (arch_opcode) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    case kArm64CapAdd:
+      EmitOOLTrapIfNeeded(zone(), this, opcode, instr, __ pc_offset());
+      __ Addc(i.InputOrZeroRegisterCapability(0), i.InputOrZeroRegisterCapability(1),
+              i.InputOperand2_64(1));
+      break;
+#endif // __CHERI_PURE_CAPABILITY__
     case kArchCallCodeObject: {
       if (instr->InputAt(0)->IsImmediate()) {
         __ Call(i.InputCode(0), RelocInfo::CODE_TARGET);
@@ -804,13 +830,13 @@ CodeGenerator::CodeGenResult CodeGenerator::AssembleArchInstruction(
       DCHECK(IsAligned(bytes, kSystemPointerAddrSize));
 #else
       DCHECK(IsAligned(bytes, kSystemPointerSize));
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
       DCHECK_EQ(0, frame_access_state()->sp_delta());
 #if defined(__CHERI_PURE_CAPABILITY__)
       frame_access_state()->IncreaseSPDelta(bytes / kSystemPointerAddrSize);
 #else
       frame_access_state()->IncreaseSPDelta(bytes / kSystemPointerSize);
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
       DCHECK(!caller_registers_saved_);
       caller_registers_saved_ = true;
       break;
@@ -826,7 +852,7 @@ CodeGenerator::CodeGenResult CodeGenerator::AssembleArchInstruction(
       frame_access_state()->IncreaseSPDelta(-(bytes / kSystemPointerAddrSize));
 #else
       frame_access_state()->IncreaseSPDelta(-(bytes / kSystemPointerSize));
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
       DCHECK_EQ(0, frame_access_state()->sp_delta());
       DCHECK(caller_registers_saved_);
       caller_registers_saved_ = false;
@@ -878,7 +904,7 @@ CodeGenerator::CodeGenResult CodeGenerator::AssembleArchInstruction(
         frame_access_state()->IncreaseSPDelta(bytes / kSystemPointerAddrSize);
 #else
         frame_access_state()->IncreaseSPDelta(bytes / kSystemPointerSize);
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
       }
       break;
     }
@@ -925,13 +951,25 @@ CodeGenerator::CodeGenResult CodeGenerator::AssembleArchInstruction(
       AssembleReturn(instr->InputAt(0));
       break;
     case kArchFramePointer:
+#if defined(__CHERI_PURE_CAPABILITY__)
+      __ cpy(i.OutputCapabilityRegister(), cfp);
+#else
       __ mov(i.OutputRegister(), fp);
+#endif // __CHERI_PURE_CAPABILITY__
       break;
     case kArchParentFramePointer:
       if (frame_access_state()->has_frame()) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+        __ ldrc(i.OutputCapabilityRegister(), MemOperand(fp, 0));
+#else
         __ ldr(i.OutputRegister(), MemOperand(fp, 0));
+#endif
       } else {
+#if defined(__CHERI_PURE_CAPABILITY__)
+        __ cpy(i.OutputCapabilityRegister(), cfp);
+#else
         __ mov(i.OutputRegister(), fp);
+#endif
       }
       break;
     case kArchStackPointerGreaterThan: {
@@ -1518,7 +1556,7 @@ CodeGenerator::CodeGenResult CodeGenerator::AssembleArchInstruction(
       Operand operand(i.InputInt32(1) * kSystemPointerAddrSize);
 #else
       Operand operand(i.InputInt32(1) * kSystemPointerSize);
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
       if (instr->InputAt(0)->IsSimd128Register()) {
         __ Poke(i.InputSimd128Register(0), operand);
       } else if (instr->InputAt(0)->IsFPRegister()) {
@@ -1536,14 +1574,14 @@ CodeGenerator::CodeGenResult CodeGenerator::AssembleArchInstruction(
                     slot * kSystemPointerAddrSize);
 #else
                     slot * kSystemPointerSize);
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
       } else {
         __ PokePair(i.InputRegister(1), i.InputRegister(0),
 #if defined(__CHERI_PURE_CAPABILITY__)
                     slot * kSystemPointerAddrSize);
 #else
                     slot * kSystemPointerSize);
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
       }
       break;
     }
@@ -1936,6 +1974,12 @@ CodeGenerator::CodeGenResult CodeGenerator::AssembleArchInstruction(
     case kArm64LdrDecodeSandboxedPointer:
       __ LoadSandboxedPointerField(i.OutputRegister(), i.MemoryOperand());
       break;
+#if defined(__CHERI_PURE_CAPABILITY__)
+    case kArm64LdrCap:
+      EmitOOLTrapIfNeeded(zone(), this, opcode, instr, __ pc_offset());
+      __ Ldrc(i.OutputRegister().C(), i.MemoryOperand());
+      break;
+#endif // __CHERI_PURE_CAPABILITY__
     case kArm64Str:
       EmitOOLTrapIfNeeded(zone(), this, opcode, instr, __ pc_offset());
       __ Str(i.InputOrZeroRegister64(0), i.MemoryOperand(1));
@@ -1977,6 +2021,11 @@ CodeGenerator::CodeGenResult CodeGenerator::AssembleArchInstruction(
       EmitOOLTrapIfNeeded(zone(), this, opcode, instr, __ pc_offset());
       __ Str(i.InputSimd128Register(0), i.MemoryOperand(1));
       break;
+#if defined(__CHERI_PURE_CAPABILITY__)
+    case kArm64StrCap:
+      EmitOOLTrapIfNeeded(zone(), this, opcode, instr, __ pc_offset());
+      __ Strc(i.InputOrZeroRegisterCapability(0), i.MemoryOperand(1));
+#endif // __CHERI_PURE_CAPABILITY__
     case kArm64DmbIsh:
       __ Dmb(InnerShareable, BarrierAll);
       break;
@@ -3083,7 +3132,7 @@ void CodeGenerator::FinishFrame(Frame* frame) {
                                             (kDoubleSize / kSystemPointerAddrSize));
 #else
                                             (kDoubleSize / kSystemPointerSize));
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
   }
 
   CPURegList saves =
@@ -3123,7 +3172,7 @@ void CodeGenerator::AssembleConstructFrame() {
 #else
       static_assert(InterpreterFrameConstants::kFixedFrameSize % 16 == 8);
       DCHECK_EQ(required_slots % 2, 1);
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
       __ Prologue();
       // Update required_slots count since we have just claimed one extra slot.
       static_assert(TurboAssembler::kExtraSlotClaimedByPrologue == 1);
@@ -3160,7 +3209,7 @@ void CodeGenerator::AssembleConstructFrame() {
     if (info()->IsWasm() && required_slots * kSystemPointerAddrSize > 4 * KB) {
 #else
     if (info()->IsWasm() && required_slots * kSystemPointerSize > 4 * KB) {
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
       // For WebAssembly functions with big frames we have to do the stack
       // overflow check before we construct the frame. Otherwise we may not
       // have enough space on the stack to call the runtime for the stack
@@ -3173,7 +3222,7 @@ void CodeGenerator::AssembleConstructFrame() {
       if (required_slots * kSystemPointerAddrSize < FLAG_stack_size * KB) {
 #else
       if (required_slots * kSystemPointerSize < FLAG_stack_size * KB) {
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
         UseScratchRegisterScope scope(tasm());
         Register scratch = scope.AcquireX();
         __ Ldr(scratch, FieldMemOperand(
@@ -3184,7 +3233,7 @@ void CodeGenerator::AssembleConstructFrame() {
         __ Add(scratch, scratch, required_slots * kSystemPointerAddrSize);
 #else
         __ Add(scratch, scratch, required_slots * kSystemPointerSize);
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
         __ Cmp(sp, scratch);
         __ B(hs, &done);
       }
@@ -3489,7 +3538,7 @@ void CodeGenerator::MoveToTempLocation(InstructionOperand* source) {
       __ Sub(sp, sp, Operand(new_slots * kSystemPointerAddrSize));
 #else
       __ Sub(sp, sp, Operand(new_slots * kSystemPointerSize));
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
       AllocatedOperand temp(LocationOperand::STACK_SLOT, rep, temp_slot);
       AssembleMove(source, &temp);
     }
@@ -3541,7 +3590,7 @@ void CodeGenerator::MoveTempLocationTo(InstructionOperand* dest,
       __ Add(sp, sp, Operand(new_slots * kSystemPointerAddrSize));
 #else
       __ Add(sp, sp, Operand(new_slots * kSystemPointerSize));
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
     }
   }
   // Restore the default state to release the {UseScratchRegisterScope} and to

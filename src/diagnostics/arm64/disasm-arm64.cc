@@ -3580,10 +3580,53 @@ void DisassemblingDecoder::VisitUnallocated(Instruction* instr) {
 }
 
 #if defined(__CHERI_PURE_CAPABILITY__)
-void DisassemblingDecoder::VisitMorelloAddSubCapability(Instruction* instr) {
-  Format(instr, "Morello ad/sub capability", "(Unimplemented)");
+void DisassemblingDecoder::VisitAddSubCapabilityImmediate(Instruction* instr) {
+  const char* form = "'Yds, 'Yns, 'IAddSubC";
+  DCHECK(instr->Mask(AddSubCapabilityImmediateFMask) == AddSubCapabilityImmediateFixed);
+  switch(instr->Mask(AddSubCapabilityImmediateMask)) {
+  case ADDCAP_c_imm:
+    Format(instr, "add", form);
+    break;
+  case SUBCAP_c_imm:
+    Format(instr, "sub", form);
+    break;
+  default:
+    Format(instr, "unknown instruction", "(Add/sub capability)");
+    break;
+  }
 }
-#endif
+
+void DisassemblingDecoder::VisitLoadStoreCapUnsignedOffsetCapNormal(Instruction* instr) {
+  const char* form = "'Yt, ['Yns'ILUC]";
+  DCHECK(instr->Mask(LoadStoreCapUnsignedOffsetCapNormalFMask) == LoadStoreCapUnsignedOffsetCapNormalFixed);
+  switch(instr->Mask(LoadStoreCapUnsignedOffsetCapNormalMask)) {
+    case LDR_c_unsigned_cap_normal:
+      Format(instr, "ldr", form);
+      break;
+    case STR_c_unsigned_cap_normal:
+      Format(instr, "str", form);
+      break;
+    default:
+      Format(instr, "unknown instruction", "(Load/Store unsigned offset)");
+      break;
+  }
+}
+
+void DisassemblingDecoder::VisitCopyCapability(Instruction* instr) {
+  DCHECK(instr->Mask(CopyCapabilityFMask) == CopyCapabilityFixed);
+  switch(instr->Mask(CopyCapabilityMask)) {
+    case CPY:
+      // MOV <Cd|CSP>, <Cn|CSP>
+      // is equivalent to CPY <Cd|CSP>, <Cn|CSP>
+      // and is always prederred disassembly.
+      Format(instr, "mov", "'Yds, 'Yns");
+      break;
+    default:
+      Format(instr, "unknown instruction", "(Move capability)");
+      break;
+  }
+}
+#endif // __CHERI_PURE_CAPABILITY__
 
 void DisassemblingDecoder::ProcessOutput(Instruction* /*instr*/) {
   // The base disasm does nothing more than disassembling into a buffer.
@@ -3595,6 +3638,10 @@ void DisassemblingDecoder::AppendRegisterNameToOutput(const CPURegister& reg) {
 
   if (reg.IsRegister()) {
     reg_char = reg.Is64Bits() ? 'x' : 'w';
+#if defined(__CHERI_PURE_CAPABILITY__)
+  } else if (reg.IsCRegister()) {
+    reg_char = 'c';
+#endif // __CHERI_PURE_CAPABILITY
   } else {
     DCHECK(reg.IsVRegister());
     switch (reg.SizeInBits()) {
@@ -3678,6 +3725,12 @@ int DisassemblingDecoder::SubstituteField(Instruction* instr,
     case 'S':
     case 'D':
     case 'Q':
+#if defined(__CHERI_PURE_CAPABILITY__)
+    // Note: The 'C prefix is already used for conditions, use of
+    // 'Y (cababilitY) doesn't clash with any of the existing format codes,
+    // (note C already used for Cond)
+    case 'Y':
+#endif // __CHERI_PURE_CAPABILITY__
       return SubstituteRegisterField(instr, format);
     case 'I':
       return SubstituteImmediateField(instr, format);
@@ -3793,6 +3846,10 @@ int DisassemblingDecoder::SubstituteRegisterField(Instruction* instr,
 
   if (reg_prefix == 'R') {
     reg_prefix = instr->SixtyFourBits() ? 'X' : 'W';
+#if defined(__CHERI_PURE_CAPABILITY__)
+  } else if (reg_prefix == 'Y') {
+    reg_prefix = 'Y';
+#endif // __CHERI_PURE_CAPABILITY__
   } else if (reg_prefix == 'F') {
     reg_prefix = ((instr->FPType() & 1) == 0) ? 'S' : 'D';
   }
@@ -3829,6 +3886,12 @@ int DisassemblingDecoder::SubstituteRegisterField(Instruction* instr,
     case 'V':
       AppendToOutput("v%d", reg_num);
       return field_len;
+#if defined(__CHERI_PURE_CAPABILITY__)
+    case 'Y':
+      reg_type = CPURegister::kCRegister;
+      reg_size = kCRegSizeInBits;
+      break;
+#endif // __CHERI_PURE_CAPABILITY__
     default:
       UNREACHABLE();
   }
@@ -3837,6 +3900,13 @@ int DisassemblingDecoder::SubstituteRegisterField(Instruction* instr,
       (format[2] == 's')) {
     reg_num = kSPRegInternalCode;
   }
+
+#if defined(__CHERI_PURE_CAPABILITY__)
+  if ((reg_type == CPURegister::kCRegister) && (reg_num == kZeroRegCode) &&
+      (format[2] == 's')) {
+    reg_num = kCSPRegInternalCode;
+  }
+#endif // __CHERI_PURE_CAPABILITY__
 
   AppendRegisterNameToOutput(CPURegister::Create(reg_num, reg_size, reg_type));
 
@@ -3886,6 +3956,16 @@ int DisassemblingDecoder::SubstituteImmediateField(Instruction* instr,
           return 4;
         }
         case 'U': {  // ILU - Immediate Load/Store Unsigned.
+#if defined(__CHERI_PURE_CAPABILITY__)
+	  if (format[3] == 'C') { // ILUC - Immediate Load/Store Unsigned.
+            if (instr->ImmLSUnsigned() != 0) {
+	      // Use a fixed shift value of 4 as unlike in the iv8 A-profile
+	      // instructions the size is not encoded in the instruction.
+              AppendToOutput(", #%" PRId32, instr->ImmLSUnsigned() << 4);
+	    }
+            return 4;
+	  }
+#endif // __CHERI_PURE_CAPABILITY
           if (instr->ImmLSUnsigned() != 0) {
             int shift = instr->SizeLS();
             AppendToOutput(", #%" PRId32, instr->ImmLSUnsigned() << shift);
@@ -3901,6 +3981,14 @@ int DisassemblingDecoder::SubstituteImmediateField(Instruction* instr,
       return 6;
     }
     case 'A': {  // IAddSub.
+#if defined(__CHERI_PURE_CAPABILITY__)
+      if (format[7] == 'C') { // IAddSubC
+        DCHECK_LE(instr->ShiftAddSubCapability(), 1);
+        int64_t imm = instr->ImmAddSubCapability() << (12 * instr->ShiftAddSubCapability());
+        AppendToOutput("#0x%" PRIx64 " (%" PRId64 ")", imm, imm);
+        return 10;
+      }
+#endif // __CHERI_PURE_CAPABILITY
       DCHECK_LE(instr->ShiftAddSub(), 1);
       int64_t imm = instr->ImmAddSub() << (12 * instr->ShiftAddSub());
       AppendToOutput("#0x%" PRIx64 " (%" PRId64 ")", imm, imm);

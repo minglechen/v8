@@ -66,6 +66,19 @@ class V8_EXPORT_PRIVATE DisassemblingDecoder : public DecoderVisitor {
   bool RaIsZROrSP(Instruction* instr) const {
     return (instr->Ra() == kZeroRegCode);
   }
+#if defined(__CHERI_PURE_CAPABILITY__)
+  bool CdIsZROrCSP(Instruction* instr) const {
+    return (instr->Rd() == kZeroRegCode);
+  }
+
+  bool CnIsZROrCSP(Instruction* instr) const {
+    return (instr->Rn() == kZeroRegCode);
+  }
+
+  bool CmIsZROrCSP(Instruction* instr) const {
+    return (instr->Rm() == kZeroRegCode);
+  }
+#endif
 
   bool IsMovzMovnImm(unsigned reg_size, uint64_t value);
 

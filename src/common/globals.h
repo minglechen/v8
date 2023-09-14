@@ -275,8 +275,8 @@ constexpr int kSystemPointerAddrSize = sizeof(ptraddr_t);
 constexpr int kPCOnStackSize = kSystemPointerAddrSize;
 constexpr int kFPOnStackSize = kSystemPointerAddrSize;
 #else
-constexpr int kPtrAddrSize = kSystemPointerSize
-constexpr int kSystemPOinterAddrSize = kSystemPointerSize
+constexpr int kPtrAddrSize = kSystemPointerSize;
+constexpr int kSystemPOinterAddrSize = kSystemPointerSize;
 constexpr int kPCOnStackSize = kSystemPointerSize;
 constexpr int kFPOnStackSize = kSystemPointerSize;
 #endif

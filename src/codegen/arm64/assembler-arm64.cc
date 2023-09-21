@@ -1269,6 +1269,48 @@ void Assembler::LoadStorePair(const CPURegister& rt, const CPURegister& rt2,
   Emit(addrmodeop | memop);
 }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+void Assembler::ldpc(const Register& ct, const Register& ct2,
+                    const MemOperand& src) {
+  LoadStorePairCap(ct, ct2, src, LDP_c);
+}
+
+void Assembler::stpc(const Register& ct, const Register& ct2,
+                    const MemOperand& dst) {
+  LoadStorePairCap(ct, ct2, dst, STP_c);
+}
+
+void Assembler::LoadStorePairCap(const Register& ct, const Register& ct2,
+                                 const MemOperand& addr, LoadStorePairCapOp op) {
+  // 'ct' and 'ct2' can only be aliased for stores.
+  DCHECK(((op & LoadStorePairCapLBit) == 0) || ct != ct2);
+  DCHECK(AreSameSizeAndType(ct, ct2));
+  DCHECK(IsImmLSPair(addr.offset(), CalcLSPairCapDataSize(op)));
+  DCHECK_EQ(STP_c | LoadStorePairLBit, LDP_c);
+  int offset = static_cast<int>(addr.offset());
+
+  Instr memop = op | Ct(ct) | Ct2(ct2) | CnCSP(addr.base()) |
+                ImmLSPair(offset, CalcLSPairCapDataSize(op));
+
+  Instr addrmodeop;
+  if (addr.IsImmediateOffset()) {
+    addrmodeop = LoadStorePairCapOffsetFixed;
+  } else {
+    // Pre-index and post-index modes.
+    DCHECK_NE(ct, addr.base());
+    DCHECK_NE(ct2, addr.base());
+    DCHECK_NE(addr.offset(), 0);
+    if (addr.IsPreIndex()) {
+      addrmodeop = LoadStorePairCapPreIndexFixed;
+    } else {
+      DCHECK(addr.IsPostIndex());
+      addrmodeop = LoadStorePairCapPostIndexFixed;
+    }
+  }
+  Emit(addrmodeop | memop);
+}
+#endif // __CHERI_PURE_CAPABILITY__
+
 // Memory instructions.
 void Assembler::ldrb(const Register& rt, const MemOperand& src) {
   LoadStore(rt, src, LDRB_w);

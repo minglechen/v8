@@ -184,6 +184,12 @@ unsigned CalcLSPairDataSize(LoadStorePairOp op) {
   }
 }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+unsigned CalcLSPairCapDataSize(LoadStorePairCapOp op) {
+  return 4;
+}
+#endif // __CHERI_PURE_CAPABILITY__
+
 int64_t Instruction::ImmPCOffset() {
   int64_t offset;
   if (IsPCRelAddressing()) {

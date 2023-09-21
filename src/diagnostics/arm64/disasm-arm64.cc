@@ -987,11 +987,19 @@ void DisassemblingDecoder::VisitLoadStorePairPostIndex(Instruction* instr) {
   const char* form = "(LoadStorePairPostIndex)";
 
   switch (instr->Mask(LoadStorePairPostIndexMask)) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define LSP_POSTINDEX(A, B, C, D) \
+  case A##_post:                  \
+    mnemonic = B;                 \
+    form = C ", ['Yns]'ILP 4";    \
+    break;
+#else
 #define LSP_POSTINDEX(A, B, C, D) \
   case A##_post:                  \
     mnemonic = B;                 \
     form = C ", ['Xns]'ILP" D;    \
     break;
+#endif // __CHERI_PURE_CAPABILITY__
     LOAD_STORE_PAIR_LIST(LSP_POSTINDEX)
 #undef LSP_POSTINDEX
   }
@@ -1003,11 +1011,19 @@ void DisassemblingDecoder::VisitLoadStorePairPreIndex(Instruction* instr) {
   const char* form = "(LoadStorePairPreIndex)";
 
   switch (instr->Mask(LoadStorePairPreIndexMask)) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define LSP_PREINDEX(A, B, C, D)   \
+  case A##_pre:                    \
+    mnemonic = B;                  \
+    form = C ", ['Yns'ILP 4 ]!";   \
+    break;
+#else
 #define LSP_PREINDEX(A, B, C, D)   \
   case A##_pre:                    \
     mnemonic = B;                  \
     form = C ", ['Xns'ILP" D "]!"; \
     break;
+#endif // __CHERI_PURE_CAPABILITY__
     LOAD_STORE_PAIR_LIST(LSP_PREINDEX)
 #undef LSP_PREINDEX
   }
@@ -1019,18 +1035,82 @@ void DisassemblingDecoder::VisitLoadStorePairOffset(Instruction* instr) {
   const char* form = "(LoadStorePairOffset)";
 
   switch (instr->Mask(LoadStorePairOffsetMask)) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define LSP_OFFSET(A, B, C, D)    \
+  case A##_off:                   \
+    mnemonic = B;                 \
+    form = C ", ['Yns'ILP 4 ]";   \
+    break;
+#else
 #define LSP_OFFSET(A, B, C, D)    \
   case A##_off:                   \
     mnemonic = B;                 \
     form = C ", ['Xns'ILP" D "]"; \
     break;
-    LOAD_STORE_PAIR_LIST(LSP_OFFSET)
+#endif // __CHERI_PURE_CAPABILITY__
+LOAD_STORE_PAIR_LIST(LSP_OFFSET)
 #undef LSP_OFFSET
   }
   Format(instr, mnemonic, form);
 }
 
 #undef LOAD_STORE_PAIR_LIST
+
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define LOAD_STORE_PAIR_CAP_LIST(V)     \
+  V(STP_x, "stp", "'Yt, 'Yt2", "4")     \
+  V(LDP_x, "ldr", "'Yt, 'Yt2", "4")
+
+void DisassemblingDecoder::VisitLoadStorePairCapPostIndex(Instruction* instr) {
+  const char* mnemonic = "unimplemented";
+  const char* form = "(LoadStorePairCapPostIndex)";
+
+  switch (instr->Mask(LoadStorePairPostIndexMask)) {
+#define LSP_POSTINDEX(A, B, C, D) \
+  case A##_post:                  \
+    mnemonic = B;                 \
+    form = C ", ['Yns]'ILP 4";    \
+    break;
+    LOAD_STORE_PAIR_CAP_LIST(LSP_POSTINDEX)
+#undef LSP_POSTINDEX
+  }
+  Format(instr, mnemonic, form);
+}
+
+void DisassemblingDecoder::VisitLoadStorePairCapPreIndex(Instruction* instr) {
+  const char* mnemonic = "unimplemented";
+  const char* form = "(LoadStorePairCapPreIndex)";
+
+  switch (instr->Mask(LoadStorePairPreIndexMask)) {
+#define LSP_PREINDEX(A, B, C, D)   \
+  case A##_pre:                    \
+    mnemonic = B;                  \
+    form = C ", ['Yns'ILP 4 ]!";   \
+    break;
+    LOAD_STORE_PAIR_CAP_LIST(LSP_PREINDEX)
+#undef LSP_PREINDEX
+  }
+  Format(instr, mnemonic, form);
+}
+
+void DisassemblingDecoder::VisitLoadStorePairCapOffset(Instruction* instr) {
+  const char* mnemonic = "unimplemented";
+  const char* form = "(LoadStorePairCapOffset)";
+
+  switch (instr->Mask(LoadStorePairCapOffsetMask)) {
+#define LSP_OFFSET(A, B, C, D)    \
+  case A##_off:                   \
+    mnemonic = B;                 \
+    form = C ", ['Yns'ILP 4 ]";   \
+    break;
+LOAD_STORE_PAIR_CAP_LIST(LSP_OFFSET)
+#undef LSP_OFFSET
+  }
+  Format(instr, mnemonic, form);
+}
+
+#undef LOAD_STORE_PAIR_CAP_LIST
+#endif // __CHERI_PURE_CAPABILITY__
 
 void DisassemblingDecoder::VisitLoadStoreAcquireRelease(Instruction* instr) {
   const char* mnemonic = "unimplemented";

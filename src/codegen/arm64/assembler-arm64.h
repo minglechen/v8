@@ -829,6 +829,12 @@ class V8_EXPORT_PRIVATE Assembler : public AssemblerBase {
   // Subtract a capability
   void subc(const Register& ct, const Register& cn,
 	    const Operand& operand);
+  // Store a pair of capabilities
+  void stpc(const Register& ct, const Register& ct2,
+            const MemOperand& src);
+  // Load a pair of capabilities
+  void ldpc(const Register& ct, const Register& ct2,
+            const MemOperand& src);
 #endif // __CHERI_PURE_CAPABILITY__
 
   // Load word with sign extension.
@@ -2215,6 +2221,11 @@ class V8_EXPORT_PRIVATE Assembler : public AssemblerBase {
     DCHECK_NE(ct.code(), kCSPRegInternalCode);
     return ct.code() << Ct_offset;
   }
+
+  static Instr Ct2(CPURegister ct) {
+    DCHECK_NE(ct.code(), kCSPRegInternalCode);
+    return ct.code() << Ct2_offset;
+  }
 #endif // __CHERI_PURE_CAPABILITY__
 
   // Flags encoding.
@@ -2528,6 +2539,8 @@ class V8_EXPORT_PRIVATE Assembler : public AssemblerBase {
 		           const LoadStoreCapOp op);
   void AddSubCapability(const Register& cd, const Register& cn,
                         const Operand& operand, AddSubCapabilityOp op);
+  void LoadStorePairCap(const Register& rt, const Register& rt2,
+                        const MemOperand& addr, LoadStorePairCapOp op);
 #endif // __CHERI_PURE_CAPABILITY__
   void LoadStorePair(const CPURegister& rt, const CPURegister& rt2,
                      const MemOperand& addr, LoadStorePairOp op);

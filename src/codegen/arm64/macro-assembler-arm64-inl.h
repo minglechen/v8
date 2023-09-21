@@ -271,6 +271,16 @@ LS_CAP_MACRO_LIST(DEFINE_FUNCTION)
 LSPAIR_MACRO_LIST(DEFINE_FUNCTION)
 #undef DEFINE_FUNCTION
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define DEFINE_FUNCTION(FN, REGTYPE, REG, REG2, OP)              \
+  void TurboAssembler::FN(const REGTYPE REG, const REGTYPE REG2, \
+                          const MemOperand& addr) {              \
+    DCHECK(allow_macro_instructions());                          \
+    LoadStorePairCapMacro(REG, REG2, addr, OP);                     \
+  }
+LSPAIR_CAP_MACRO_LIST(DEFINE_FUNCTION)
+#endif // __CHERI_PURE_CAPABILITY__
+
 #define DECLARE_FUNCTION(FN, OP)                                    \
   void TurboAssembler::FN(const Register& rt, const Register& rn) { \
     DCHECK(allow_macro_instructions());                             \

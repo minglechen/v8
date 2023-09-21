@@ -55,6 +55,12 @@ namespace internal {
   V(Stp, CPURegister&, rt, rt2, StorePairOpFor(rt, rt2)) \
   V(Ldpsw, CPURegister&, rt, rt2, LDPSW_x)
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define LSPAIR_CAP_MACRO_LIST(V)                         \
+  V(Stpc, Register&, ct, ct2, STP_c)                     \
+  V(Ldpc, Register&, ct, ct2, LDP_c)
+#endif // __CHERI_PURE_CAPABILITY__
+
 #define LDA_STL_MACRO_LIST(V) \
   V(Ldarb, ldarb)             \
   V(Ldarh, ldarh)             \
@@ -1204,6 +1210,13 @@ class V8_EXPORT_PRIVATE TurboAssembler : public TurboAssemblerBase {
   LSPAIR_MACRO_LIST(DECLARE_FUNCTION)
 #undef DECLARE_FUNCTION
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define DECLARE_FUNCTION(FN, REGTYPE, REG, REG2, OP) \
+  inline void FN(const REGTYPE REG, const REGTYPE REG2, const MemOperand& addr);
+  LSPAIR_CAP_MACRO_LIST(DECLARE_FUNCTION)
+#undef DECLARE_FUNCTION
+#endif // __CHERI_PURE_CAPABILITY__
+
   void St1(const VRegister& vt, const MemOperand& dst) {
     DCHECK(allow_macro_instructions());
     st1(vt, dst);
@@ -1534,6 +1547,8 @@ class V8_EXPORT_PRIVATE TurboAssembler : public TurboAssemblerBase {
 #if defined(__CHERI_PURE_CAPABILITY__)
   void LoadStoreCapMacro(const Register& rt, const MemOperand& addr,
 		         const LoadStoreCapOp op);
+  void LoadStorePairCapMacro(const Register& ct, const Register& ct2,
+                             const MemOperand& addr, LoadStorePairCapOp op);
 #endif // __CHERI_PURE_CAPABILITY__
 
   void LoadStorePairMacro(const CPURegister& rt, const CPURegister& rt2,

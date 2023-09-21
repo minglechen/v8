@@ -937,7 +937,7 @@ void Decoder<V>::DecodeMorelloLdrLiteral(Instruction* instr) {
 
 template <typename V>
 void Decoder<V>::DecodeMorelloLoadStoreMisc1(Instruction* instr) {
-  DCHECK_EQ(0x42, instr->Bits(31, 24)); //  [0010 0010][L][op][Rs][o2][Ct2][Rn][Ct]
+  DCHECK_EQ(0x22, instr->Bits(31, 24)); //  [0010 0010][L][op][Rs][o2][Ct2][Rn][Ct]
   if (instr->Bit(23) == 0) {
     // op0: 0 Morello load/ exclusive
     if (instr->Bit(22) == 0) {
@@ -974,17 +974,13 @@ void Decoder<V>::DecodeMorelloLoadStoreMisc1(Instruction* instr) {
     }
   } else {
     // op0: 1 Morello load/store pair postindex
-    if (instr->Bit(22) == 0) {
-      // L: 0 STP
-    } else {
-      // L: 1 LDP
-    }
+    V::VisitLoadStorePairCapPostIndex(instr);
   }
 }
 
 template <typename V>
 void Decoder<V>::DecodeMorelloLoadStoreMisc2(Instruction* instr) {
-  DCHECK_EQ(0x84, instr->Bits(31, 24)); // [0 1000 0100][L][0][Rs][0][Ct2][Rn][Ct]
+  DCHECK_EQ(0x42, instr->Bits(31, 24)); // [0 1000 0100][op0][][op1][][op2][]
   if (instr->Bit(23) == 0) {
     if (instr->Bit(21) == 0) {
       if (instr->Bit(15) == 0) {
@@ -1026,17 +1022,14 @@ void Decoder<V>::DecodeMorelloLoadStoreMisc2(Instruction* instr) {
     }
   } else {
     // op0: 1 Morello load/store pair
-    if (instr->Bit(22) == 0) {
-      // L: 0 STP (signed offset)
-    } else {
-      // L: 1 LDP (signed offset)
-    }
+    // [0 1000 0100][L][0][Rs][0][Ct2][Rn][Ct]
+    V::VisitLoadStorePairCapOffset(instr);
   }
 }
 
 template <typename V>
 void Decoder<V>::DecodeMorelloLoadStoreMisc3(Instruction* instr) {
-  DCHECK_EQ(0xC4, instr->Bits(31, 23)); // [0 1100 0100][L][imm7][Ct2][Rn][Ct]
+  DCHECK_EQ(0x62, instr->Bits(31, 24)); // [0 1100 0010][op0][]
   if (instr->Bit(23) == 0) {
     // op0: 0 Morello load/store pair non-temporal
     if (instr->Bit(22) == 0) {
@@ -1046,11 +1039,8 @@ void Decoder<V>::DecodeMorelloLoadStoreMisc3(Instruction* instr) {
     }
   } else {
     // op0: 1 Morello load/store pair preindex
-    if (instr->Bit(22) == 0) {
-      // L: 0 STP (pre-indexed)
-    } else {
-      // L: 1 LDP (pre-indexed)
-    }
+    // [0 1100 00101][L][imm7][Ct2][Rn][Ct]
+    V::VisitLoadStorePairCapPreIndex(instr);
   }
 }
 

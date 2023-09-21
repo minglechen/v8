@@ -295,6 +295,7 @@ using float16 = uint16_t;
   V_(Cn, 9, 5, Bits)    /* First source capability register.    */ 	\
   V_(Cm, 20, 16, Bits)  /* Second source register.   */                 \
   V_(Ct, 4, 0, Bits)    /* Load dest / store source. */                 \
+  V_(Ct2, 14, 10, Bits) /* Load second dest /        */                 \
 									\
   /* Morello add/subtract capability immediate */                       \
   V_(ImmAddSubCapability, 21, 10, Bits)                                 \
@@ -902,6 +903,50 @@ enum LoadStorePairOffsetOp : uint32_t {
   LOAD_STORE_PAIR_OP_LIST(LOAD_STORE_PAIR_OFFSET)
 #undef LOAD_STORE_PAIR_OFFSET
 };
+
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define LOAD_STORE_PAIR_CAP_OP_LIST(V)                                     \
+  V(LDP, c, 0x00400000), V(STP, c, 0x00000000),
+
+// Load/store pair cap (post, pre and offset.)
+enum LoadStorePairCapOp : uint32_t {
+  LoadStorePairCapMask = 0xFFC00000,
+  LoadStorePairCapLBit = 1 << 22,
+#define LOAD_STORE_PAIR_CAP(A, B, C) A##_##B = C
+  LOAD_STORE_PAIR_CAP_OP_LIST(LOAD_STORE_PAIR_CAP)
+#undef LOAD_STORE_PAIR
+};
+
+enum LoadStorePairCapPostIndexOp : uint32_t {
+  LoadStorePairCapPostIndexFixed = 0x22800000,
+  LoadStorePairCapPostIndexFMask = 0xFF800000,
+  LoadStorePairCapPostIndexMask = 0xFFC00000,
+#define LOAD_STORE_PAIR_CAP_POST_INDEX(A, B, C) \
+  A##_##B##_post = LoadStorePairCapPostIndexFixed | A##_##B
+  LOAD_STORE_PAIR_CAP_OP_LIST(LOAD_STORE_PAIR_CAP_POST_INDEX)
+#undef LOAD_STORE_PAIR_POST_INDEX
+};
+
+enum LoadStorePairCapPreIndexOp : uint32_t {
+  LoadStorePairCapPreIndexFixed = 0x62800000,
+  LoadStorePairCapPreIndexFMask = 0xFF800000,
+  LoadStorePairCapPreIndexMask = 0xFFC00000,
+#define LOAD_STORE_PAIR_CAP_PRE_INDEX(A, B, C) \
+  A##_##B##_pre = LoadStorePairCapPreIndexFixed | A##_##B
+  LOAD_STORE_PAIR_CAP_OP_LIST(LOAD_STORE_PAIR_CAP_PRE_INDEX)
+#undef LOAD_STORE_PAIR_PRE_INDEX
+};
+
+enum LoadStorePairCapOffsetOp : uint32_t {
+  LoadStorePairCapOffsetFixed = 0x42800000,
+  LoadStorePairCapOffsetFMask = 0xFF800000,
+  LoadStorePairCapOffsetMask = 0xFFC00000,
+#define LOAD_STORE_PAIR_CAP_OFFSET(A, B, C) \
+  A##_##B##_off = LoadStorePairCapOffsetFixed | A##_##B
+  LOAD_STORE_PAIR_CAP_OP_LIST(LOAD_STORE_PAIR_CAP_OFFSET)
+#undef LOAD_STORE_PAIR_OFFSET
+};
+#endif // __CHERI_PURE_CAPABILITY__
 
 // Load literal.
 enum LoadLiteralOp : uint32_t {

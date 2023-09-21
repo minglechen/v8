@@ -955,6 +955,39 @@ void TurboAssembler::LoadStorePairMacro(const CPURegister& rt,
   }
 }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+void TurboAssembler::LoadStorePairCapMacro(const Register& ct,
+                                           const Register& ct2,
+                                           const MemOperand& addr,
+                                           LoadStorePairCapOp op) {
+  DCHECK(!addr.IsRegisterOffset());
+
+  int64_t offset = addr.offset();
+
+  // Check if the offset fits in the immediate field of the appropriate
+  // instruction. If not, emit two instructions to perform the operation.
+  if (IsImmLSPair(offset, CalcLSPairCapDataSize(op))) {
+    // Encodable in one load/store pair instruction.
+    LoadStorePairCap(ct, ct2, addr, op);
+  } else {
+    Register base = addr.base();
+    if (addr.IsImmediateOffset()) {
+      UseScratchRegisterScope temps(this);
+      Register temp = temps.AcquireSameSizeAs(base);
+      Add(temp, base, offset);
+      LoadStorePairCap(ct, ct2, MemOperand(temp), op);
+    } else if (addr.IsPostIndex()) {
+      LoadStorePairCap(ct, ct2, MemOperand(base), op);
+      Add(base, base, offset);
+    } else {
+      DCHECK(addr.IsPreIndex());
+      Add(base, base, offset);
+      LoadStorePairCap(ct, ct2, MemOperand(base), op);
+    }
+  }
+}
+#endif // __CHERI_PURE_CAPABILITY__
+
 bool TurboAssembler::NeedExtraInstructionsOrRegisterBranch(
     Label* label, ImmBranchType b_type) {
   bool need_longer_range = false;

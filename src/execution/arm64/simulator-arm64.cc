@@ -6044,9 +6044,23 @@ void Simulator::VisitNEONPerm(Instruction* instr) {
 }
 
 #if defined(__CHERI_PURE_CAPABILITY__)
-void Simulator::VisitMorelloAddSubCapability(Instruction* instr) {
+void Simulator::VisitAddSubCapability(Instruction* instr) {
 }
 
+void Simulator::VisitLoadStoreCapUnsignedOffsetCapNormal(Instruction* instr) {
+}
+
+void Simulator::VisitCopyCapability(Instruction* instr) {
+}
+
+void Simulator::VisitLoadStorePairCapPostIndex(Instruction* instr) {
+}
+
+void Simulator::VisitLoadStorePairCapPreIndex(Instruction* instr) {
+}
+
+void Simulator::VisitLoadStorePairCapOffset(Instruction* instr) {
+}
 #endif
 
 void Simulator::DoPrintf(Instruction* instr) {

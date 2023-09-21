@@ -19,7 +19,10 @@ namespace internal {
 	ARM64_VISITOR_LIST(V)		        \
 	V(AddSubCapabilityImmediate)            \
 	V(CopyCapability)                       \
-	V(LoadStoreCapUnsignedOffsetCapNormal)
+	V(LoadStoreCapUnsignedOffsetCapNormal)  \
+	V(LoadStorePairCapPostIndex)            \
+	V(LoadStorePairCapPreIndex)             \
+	V(LoadStorePairCapOffset)
 #else
 #define VISITOR_LIST(V)                 \
 	ARM64_VISITOR_LIST(V)

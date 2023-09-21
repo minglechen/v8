@@ -52,6 +52,9 @@ extern const float16 kFP16DefaultNaN;
 
 unsigned CalcLSDataSize(LoadStoreOp op);
 unsigned CalcLSPairDataSize(LoadStorePairOp op);
+#if defined(__CHERI_PURE_CAPABILITY__)
+unsigned CalcLSPairCapDataSize(LoadStorePairCapOp op);
+#endif // __CHERI_PURE_CAPABILITY__
 
 enum ImmBranchType {
   UnknownBranchType = 0,

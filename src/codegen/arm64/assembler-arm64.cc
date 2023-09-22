@@ -1469,6 +1469,20 @@ void Assembler::LoadStoreCapability(const Register& ct, const MemOperand& addr,
     }
   }
 }
+
+void Assembler::gcvalue(const Register& cd, const Register& cn,
+	                const Register& rm)
+{
+  Emit(GCVALUE | Rm(rm) | Cd(cd)| Cn(cn));
+}
+
+void Assembler::scvalue(const Register& cd, const Register& cn,
+	                const Register& rm)
+{
+  Emit(SCVALUE | Rm(rm) | Cd(cd)| Cn(cn));
+}
+
+
 #endif // __CHERI_PURE_CAPABILITY__
 
 void Assembler::ldrsw(const Register& rt, const MemOperand& src) {

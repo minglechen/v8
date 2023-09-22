@@ -3722,11 +3722,37 @@ void DisassemblingDecoder::VisitCopyCapability(Instruction* instr) {
     case CPY:
       // MOV <Cd|CSP>, <Cn|CSP>
       // is equivalent to CPY <Cd|CSP>, <Cn|CSP>
-      // and is always prederred disassembly.
+      // and is always preferred disassembly.
       Format(instr, "mov", "'Yds, 'Yns");
       break;
     default:
       Format(instr, "unknown instruction", "(Move capability)");
+      break;
+  }
+}
+
+void DisassemblingDecoder::VisitGetField1(Instruction* instr) {
+  DCHECK(instr->Mask(GetField1FMask) == GetField1Fixed);
+  const char* form = "'Xd, 'Yns";
+  switch(instr->Mask(GetField1Mask)) {
+    case GCVALUE:
+      Format(instr, "gcvalue", form);
+      break;
+    default:
+      Format(instr, "unknown instruction", "(Get capability value)");
+      break;
+  }
+}
+
+void DisassemblingDecoder::VisitSetField1(Instruction* instr) {
+  DCHECK(instr->Mask(SetField1FMask) == SetField1Fixed);
+  const char* form = "'Xd, 'Yns";
+  switch(instr->Mask(SetField1Mask)) {
+    case SCVALUE:
+      Format(instr, "scvalue", form);
+      break;
+    default:
+      Format(instr, "unknown instruction", "(Set capability value)");
       break;
   }
 }

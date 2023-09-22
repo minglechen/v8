@@ -1257,6 +1257,13 @@ void Decoder<V>::DecodeMorelloMisc(Instruction* instr) {
           // op0: 0xxxxx110, op1: 00, op2: 0 Morello set field 2
         } else {
           // op0: 0xxxxx0xx, op1: 00, op2: 0 Morello set field 1
+	  switch(instr->Bits(14, 13)) {
+          case 0x02:
+	    V::VisitSetField1(instr);
+            break;
+          default:
+	    break;
+	  }
         }
       } else {
         DCHECK_EQ(0x1, instr->Bit(10));
@@ -1295,6 +1302,14 @@ void Decoder<V>::DecodeMorelloMisc(Instruction* instr) {
 	    } else {
 	      CHECK_EQ(0x0, instr->Bit(16));
 	      // op0: 000000xxx, op1: 10, op2: 0 Morello get field 1
+	      switch (instr->Bits(15, 13)) {
+	      case 0x02:
+		// opc: 010 GCVALUE
+                V::VisitGetField1(instr);
+                break;
+              default:
+		break;
+	      }
 	    }
 	  } else {
 	    DCHECK_EQ(0x1, instr->Bit(17));

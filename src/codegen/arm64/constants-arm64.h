@@ -117,9 +117,6 @@ const int kFramePointerRegCode = 29;
 const int kLinkRegCode = 30;
 const int kZeroRegCode = 31;
 const int kSPRegInternalCode = 63;
-#if defined(__CHERI_PURE_CAPABILITY__)
-const int kCSPRegInternalCode = 64;
-#endif // __CHERI_PURE_CAPABILITY__
 const unsigned kRegCodeMask = 0x1f;
 const unsigned kShiftAmountWRegMask = 0x1f;
 const unsigned kShiftAmountXRegMask = 0x3f;
@@ -2380,7 +2377,6 @@ enum UnallocatedOp : uint32_t {
 };
 
 #if defined(__CHERI_PURE_CAPABILITY__)
-
 enum AddSubCapabilityOp : uint32_t {
   ADDCAP = 0x00000000,
   SUBCAP = 0x00800000
@@ -2409,7 +2405,23 @@ enum AddSubCapabilityExtendedOp : uint32_t {
   ADDCAP_c_ext = AddSubCapabilityExtendedFixed,
 };
 
+enum GetField1Op : uint32_t {
+  GetField1Fixed = 0xC2C01000,
+  GetField1FMask = 0xFFFF1C00,
+  GetField1Mask = 0xFFFFFC00,
+  // 4.4.61 GCVALUE
+  // Get the Value field of a capability.
+  GCVALUE = GetField1Fixed | 0x00004000 
+};
 
+enum SetField1Op : uint32_t {
+  SetField1Fixed = 0xC2C00000,
+  SetField1FMask = 0xFFE09C00,
+  SetField1Mask = 0xFFE0FC00,
+  // 4.4.120 SCVALUE
+  // Set value field of a capability.
+  SCVALUE = SetField1Fixed | 0x00004000 
+};
 #endif // __CHERI_PURE_CAPABILITY__
 
 }  // namespace internal

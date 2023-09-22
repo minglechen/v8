@@ -351,6 +351,61 @@ TEST_F(DecoderArm64Test, DecodeLoadPairCapOffset) {
   auto loadPairCapInstr = reinterpret_cast<Instruction*>(&loadPairCap);
   decoder->Decode(loadPairCapInstr);
 }
+
+TEST_F(DecoderArm64Test, DecodeGcvalue) {
+  class GcvalueVisitor : public DecoderArm64TestVisitor {
+    public:
+      GcvalueVisitor() {};
+
+      void VisitGetField1(Instruction* instr) override {
+	EXPECT_EQ(instr->Mask(GetField1FMask), GetField1Fixed);
+	switch(instr->Mask(GetField1Mask)) {
+          case GCVALUE:
+	    EXPECT_TRUE(true);
+	    EXPECT_EQ(instr->Mask(Cn_mask), Assembler::Cn(c1));
+	    EXPECT_EQ(instr->Mask(Rd_mask), Assembler::Rd(x1));
+	    break;
+	  default:
+  	    EXPECT_TRUE(false) << "gcvalue incorrectly decoded (" << std::hex << instr->Mask(GetField1Mask) << ")";
+	    break;
+	}
+      }
+  };
+  using TestOp = uint32_t;
+  TestOp gcvalue = GCVALUE | Assembler::Cn(c1) | Assembler::Rd(x1);
+  auto decoder = new Decoder<DispatchingDecoderVisitor>();
+  decoder->AppendVisitor(new GcvalueVisitor());
+  auto gcvalueInstr = reinterpret_cast<Instruction*>(&gcvalue);
+  decoder->Decode(gcvalueInstr);
+}
+
+TEST_F(DecoderArm64Test, DecodeScvalue) {
+  class ScvalueVisitor : public DecoderArm64TestVisitor {
+    public:
+      ScvalueVisitor() {};
+
+      void VisitSetField1(Instruction* instr) override {
+	EXPECT_EQ(instr->Mask(SetField1FMask), SetField1Fixed);
+	switch(instr->Mask(SetField1Mask)) {
+          case SCVALUE:
+	    EXPECT_TRUE(true);
+	    EXPECT_EQ(instr->Mask(Rm_mask), Assembler::Rm(x1));
+	    EXPECT_EQ(instr->Mask(Cn_mask), Assembler::Cn(c1));
+	    EXPECT_EQ(instr->Mask(Cd_mask), Assembler::Cd(c2));
+	    break;
+	  default:
+  	    EXPECT_TRUE(false) << "scvalue incorrectly decoded (" << std::hex << instr->Mask(SetField1Mask) << ")";
+	    break;
+	}
+      }
+  };
+  using TestOp = uint32_t;
+  TestOp scvalue = SCVALUE | Assembler::Rm(x1) | Assembler::Cn(c1) | Assembler::Cd(c2);
+  auto decoder = new Decoder<DispatchingDecoderVisitor>();
+  decoder->AppendVisitor(new ScvalueVisitor());
+  auto scvalueInstr = reinterpret_cast<Instruction*>(&scvalue);
+  decoder->Decode(scvalueInstr);
+}
 #endif // __CHERI_PURE_CAPABILITY__
 
 }  // namespace internal

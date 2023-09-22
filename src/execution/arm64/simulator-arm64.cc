@@ -6061,6 +6061,12 @@ void Simulator::VisitLoadStorePairCapPreIndex(Instruction* instr) {
 
 void Simulator::VisitLoadStorePairCapOffset(Instruction* instr) {
 }
+
+void Simulator::VisitGetField1(Instruction* instr) {
+}
+
+void Simulator::VisitSetField1(Instruction* instr) {
+}
 #endif
 
 void Simulator::DoPrintf(Instruction* instr) {

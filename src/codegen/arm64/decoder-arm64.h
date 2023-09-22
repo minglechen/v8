@@ -22,7 +22,9 @@ namespace internal {
 	V(LoadStoreCapUnsignedOffsetCapNormal)  \
 	V(LoadStorePairCapPostIndex)            \
 	V(LoadStorePairCapPreIndex)             \
-	V(LoadStorePairCapOffset)
+	V(LoadStorePairCapOffset)               \
+	V(GetField1)                            \
+	V(SetField1)
 #else
 #define VISITOR_LIST(V)                 \
 	ARM64_VISITOR_LIST(V)

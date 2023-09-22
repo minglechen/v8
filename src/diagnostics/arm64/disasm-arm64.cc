@@ -836,11 +836,19 @@ void DisassemblingDecoder::VisitLoadStorePreIndex(Instruction* instr) {
   const char* form = "(LoadStorePreIndex)";
 
   switch (instr->Mask(LoadStorePreIndexMask)) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define LS_PREINDEX(A, B, C)  \
+  case A##_pre:               \
+    mnemonic = B;             \
+    form = C ", ['Yns'ILS]!"; \
+    break;
+#else
 #define LS_PREINDEX(A, B, C)  \
   case A##_pre:               \
     mnemonic = B;             \
     form = C ", ['Xns'ILS]!"; \
     break;
+#endif // __CHERI_PURE_CAPABILITY__
     LOAD_STORE_LIST(LS_PREINDEX)
 #undef LS_PREINDEX
   }
@@ -852,11 +860,19 @@ void DisassemblingDecoder::VisitLoadStorePostIndex(Instruction* instr) {
   const char* form = "(LoadStorePostIndex)";
 
   switch (instr->Mask(LoadStorePostIndexMask)) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define LS_POSTINDEX(A, B, C) \
+  case A##_post:              \
+    mnemonic = B;             \
+    form = C ", ['Yns]'ILS";  \
+    break;
+#else
 #define LS_POSTINDEX(A, B, C) \
   case A##_post:              \
     mnemonic = B;             \
     form = C ", ['Xns]'ILS";  \
     break;
+#endif // __CHERI_PURE_CAPABILITY__
     LOAD_STORE_LIST(LS_POSTINDEX)
 #undef LS_POSTINDEX
   }
@@ -868,11 +884,19 @@ void DisassemblingDecoder::VisitLoadStoreUnsignedOffset(Instruction* instr) {
   const char* form = "(LoadStoreUnsignedOffset)";
 
   switch (instr->Mask(LoadStoreUnsignedOffsetMask)) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define LS_UNSIGNEDOFFSET(A, B, C) \
+  case A##_unsigned:               \
+    mnemonic = B;                  \
+    form = C ", ['Yns'ILU]";       \
+    break;
+#else
 #define LS_UNSIGNEDOFFSET(A, B, C) \
   case A##_unsigned:               \
     mnemonic = B;                  \
     form = C ", ['Xns'ILU]";       \
     break;
+#endif // __CHERI_PURE_CAPABILITY__
     LOAD_STORE_LIST(LS_UNSIGNEDOFFSET)
 #undef LS_UNSIGNEDOFFSET
     case PRFM_unsigned:
@@ -991,7 +1015,7 @@ void DisassemblingDecoder::VisitLoadStorePairPostIndex(Instruction* instr) {
 #define LSP_POSTINDEX(A, B, C, D) \
   case A##_post:                  \
     mnemonic = B;                 \
-    form = C ", ['Yns]'ILP 4";    \
+    form = C ", ['Yns]'ILP4";    \
     break;
 #else
 #define LSP_POSTINDEX(A, B, C, D) \
@@ -1015,7 +1039,7 @@ void DisassemblingDecoder::VisitLoadStorePairPreIndex(Instruction* instr) {
 #define LSP_PREINDEX(A, B, C, D)   \
   case A##_pre:                    \
     mnemonic = B;                  \
-    form = C ", ['Yns'ILP 4 ]!";   \
+    form = C ", ['Yns'ILP4]!";     \
     break;
 #else
 #define LSP_PREINDEX(A, B, C, D)   \
@@ -1039,7 +1063,7 @@ void DisassemblingDecoder::VisitLoadStorePairOffset(Instruction* instr) {
 #define LSP_OFFSET(A, B, C, D)    \
   case A##_off:                   \
     mnemonic = B;                 \
-    form = C ", ['Yns'ILP 4 ]";   \
+    form = C ", ['Yns'ILP4]";     \
     break;
 #else
 #define LSP_OFFSET(A, B, C, D)    \
@@ -3743,7 +3767,12 @@ void DisassemblingDecoder::AppendRegisterNameToOutput(const CPURegister& reg) {
     }
   }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  if (reg.IsVRegister() || !(reg.Aliases(sp) || reg.Aliases(csp)) || 
+      reg.Aliases(xzr) || reg.Aliases(czr)) {
+#else
   if (reg.IsVRegister() || !(reg.Aliases(sp) || reg.Aliases(xzr))) {
+#endif // _CHERI_PRE_CAPABILITY__
     // Filter special registers
     if (reg.IsX() && (reg.code() == 27)) {
       AppendToOutput("cp");
@@ -3758,6 +3787,11 @@ void DisassemblingDecoder::AppendRegisterNameToOutput(const CPURegister& reg) {
   } else if (reg.Aliases(sp)) {
     // Disassemble w31/x31 as stack pointer wsp/sp.
     AppendToOutput("%s", reg.Is64Bits() ? "sp" : "wsp");
+#if defined(__CHERI_PURE_CAPABILITY__)
+  } else if (reg.Aliases(csp)) {
+    DCHECK(reg.Is128Bits());
+    AppendToOutput("csp");
+#endif // _CHERI_PRE_CAPABILITY__
   } else {
     // Disassemble w31/x31 as zero register wzr/xzr.
     AppendToOutput("%czr", reg_char);
@@ -3926,10 +3960,6 @@ int DisassemblingDecoder::SubstituteRegisterField(Instruction* instr,
 
   if (reg_prefix == 'R') {
     reg_prefix = instr->SixtyFourBits() ? 'X' : 'W';
-#if defined(__CHERI_PURE_CAPABILITY__)
-  } else if (reg_prefix == 'Y') {
-    reg_prefix = 'Y';
-#endif // __CHERI_PURE_CAPABILITY__
   } else if (reg_prefix == 'F') {
     reg_prefix = ((instr->FPType() & 1) == 0) ? 'S' : 'D';
   }
@@ -3984,7 +4014,7 @@ int DisassemblingDecoder::SubstituteRegisterField(Instruction* instr,
 #if defined(__CHERI_PURE_CAPABILITY__)
   if ((reg_type == CPURegister::kCRegister) && (reg_num == kZeroRegCode) &&
       (format[2] == 's')) {
-    reg_num = kCSPRegInternalCode;
+    reg_num = kSPRegInternalCode;
   }
 #endif // __CHERI_PURE_CAPABILITY__
 

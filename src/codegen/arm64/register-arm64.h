@@ -186,7 +186,7 @@ class CPURegister : public RegisterBase<CPURegister, kRegAfterLast> {
 #if defined(__CHERI_PURE_CAPABILITY__)
   bool IsCSP() const;
   bool IsCRegister() const { return reg_type_ == kCRegister; }
-  bool IsC() const { return IsRegister() && Is128Bits(); }
+  bool IsC() const { return IsCRegister() && Is128Bits(); }
 #endif // __CHERI_PURE_CAPABILITY__
 
   // These assertions ensure that the size and type of the register are as
@@ -241,7 +241,7 @@ class CPURegister : public RegisterBase<CPURegister, kRegAfterLast> {
 #if defined(__CHERI_PURE_CAPABILITY__)
   static constexpr bool IsValidCRegister(int code, int size) {
     return (size == kCRegSizeInBits) &&
-           (code < kNumberOfRegisters || code == kCSPRegInternalCode);
+           (code < kNumberOfRegisters || code == kSPRegInternalCode);
   }
 #endif // __CHERI_PURE_CAPABILITY__
 
@@ -290,7 +290,7 @@ class Register : public CPURegister {
 
   static const char* GetSpecialRegisterName(int code) {
 #if defined(__CHERI_PURE_CAPABILITY__)
-    if (code == kCSPRegInternalCode) return  "csp";
+    if (code == kSPRegInternalCode) return  "csp";
 #endif // __CHERI_PURE_CAPABILITY__
     return (code == kSPRegInternalCode) ? "sp" : "UNKNOWN";
   }
@@ -516,7 +516,7 @@ DEFINE_REGISTER(Register, sp, kSPRegInternalCode, kXRegSizeInBits);
   DEFINE_REGISTER(Register, c##N, N, kCRegSizeInBits, CPURegister::kCRegister);
 CAPABILITY_REGISTER_CODE_LIST(DEFINE_REGISTERS)
 #undef DEFINE_REGISTERS
-DEFINE_REGISTER(Register, csp, kCSPRegInternalCode, kCRegSizeInBits, CPURegister::kCRegister);
+DEFINE_REGISTER(Register, csp, kSPRegInternalCode, kCRegSizeInBits, CPURegister::kCRegister);
 #endif // __CHERI_PURE_CAPABILITY__
 
 #define DEFINE_VREGISTERS(N)                            \

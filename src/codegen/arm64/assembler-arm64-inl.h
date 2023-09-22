@@ -54,7 +54,7 @@ inline bool CPURegister::IsSP() const {
 #if defined(__CHERI_PURE_CAPABILITY__)
 inline bool CPURegister::IsCSP() const {
   DCHECK(is_valid());
-  return IsCRegister() && (code() == kCSPRegInternalCode);
+  return IsCRegister() && (code() == kSPRegInternalCode);
 }
 #endif // __CHERI_PURE_CAPABILITY__
 
@@ -117,7 +117,7 @@ inline Register Register::WRegFromCode(unsigned code) {
 
 #if defined(__CHERI_PURE_CAPABILITY__)
 inline Register Register::CRegFromCode(unsigned code) {
-  if (code == kCSPRegInternalCode) {
+  if (code == kSPRegInternalCode) {
     return csp;
   } else {
     DCHECK_LT(code, static_cast<unsigned>(kNumberOfRegisters));

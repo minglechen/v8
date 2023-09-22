@@ -835,6 +835,12 @@ class V8_EXPORT_PRIVATE Assembler : public AssemblerBase {
   // Load a pair of capabilities
   void ldpc(const Register& ct, const Register& ct2,
             const MemOperand& src);
+  // Store a capability value field
+  void gcvalue(const Register& cd, const Register& cn,
+	       const Register& rm);
+  // Load a capability value field
+  void scvalue(const Register& cd, const Register& cn,
+	       const Register& rm);
 #endif // __CHERI_PURE_CAPABILITY__
 
   // Load word with sign extension.
@@ -2203,27 +2209,27 @@ class V8_EXPORT_PRIVATE Assembler : public AssemblerBase {
 
   // Capability register encoding.
   static Instr Cd(CPURegister cd) {
-    DCHECK_NE(cd.code(), kCSPRegInternalCode);
+    DCHECK_NE(cd.code(), kSPRegInternalCode);
     return cd.code() << Cd_offset;
   }
 
   static Instr Cn(CPURegister cn) {
-    DCHECK_NE(cn.code(), kCSPRegInternalCode);
+    DCHECK_NE(cn.code(), kSPRegInternalCode);
     return cn.code() << Cn_offset;
   }
 
   static Instr Cm(CPURegister cm) {
-    DCHECK_NE(cm.code(), kCSPRegInternalCode);
+    DCHECK_NE(cm.code(), kSPRegInternalCode);
     return cm.code() << Cm_offset;
   }
 
   static Instr Ct(CPURegister ct) {
-    DCHECK_NE(ct.code(), kCSPRegInternalCode);
+    DCHECK_NE(ct.code(), kSPRegInternalCode);
     return ct.code() << Ct_offset;
   }
 
   static Instr Ct2(CPURegister ct) {
-    DCHECK_NE(ct.code(), kCSPRegInternalCode);
+    DCHECK_NE(ct.code(), kSPRegInternalCode);
     return ct.code() << Ct2_offset;
   }
 #endif // __CHERI_PURE_CAPABILITY__

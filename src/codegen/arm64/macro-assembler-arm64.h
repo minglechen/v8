@@ -2195,6 +2195,9 @@ class V8_NODISCARD UseScratchRegisterScope {
   VRegister AcquireV(VectorFormat format) {
     return VRegister::Create(AcquireNextAvailable(availablefp_).code(), format);
   }
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register AcquireC() { return AcquireNextAvailable(available_).C(); }
+#endif // __CHERI_PURE_CAPABILITY__
 
   bool CanAcquire() const { return !available_->IsEmpty(); }
   bool CanAcquireFP() const { return !availablefp_->IsEmpty(); }

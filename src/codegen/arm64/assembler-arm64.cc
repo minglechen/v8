@@ -148,6 +148,7 @@ CPURegister CPURegList::PopHighestIndex() {
 }
 
 void CPURegList::Align() {
+#if !defined(__CHERI_PURE_CAPABILITY__)
   // Use padreg, if necessary, to maintain stack alignment.
   if (Count() % 2 != 0) {
     if (IncludesAliasOf(padreg)) {
@@ -158,6 +159,7 @@ void CPURegList::Align() {
   }
 
   DCHECK_EQ(Count() % 2, 0);
+#endif
 }
 
 CPURegList CPURegList::GetCalleeSaved(int size) {
@@ -753,22 +755,37 @@ void Assembler::EndBlockVeneerPool() {
   }
 }
 
-void Assembler::br(const Register& xn) {
+void Assembler::br(const Register& rn) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  DCHECK(rn.Is128Bits());
+#else
   DCHECK(xn.Is64Bits());
-  Emit(BR | Rn(xn));
+#endif // __CHERI_PURE_CAPABILITY__
+  Emit(BR | Rn(rn));
 }
 
-void Assembler::blr(const Register& xn) {
-  DCHECK(xn.Is64Bits());
+void Assembler::blr(const Register& rn) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  DCHECK(rn.Is128Bits());
+  // The pattern 'blr czr' is used as a guard to detect when execution falls
+  // through the constant pool. It should not be emitted.
+  DCHECK_NE(rn, czr);
+#else
+  DCHECK(rn.Is64Bits());
   // The pattern 'blr xzr' is used as a guard to detect when execution falls
   // through the constant pool. It should not be emitted.
-  DCHECK_NE(xn, xzr);
-  Emit(BLR | Rn(xn));
+  DCHECK_NE(rn, xzr);
+#endif // __CHERI_PURE_CAPABILITY__
+  Emit(BLR | Rn(rn));
 }
 
-void Assembler::ret(const Register& xn) {
-  DCHECK(xn.Is64Bits());
-  Emit(RET | Rn(xn));
+void Assembler::ret(const Register& rn) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  DCHECK(rn.Is128Bits());
+#else
+  DCHECK(rn.Is64Bits());
+#endif // __CHERI_PURE_CAPABILITY__
+  Emit(RET | Rn(rn));
 }
 
 void Assembler::b(int imm26) { Emit(B | ImmUncondBranch(imm26)); }
@@ -1014,6 +1031,14 @@ void Assembler::extr(const Register& rd, const Register& rn, const Register& rm,
 
 void Assembler::csel(const Register& rd, const Register& rn, const Register& rm,
                      Condition cond) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  if (rd.IsC()) {
+    DCHECK(rn.IsC());
+    DCHECK(rm.IsC());
+    Emit(CSEL_c | Cm(rm) | Cond(cond) | Cn(rn) | Cd(rd));
+    return;
+  }
+#endif // __CHERI_PURE_CAPABILITY__
   ConditionalSelect(rd, rn, rm, cond, CSEL);
 }
 
@@ -1281,7 +1306,7 @@ void Assembler::stpc(const Register& ct, const Register& ct2,
 }
 
 void Assembler::LoadStorePairCap(const Register& ct, const Register& ct2,
-                                 const MemOperand& addr, LoadStorePairCapOp op) {
+                                 const MemOperand& addr, LoadStorePairOp op) {
   // 'ct' and 'ct2' can only be aliased for stores.
   DCHECK(((op & LoadStorePairCapLBit) == 0) || ct != ct2);
   DCHECK(AreSameSizeAndType(ct, ct2));
@@ -1354,9 +1379,36 @@ void Assembler::ldrc(const Register& ct, const MemOperand& src) {
   LoadStoreCapability(ct, src, LoadCap);
 }
 
-void Assembler::cpy(const Register& ct, const Register& cn) {
-  Emit(CPY | Ct(ct)| Cn(cn));
+void Assembler::ldrc(const Register& ct, const Operand& operand) {
+  if (operand.IsHeapObjectRequest()) {
+    BlockPoolsScope no_pool_before_ldr_of_heap_object_request(this);
+    RequestHeapObject(operand.heap_object_request());
+    ldrc(ct, operand.immediate_for_heap_object_request());
+  } else {
+    ldrc(ct, operand.immediate());
+  }
 }
+
+void Assembler::ldrc(const Register& ct, const Immediate& imm) {
+  BlockPoolsScope no_pool_before_ldr_pcrel_instr(this);
+  RecordRelocInfo(imm.rmode(), imm.value());
+  // The load will be patched when the constpool is emitted, patching code
+  // expect a load literal with offset 0.
+  ldr_pcrel(ct, 0);
+}
+
+void Assembler::cpy(const Register& cd, const Register& cn) {
+  Emit(CPY | CdCSP(cd) | CnCSP(cn));
+}
+
+void Assembler::cselc(const Register& cd, const Register& cn, const Register& cm,
+                      Condition cond) {
+  DCHECK(cd.SizeInBits() == cn.SizeInBits());
+  DCHECK(cd.SizeInBits() == cm.SizeInBits());
+  // TODO(gcjenkinson): Emit new Morell csel
+  // Emit(SF(rd) | op | Rm(rm) | Cond(cond) | Rn(rn) | Rd(rd));
+}
+
 
 void Assembler::strc(const Register& ct, const MemOperand& src) {
   LoadStoreCapability(ct, src, StoreCap);
@@ -1373,7 +1425,7 @@ bool Assembler::IsImmAddSubCapability(int64_t immediate) {
 }
 
 void Assembler::AddSubCapability(const Register& cd, const Register& cn,
-                                 const Operand& operand, AddSubCapabilityOp op) {
+                                 const Operand& operand, AddSubOp op) {
   DCHECK_EQ(cd.SizeInBits(), kCRegSizeInBits);
   DCHECK_EQ(cn.SizeInBits(), kCRegSizeInBits);
   DCHECK(!operand.NeedsRelocation(this));
@@ -1382,24 +1434,22 @@ void Assembler::AddSubCapability(const Register& cd, const Register& cn,
     DCHECK(IsImmAddSubCapability(immediate));
     Emit(AddSubCapabilityImmediateFixed | op |
          ImmAddSub(static_cast<int>(immediate)) | CdCSP(cd) | CnCSP(cn));
-  } else if (operand.IsExtendedRegister()) {
+  } else if (operand.IsShiftedRegister()) {
+    // TODO(gcjenkinson): Handle Shifted case
+  } else {
+    DCHECK(operand.IsExtendedRegister());
     Emit(AddSubCapabilityExtendedFixed | Cm(operand.reg()) |
          ExtendMode(operand.extend()) | ImmExtendShift(operand.shift_amount()) |
          CdCSP(cd) | CnCSP(cn));
-  } else {
-      // This case is handled in the macro assembler.
-      UNREACHABLE();
   }
 }
 
 void Assembler::LoadStoreCapability(const Register& ct, const MemOperand& addr,
-		                    const LoadStoreCapOp op = LoadCap) {
+				    const LoadStoreCapOp op = LoadCap) {
   DCHECK_EQ(ct.SizeInBits(), kCRegSizeInBits);
   DCHECK_EQ(ct.SizeInBits(), kCRegSizeInBits);
   Instr memop = Ct(ct) | CnCSP(addr.base());
 
-  // Pre-index and post-index modes.
-  DCHECK_NE(ct, addr.base());
   if (addr.IsImmediateOffset()) {
     // <imm> Is the optional unsigned immediate byte offset,
     // a mulitple of 16 in the range 0 to 65520, defaulting to
@@ -1408,14 +1458,12 @@ void Assembler::LoadStoreCapability(const Register& ct, const MemOperand& addr,
     if (IsImmLSScaled(addr.offset(), size)) {
       int offset = static_cast<int>(addr.offset());
       // Use the scaled addressing mode.
-      //Emit(LDR_c_unsigned_cap_normal | memop | ImmLSUnsigned(offset >> size));
       Emit(LoadStoreCapUnsignedOffsetCapNormalFixed |
            (op == LoadCap ? LoadCapUnsignedOffsetCapNormal : StoreCapUnsignedOffsetCapNormal) |
            memop | ImmLSUnsigned(offset >> size));
     } else if (IsImmLSUnscaled(addr.offset())) {
       int offset = static_cast<int>(addr.offset());
       // Use the unscaled addressing mode.
-      //Emit(LDRU_c_capability_normal | memop | ImmLS(offset));
       Emit(LoadStoreCapUnscaledOffsetNormalBaseFixed |
            (op == LoadCap ? LoadCapUnscaledOffsetAlternativeBase : StoreCapUnscaledOffsetNormalBase) |
            memop | ImmLS(offset));
@@ -1452,13 +1500,11 @@ void Assembler::LoadStoreCapability(const Register& ct, const MemOperand& addr,
     if (IsImmLSUnscaled(addr.offset())) {
       int offset = static_cast<int>(addr.offset());
       if (addr.IsPreIndex()) {
-        //Emit(LDR_c_pre | memop | ImmLS(offset));
         Emit(LoadStorePreCapIndexFixed |
 	     (op == LoadCap ? LoadPreCapIndex : StorePreCapIndex) |
 	     memop | ImmLS(offset));
       } else {
         DCHECK(addr.IsPostIndex());
-        //Emit(LDR_c_post | memop | ImmLS(offset));
         Emit(LoadStorePostCapIndexFixed |
 	     (op == LoadCap ? LoadPostCapIndex : StorePostCapIndex) |
 	     memop | ImmLS(offset));
@@ -1470,19 +1516,20 @@ void Assembler::LoadStoreCapability(const Register& ct, const MemOperand& addr,
   }
 }
 
-void Assembler::gcvalue(const Register& cd, const Register& cn,
-	                const Register& rm)
+void Assembler::gcvalue(const Register& cn, const Register& rd)
 {
-  Emit(GCVALUE | Rm(rm) | Cd(cd)| Cn(cn));
+  DCHECK(cn.Is128Bits());
+  DCHECK(rd.Is64Bits());
+  Emit(GCVALUE | CnCSP(cn) | Rd(rd));
 }
 
 void Assembler::scvalue(const Register& cd, const Register& cn,
-	                const Register& rm)
+			const Register& rm)
 {
-  Emit(SCVALUE | Rm(rm) | Cd(cd)| Cn(cn));
+  DCHECK(cn.Is128Bits() && cd.Is128Bits());
+  DCHECK(rm.Is64Bits());
+  Emit(SCVALUE | Rm(rm) | CdCSP(cd) | CnCSP(cn));
 }
-
-
 #endif // __CHERI_PURE_CAPABILITY__
 
 void Assembler::ldrsw(const Register& rt, const MemOperand& src) {
@@ -3819,11 +3866,25 @@ void Assembler::AddSub(const Register& rd, const Register& rn,
   if (operand.IsImmediate()) {
     int64_t immediate = operand.ImmediateValue();
     DCHECK(IsImmAddSub(immediate));
+#if defined(__CHERI_PURE_CAPABILITY__)
+    if (rd.IsC()) {
+      DCHECK(rn.IsC());
+      Emit(AddSubCapabilityImmediateFixed | op |
+           ImmAddSub(static_cast<int>(immediate)) | CdCSP(rd) | CnCSP(rn));
+      return;
+    }
+#endif // __CHERI_PURE_CAPABILITY__
     Instr dest_reg = (S == SetFlags) ? Rd(rd) : RdSP(rd);
     Emit(SF(rd) | AddSubImmediateFixed | op | Flags(S) |
          ImmAddSub(static_cast<int>(immediate)) | dest_reg | RnSP(rn));
   } else if (operand.IsShiftedRegister()) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    DCHECK((operand.reg().SizeInBits(), rd.SizeInBits()) ||
+	   (operand.reg().SizeInBits() == kXRegSizeInBits &&
+	   rd.SizeInBits() == kCRegSizeInBits));
+#else
     DCHECK_EQ(operand.reg().SizeInBits(), rd.SizeInBits());
+#endif // __CHERI_PURE_CAPABILITY__
     DCHECK_NE(operand.shift(), ROR);
 
     // For instructions of the form:
@@ -3837,11 +3898,28 @@ void Assembler::AddSub(const Register& rd, const Register& rn,
       DCHECK(!(rd.IsSP() && (S == SetFlags)));
       DataProcExtendedRegister(rd, rn, operand.ToExtendedRegister(), S,
                                AddSubExtendedFixed | op);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    } else if (rn.IsC()) {
+      DCHECK(rd.IsC());
+#endif // __CHERI_PURE_CAPABILITY__
+      Emit(AddSubCapabilityExtendedFixed | Rm(operand.ToExtendedRegister().reg()) |
+           ExtendMode(operand.ToExtendedRegister().extend()) |
+	   ImmExtendShift(operand.shift_amount()) |
+           CdCSP(rd) | CnCSP(rn));
     } else {
       DataProcShiftedRegister(rd, rn, operand, S, AddSubShiftedFixed | op);
     }
   } else {
     DCHECK(operand.IsExtendedRegister());
+#if defined(__CHERI_PURE_CAPABILITY__)
+    if (op == ADDCAP || op == SUBCAP) {
+      DCHECK(rn.IsC() && rd.IsC());
+      Emit(AddSubCapabilityExtendedFixed | Rm(operand.reg()) |
+           ExtendMode(operand.extend()) | ImmExtendShift(operand.shift_amount()) |
+           CdCSP(rd) | CnCSP(rn));
+      return;
+    }
+#endif // __CHERI_PURE_CAPABILITY__
     DataProcExtendedRegister(rd, rn, operand, S, AddSubExtendedFixed | op);
   }
 }
@@ -3913,6 +3991,7 @@ void Assembler::Logical(const Register& rd, const Register& rn,
                         const Operand& operand, LogicalOp op) {
   DCHECK(rd.SizeInBits() == rn.SizeInBits());
   DCHECK(!operand.NeedsRelocation(this));
+
   if (operand.IsImmediate()) {
     int64_t immediate = operand.ImmediateValue();
     unsigned reg_size = rd.SizeInBits();
@@ -4144,11 +4223,26 @@ void Assembler::LoadStore(const CPURegister& rt, const MemOperand& addr,
     if (IsImmLSScaled(addr.offset(), size)) {
       int offset = static_cast<int>(addr.offset());
       // Use the scaled addressing mode.
+#if defined(__CHERI_PURE_CAPABILITY__)
+      if (rt.IsC()) {
+        Emit(LoadStoreCapUnsignedOffsetCapNormalFixed |
+	     Rt(rt) | RnSP(addr.base()) |
+             ImmLSUnsigned(offset >> size));
+	return;
+      }
+#endif // __CHERI_PURE_CAPABILITY__
       Emit(LoadStoreUnsignedOffsetFixed | memop |
            ImmLSUnsigned(offset >> size));
     } else if (IsImmLSUnscaled(addr.offset())) {
       int offset = static_cast<int>(addr.offset());
       // Use the unscaled addressing mode.
+#if defined(__CHERI_PURE_CAPABILITY__)
+      if (rt.IsC()) {
+        Emit(LoadStoreCapUnscaledOffsetNormalBaseFixed | memop |
+	     ImmLS(offset));
+	return;
+      }
+#endif // __CHERI_PURE_CAPABILITY__
       Emit(LoadStoreUnscaledOffsetFixed | memop | ImmLS(offset));
     } else {
       // This case is handled in the macro assembler.
@@ -4164,11 +4258,19 @@ void Assembler::LoadStore(const CPURegister& rt, const MemOperand& addr,
       ext = UXTX;
     }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+    if (rt.IsC()) {
+      Emit(LoadStoreCapRegisterOffsetNormalFixed | memop |
+           Cm(addr.regoffset()) | ExtendMode(ext) |
+	   ImmShiftLS((shift_amount > 0) ? 1 : 0));
+      return;
+    }
+#endif // __CHERI_PURE_CAPABILITY__
     // Shifts are encoded in one bit, indicating a left shift by the memory
     // access size.
     DCHECK((shift_amount == 0) ||
            (shift_amount == static_cast<unsigned>(CalcLSDataSize(op))));
-    Emit(LoadStoreRegisterOffsetFixed | memop | Rm(addr.regoffset()) |
+   Emit(LoadStoreRegisterOffsetFixed | memop | Rm(addr.regoffset()) |
          ExtendMode(ext) | ImmShiftLS((shift_amount > 0) ? 1 : 0));
   } else {
     // Pre-index and post-index modes.
@@ -4176,9 +4278,21 @@ void Assembler::LoadStore(const CPURegister& rt, const MemOperand& addr,
     if (IsImmLSUnscaled(addr.offset())) {
       int offset = static_cast<int>(addr.offset());
       if (addr.IsPreIndex()) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+        if (rt.IsC()) {
+          Emit(LoadStorePreCapIndexFixed | memop | ImmLS(offset));
+          return;
+	}
+#endif // __CHERI_PURE_CAPABILITY__
         Emit(LoadStorePreIndexFixed | memop | ImmLS(offset));
       } else {
         DCHECK(addr.IsPostIndex());
+#if defined(__CHERI_PURE_CAPABILITY__)
+        if (rt.IsC()) {
+          Emit(LoadStorePostCapIndexFixed | memop | ImmLS(offset));
+          return;
+	}
+#endif // __CHERI_PURE_CAPABILITY__
         Emit(LoadStorePostIndexFixed | memop | ImmLS(offset));
       }
     } else {

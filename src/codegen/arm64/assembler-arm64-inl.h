@@ -51,13 +51,6 @@ inline bool CPURegister::IsSP() const {
   return IsRegister() && (code() == kSPRegInternalCode);
 }
 
-#if defined(__CHERI_PURE_CAPABILITY__)
-inline bool CPURegister::IsCSP() const {
-  DCHECK(is_valid());
-  return IsCRegister() && (code() == kSPRegInternalCode);
-}
-#endif // __CHERI_PURE_CAPABILITY__
-
 inline void CPURegList::Combine(const CPURegList& other) {
   DCHECK(other.type() == type_);
   DCHECK(other.RegisterSizeInBits() == size_);
@@ -121,7 +114,7 @@ inline Register Register::CRegFromCode(unsigned code) {
     return csp;
   } else {
     DCHECK_LT(code, static_cast<unsigned>(kNumberOfRegisters));
-    return Register::Create(code, kCRegSizeInBits, kCRegister);
+    return Register::Create(code, kCRegSizeInBits);
   }
 }
 #endif // __CHERI_PURE_CAPABILITY__
@@ -229,20 +222,20 @@ struct ImmediateInitializer {
 template <>
 struct ImmediateInitializer<intptr_t> {
   static inline RelocInfo::Mode rmode_for(intptr_t) { return RelocInfo::NO_INFO; }
-  static inline int64_t immediate_for(intptr_t t) {
+  static inline intptr_t immediate_for(intptr_t t) {
     static_assert(sizeof(intptr_t) <= 16);
     static_assert(std::is_integral<intptr_t>::value);
-    return static_cast<int64_t>(t);
+    return static_cast<intptr_t>(t);
   }
 };
 
 template <>
 struct ImmediateInitializer<Address> {
   static inline RelocInfo::Mode rmode_for(Address) { return RelocInfo::NO_INFO; }
-  static inline int64_t immediate_for(Address t) {
+  static inline uintptr_t immediate_for(Address t) {
     static_assert(sizeof(Address) <= 16);
     static_assert(std::is_integral<Address>::value);
-    return static_cast<uint64_t>(t);
+    return static_cast<uintptr_t>(t);
   }
 };
 #endif // __CHERI_PURE_CAPABILITY__
@@ -260,9 +253,15 @@ struct ImmediateInitializer<ExternalReference> {
   static inline RelocInfo::Mode rmode_for(ExternalReference t) {
     return RelocInfo::EXTERNAL_REFERENCE;
   }
+#if defined(__CHERI_PURE_CAPABILITY__)
+  static inline uintptr_t immediate_for(ExternalReference t) {
+    return static_cast<uintptr_t>(t.address());
+  }
+#else
   static inline int64_t immediate_for(ExternalReference t) {
     return static_cast<int64_t>(t.address());
   }
+#endif // __CHERI_PURE_CAPABILITY__
 };
 
 template <typename T>
@@ -299,7 +298,6 @@ Operand::Operand(Register reg, Shift shift, unsigned shift_amount)
   DCHECK(reg.Is32Bits() || (shift_amount < kXRegSizeInBits));
 #if defined(__CHERI_PURE_CAPABILITY__)
   DCHECK(reg.Is128Bits() || (shift_amount < kCRegSizeInBits));
-  DCHECK_IMPLIES(reg.IsCSP(), shift_amount == 0);
 #endif // __CHERI_PURE_CAPABILITY__
   DCHECK_IMPLIES(reg.IsSP(), shift_amount == 0);
 }
@@ -311,7 +309,11 @@ Operand::Operand(Register reg, Extend extend, unsigned shift_amount)
       extend_(extend),
       shift_amount_(shift_amount) {
   DCHECK(reg.is_valid());
+#if defined(__CHERI_PURE_CAPABILITY__)
+  DCHECK_LE(shift_amount, 5);
+#else
   DCHECK_LE(shift_amount, 4);
+#endif // __CHERI_PURE_CAPABILITY__
   DCHECK(!reg.IsSP());
 
   // Extend modes SXTX and UXTX require a 64-bit register.
@@ -353,7 +355,11 @@ bool Operand::IsZero() const {
 
 Operand Operand::ToExtendedRegister() const {
   DCHECK(IsShiftedRegister());
+#if defined(__CHERI_PURE_CAPABILITY__)
+  DCHECK((shift_ == LSL) && (shift_amount_ <= 5));
+#else
   DCHECK((shift_ == LSL) && (shift_amount_ <= 4));
+#endif // __CHERI_PURE_CAPABILITY__
   return Operand(reg_, reg_.Is64Bits() ? UXTX : UXTW, shift_amount_);
 }
 
@@ -433,7 +439,11 @@ MemOperand::MemOperand(Register base, int64_t offset, AddrMode addrmode)
       shift_(NO_SHIFT),
       extend_(NO_EXTEND),
       shift_amount_(0) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  DCHECK((base.Is64Bits() || base.Is128Bits()) && !base.IsZero());
+#else
   DCHECK(base.Is64Bits() && !base.IsZero());
+#endif // _CHERI_PURE_CAPABILITY__
 }
 
 MemOperand::MemOperand(Register base, Register regoffset, Extend extend,
@@ -445,7 +455,11 @@ MemOperand::MemOperand(Register base, Register regoffset, Extend extend,
       shift_(NO_SHIFT),
       extend_(extend),
       shift_amount_(shift_amount) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  DCHECK((base.Is64Bits() || base.Is128Bits()) && !base.IsZero());
+#else
   DCHECK(base.Is64Bits() && !base.IsZero());
+#endif // _CHERI_PURE_CAPABILITY__
   DCHECK(!regoffset.IsSP());
   DCHECK((extend == UXTW) || (extend == SXTW) || (extend == SXTX));
 
@@ -462,14 +476,23 @@ MemOperand::MemOperand(Register base, Register regoffset, Shift shift,
       shift_(shift),
       extend_(NO_EXTEND),
       shift_amount_(shift_amount) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  DCHECK((base.Is64Bits() || base.Is128Bits()) && !base.IsZero());
+  DCHECK((regoffset.Is64Bits() || regoffset.Is128Bits()) && !regoffset.IsSP());
+#else
   DCHECK(base.Is64Bits() && !base.IsZero());
   DCHECK(regoffset.Is64Bits() && !regoffset.IsSP());
+#endif // _CHERI_PURE_CAPABILITY__
   DCHECK(shift == LSL);
 }
 
 MemOperand::MemOperand(Register base, const Operand& offset, AddrMode addrmode)
     : base_(base), regoffset_(NoReg), addrmode_(addrmode) {
-  DCHECK(base.Is64Bits() && !base.IsZero());
+#if defined(__CHERI_PURE_CAPABILITY__)
+    DCHECK((base.Is64Bits() || base.Is128Bits()) && !base.IsZero());
+#else
+    DCHECK(base.Is64Bits() && !base.IsZero());
+#endif // _CHERI_PURE_CAPABILITY__
 
   if (offset.IsImmediate()) {
     offset_ = offset.ImmediateValue();
@@ -832,7 +855,11 @@ void RelocInfo::WipeOut() {
 LoadStoreOp Assembler::LoadOpFor(const CPURegister& rt) {
   DCHECK(rt.is_valid());
   if (rt.IsRegister()) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    return rt.Is128Bits() ? LDR_c : rt.Is64Bits() ? LDR_x : LDR_w;
+#else
     return rt.Is64Bits() ? LDR_x : LDR_w;
+#endif // __CHERI_PURE_CAPABILITY__
   } else {
     DCHECK(rt.IsVRegister());
     switch (rt.SizeInBits()) {
@@ -854,7 +881,11 @@ LoadStoreOp Assembler::LoadOpFor(const CPURegister& rt) {
 LoadStoreOp Assembler::StoreOpFor(const CPURegister& rt) {
   DCHECK(rt.is_valid());
   if (rt.IsRegister()) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    return rt.Is128Bits() ? STR_c : rt.Is64Bits() ? STR_x : STR_w;
+#else
     return rt.Is64Bits() ? STR_x : STR_w;
+#endif // __CHERI_PURE_CAPABILITY__
   } else {
     DCHECK(rt.IsVRegister());
     switch (rt.SizeInBits()) {
@@ -885,6 +916,9 @@ LoadStorePairOp Assembler::StorePairOpFor(const CPURegister& rt,
   DCHECK(AreSameSizeAndType(rt, rt2));
   USE(rt2);
   if (rt.IsRegister()) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    if (rt.Is128Bits()) return STP_c;
+#endif // __CHERI_PURE_CAPABILITY__
     return rt.Is64Bits() ? STP_x : STP_w;
   } else {
     DCHECK(rt.IsVRegister());
@@ -908,6 +942,24 @@ LoadLiteralOp Assembler::LoadLiteralOpFor(const CPURegister& rt) {
     return rt.Is64Bits() ? LDR_d_lit : LDR_s_lit;
   }
 }
+
+#if defined(__CHERI_PURE_CAPABILITY__)
+AddSubOp Assembler::AddOpFor(const CPURegister& rt) {
+  if (rt.IsC()) {
+    return ADDCAP;
+  } else {
+    return ADD;
+  }
+}
+
+AddSubOp Assembler::SubOpFor(const CPURegister& rt) {
+  if (rt.IsC()) {
+    return SUBCAP;
+  } else {
+    return SUB;
+  }
+}
+#endif // __CHERI_PURE_CAPABILITY__
 
 int Assembler::LinkAndGetInstructionOffsetTo(Label* label) {
   DCHECK_EQ(kStartOfLabelLinkChain, 0);
@@ -1037,7 +1089,11 @@ Instr Assembler::ExtendMode(Extend extend) {
 }
 
 Instr Assembler::ImmExtendShift(unsigned left_shift) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  DCHECK_LE(left_shift, 5);
+#else
   DCHECK_LE(left_shift, 4);
+#endif // __CHERI_PURE_CAPABILITY__
   return left_shift << ImmExtendShift_offset;
 }
 
@@ -1142,7 +1198,7 @@ Instr Assembler::ImmAddSubCapability(int imm) {
 
 const Register& Assembler::AppropriateZeroRegFor(const CPURegister& reg) const {
 #if defined(__CHERI_PURE_CAPABILITY__)
-  if (reg.Is128Bits()) return czr;
+  if (reg.IsC()) return czr;
 #endif // __CHERI_PURE_CAPABILITY__
   return reg.Is64Bits() ? xzr : wzr;
 }

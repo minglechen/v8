@@ -565,6 +565,10 @@ const int kSFOffset = 31;
 enum AddSubOp : uint32_t {
   AddSubOpMask = 0x60000000,
   AddSubSetFlagsBit = 0x20000000,
+#if defined(__CHERI_PURE_CAPABILITY__)
+  ADDCAP = 0x00000000,
+  SUBCAP = 0x00800000,
+#endif // __CHERI_PURE_CAPABILITY__
   ADD = 0x00000000,
   ADDS = ADD | AddSubSetFlagsBit,
   SUB = 0x40000000,
@@ -573,7 +577,24 @@ enum AddSubOp : uint32_t {
 
 #define ADD_SUB_OP_LIST(V) V(ADD), V(ADDS), V(SUB), V(SUBS)
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define ADD_SUB_CAP_OP_LIST(V) V(ADDCAP), V(SUBCAP),
+#endif // __CHERI_PURE_CAPABILITY__
+
 enum AddSubImmediateOp : uint32_t {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  AddSubCapabilityImmediateFixed = 0x02000000,
+  AddSubCapabilityImmediateFMask = 0xFF000000,
+  AddSubCapabilityImmediateMask = 0x0FF80000,
+  // 4.4.2 ADD (Immediate)
+  // Add (immediate_ copies a cpability from the source Capability register
+  // to the destination Capability register with an optionally shifted
+  // immediate value added to the value field.
+#define ADD_SUB_CAP_IMMEDIATE(A)            \
+  A##_c_imm = AddSubCapabilityImmediateFixed | A
+  ADD_SUB_CAP_OP_LIST(ADD_SUB_CAP_IMMEDIATE)
+#undef ADD_SUB_CAP_IMMEDIATE
+#endif // __CHERI_PURE_CAPABILITY__
   AddSubImmediateFixed = 0x11000000,
   AddSubImmediateFMask = 0x1F000000,
   AddSubImmediateMask = 0xFF000000,
@@ -596,6 +617,15 @@ enum AddSubShiftedOp : uint32_t {
 };
 
 enum AddSubExtendedOp : uint32_t {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  AddSubCapabilityExtendedFixed = 0xC2A00000,
+  AddSubCapabilityExtendedFMask = 0xFFE00000,
+  AddSubCapabilityExtendedMask = 0x0FF80000,
+#define ADD_SUB_CAP_EXTENDED(A)            \
+  A##_c_ext = AddSubCapabilityExtendedFixed | A
+  ADD_SUB_CAP_OP_LIST(ADD_SUB_CAP_EXTENDED)
+#undef ADD_SUB_CAP_IMMEDIATE
+#endif // __CHERI_PURE_CAPABILITY__
   AddSubExtendedFixed = 0x0B200000,
   AddSubExtendedFMask = 0x1F200000,
   AddSubExtendedMask = 0xFFE00000,
@@ -747,12 +777,21 @@ enum UnconditionalBranchOp : uint32_t {
 
 // Unconditional branch to register.
 enum UnconditionalBranchToRegisterOp : uint32_t {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  UnconditionalBranchToRegisterFixed = 0xC2C21000,
+  UnconditionalBranchToRegisterFMask = 0xFFFF9C1F,
+  UnconditionalBranchToRegisterMask = 0x00006000,
+  BR = UnconditionalBranchToRegisterFixed | 0x00000000,
+  BLR = UnconditionalBranchToRegisterFixed | 0x00002000,
+  RET = UnconditionalBranchToRegisterFixed | 0x00004000
+#else
   UnconditionalBranchToRegisterFixed = 0xD6000000,
   UnconditionalBranchToRegisterFMask = 0xFE000000,
   UnconditionalBranchToRegisterMask = 0xFFFFFC1F,
   BR = UnconditionalBranchToRegisterFixed | 0x001F0000,
   BLR = UnconditionalBranchToRegisterFixed | 0x003F0000,
   RET = UnconditionalBranchToRegisterFixed | 0x005F0000
+#endif // __CHERI_PURE_CAPABILITY__
 };
 
 // Compare and branch.
@@ -862,8 +901,20 @@ enum LoadStorePairAnyOp : uint32_t {
       V(STP, d, 0x44000000), V(LDP, d, 0x44400000), V(STP, q, 0x84000000), \
       V(LDP, q, 0x84400000)
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define LOAD_STORE_PAIR_CAP_OP_LIST(V)                                     \
+  V(LDP, c, 0x00400000), V(STP, c, 0x00000000),
+#endif // __CHERI_PURE_CAPABILITY__
+
 // Load/store pair (post, pre and offset.)
 enum LoadStorePairOp : uint32_t {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  LoadStorePairCapMask = 0xFFC00000,
+  LoadStorePairCapLBit = 1 << 22,
+#define LOAD_STORE_PAIR_CAP(A, B, C) A##_##B = C
+  LOAD_STORE_PAIR_CAP_OP_LIST(LOAD_STORE_PAIR_CAP)
+#undef LOAD_STORE_PAIR
+#endif // __CHERI_PURE_CAPABILITY__
   LoadStorePairMask = 0xC4400000,
   LoadStorePairLBit = 1 << 22,
 #define LOAD_STORE_PAIR(A, B, C) A##_##B = C
@@ -872,6 +923,15 @@ enum LoadStorePairOp : uint32_t {
 };
 
 enum LoadStorePairPostIndexOp : uint32_t {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  LoadStorePairCapPostIndexFixed = 0x22800000,
+  LoadStorePairCapPostIndexFMask = 0xFF800000,
+  LoadStorePairCapPostIndexMask = 0xFFC00000,
+#define LOAD_STORE_PAIR_CAP_POST_INDEX(A, B, C) \
+  A##_##B##_post = LoadStorePairCapPostIndexFixed | A##_##B
+  LOAD_STORE_PAIR_CAP_OP_LIST(LOAD_STORE_PAIR_CAP_POST_INDEX)
+#undef LOAD_STORE_PAIR_POST_INDEX
+#endif // __CHERI_PURE_CAPABILITY__
   LoadStorePairPostIndexFixed = 0x28800000,
   LoadStorePairPostIndexFMask = 0x3B800000,
   LoadStorePairPostIndexMask = 0xFFC00000,
@@ -882,6 +942,15 @@ enum LoadStorePairPostIndexOp : uint32_t {
 };
 
 enum LoadStorePairPreIndexOp : uint32_t {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  LoadStorePairCapPreIndexFixed = 0x62800000,
+  LoadStorePairCapPreIndexFMask = 0xFF800000,
+  LoadStorePairCapPreIndexMask = 0xFFC00000,
+#define LOAD_STORE_PAIR_CAP_PRE_INDEX(A, B, C) \
+  A##_##B##_pre = LoadStorePairCapPreIndexFixed | A##_##B
+  LOAD_STORE_PAIR_CAP_OP_LIST(LOAD_STORE_PAIR_CAP_PRE_INDEX)
+#undef LOAD_STORE_PAIR_PRE_INDEX
+#endif // __CHERI_PURE_CAPABILITY__
   LoadStorePairPreIndexFixed = 0x29800000,
   LoadStorePairPreIndexFMask = 0x3B800000,
   LoadStorePairPreIndexMask = 0xFFC00000,
@@ -892,6 +961,15 @@ enum LoadStorePairPreIndexOp : uint32_t {
 };
 
 enum LoadStorePairOffsetOp : uint32_t {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  LoadStorePairCapOffsetFixed = 0x42800000,
+  LoadStorePairCapOffsetFMask = 0xFF800000,
+  LoadStorePairCapOffsetMask = 0xFFC00000,
+#define LOAD_STORE_PAIR_CAP_OFFSET(A, B, C) \
+  A##_##B##_off = LoadStorePairCapOffsetFixed | A##_##B
+  LOAD_STORE_PAIR_CAP_OP_LIST(LOAD_STORE_PAIR_CAP_OFFSET)
+#undef LOAD_STORE_PAIR_OFFSET
+#endif // __CHERI_PURE_CAPABILITY__
   LoadStorePairOffsetFixed = 0x29000000,
   LoadStorePairOffsetFMask = 0x3B800000,
   LoadStorePairOffsetMask = 0xFFC00000,
@@ -900,50 +978,6 @@ enum LoadStorePairOffsetOp : uint32_t {
   LOAD_STORE_PAIR_OP_LIST(LOAD_STORE_PAIR_OFFSET)
 #undef LOAD_STORE_PAIR_OFFSET
 };
-
-#if defined(__CHERI_PURE_CAPABILITY__)
-#define LOAD_STORE_PAIR_CAP_OP_LIST(V)                                     \
-  V(LDP, c, 0x00400000), V(STP, c, 0x00000000),
-
-// Load/store pair cap (post, pre and offset.)
-enum LoadStorePairCapOp : uint32_t {
-  LoadStorePairCapMask = 0xFFC00000,
-  LoadStorePairCapLBit = 1 << 22,
-#define LOAD_STORE_PAIR_CAP(A, B, C) A##_##B = C
-  LOAD_STORE_PAIR_CAP_OP_LIST(LOAD_STORE_PAIR_CAP)
-#undef LOAD_STORE_PAIR
-};
-
-enum LoadStorePairCapPostIndexOp : uint32_t {
-  LoadStorePairCapPostIndexFixed = 0x22800000,
-  LoadStorePairCapPostIndexFMask = 0xFF800000,
-  LoadStorePairCapPostIndexMask = 0xFFC00000,
-#define LOAD_STORE_PAIR_CAP_POST_INDEX(A, B, C) \
-  A##_##B##_post = LoadStorePairCapPostIndexFixed | A##_##B
-  LOAD_STORE_PAIR_CAP_OP_LIST(LOAD_STORE_PAIR_CAP_POST_INDEX)
-#undef LOAD_STORE_PAIR_POST_INDEX
-};
-
-enum LoadStorePairCapPreIndexOp : uint32_t {
-  LoadStorePairCapPreIndexFixed = 0x62800000,
-  LoadStorePairCapPreIndexFMask = 0xFF800000,
-  LoadStorePairCapPreIndexMask = 0xFFC00000,
-#define LOAD_STORE_PAIR_CAP_PRE_INDEX(A, B, C) \
-  A##_##B##_pre = LoadStorePairCapPreIndexFixed | A##_##B
-  LOAD_STORE_PAIR_CAP_OP_LIST(LOAD_STORE_PAIR_CAP_PRE_INDEX)
-#undef LOAD_STORE_PAIR_PRE_INDEX
-};
-
-enum LoadStorePairCapOffsetOp : uint32_t {
-  LoadStorePairCapOffsetFixed = 0x42800000,
-  LoadStorePairCapOffsetFMask = 0xFF800000,
-  LoadStorePairCapOffsetMask = 0xFFC00000,
-#define LOAD_STORE_PAIR_CAP_OFFSET(A, B, C) \
-  A##_##B##_off = LoadStorePairCapOffsetFixed | A##_##B
-  LOAD_STORE_PAIR_CAP_OP_LIST(LOAD_STORE_PAIR_CAP_OFFSET)
-#undef LOAD_STORE_PAIR_OFFSET
-};
-#endif // __CHERI_PURE_CAPABILITY__
 
 // Load literal.
 enum LoadLiteralOp : uint32_t {
@@ -989,6 +1023,11 @@ enum LoadLiteralOp : uint32_t {
   V(LD, R, s,   0x84400000),   \
   V(LD, R, d,   0xC4400000),   \
   V(LD, R, q,   0x04C00000)
+
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define LOAD_STORE_CAP_OP_LIST(V)                                     \
+  V(LD, R, c, 0x00400000), V(ST, R, c, 0x00000000)
+#endif // __CHERI_PURE_CAPABILITY__
 
 // clang-format on
 
@@ -1047,6 +1086,12 @@ enum LoadStoreUnscaledOffsetOp : uint32_t {
 
 // Load/store (post, pre, offset and unsigned.)
 enum LoadStoreOp : uint32_t {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  LoadStoreCapMask = 0x00C00000,
+#define LOAD_STORE(A, B, C, D) A##B##_##C = D
+  LOAD_STORE_CAP_OP_LIST(LOAD_STORE),
+#undef LOAD_STORE
+#endif // __CHERI_PURE_CAPABILITY__
   LoadStoreMask = 0xC4C00000,
 #define LOAD_STORE(A, B, C, D) A##B##_##C = D
   LOAD_STORE_OP_LIST(LOAD_STORE),
@@ -1276,6 +1321,12 @@ enum ConditionalCompareImmediateOp : uint32_t {
 
 // Conditional select.
 enum ConditionalSelectOp : uint32_t {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  ConditionalSelectCapFixed = 0xC2C00C00,
+  ConditionalSelectCapFMask = 0xFFE00C00,
+  ConditionalSelectCapMask = 0xFFE00C00,
+  CSEL_c = ConditionalSelectCapFixed | 0x00000000,
+#endif // __CHERI_PURE_CAPABILITY__
   ConditionalSelectFixed = 0x1A800000,
   ConditionalSelectFMask = 0x1FE00000,
   ConditionalSelectMask = 0xFFE00C00,
@@ -2377,34 +2428,6 @@ enum UnallocatedOp : uint32_t {
 };
 
 #if defined(__CHERI_PURE_CAPABILITY__)
-enum AddSubCapabilityOp : uint32_t {
-  ADDCAP = 0x00000000,
-  SUBCAP = 0x00800000
-};
-
-#define ADD_SUB_CAP_OP_LIST(V) V(ADDCAP), V(SUBCAP)
-
-enum AddSubCapabilityImmediateOp : uint32_t {
-  AddSubCapabilityImmediateFixed = 0x02000000,
-  AddSubCapabilityImmediateFMask = 0xFF000000,
-  AddSubCapabilityImmediateMask = 0x0FF80000,
-  // 4.4.2 ADD (Immediate)
-  // Add (immediate_ copies a cpability from the source Capability register
-  // to the destination Capability register with an optionally shifted
-  // immediate value added to the value field.
-#define ADD_SUB_CAP_IMMEDIATE(A)            \
-  A##_c_imm = AddSubCapabilityImmediateFixed | A
-  ADD_SUB_CAP_OP_LIST(ADD_SUB_CAP_IMMEDIATE)
-#undef ADD_SUB_IMMEDIATE
-};
-
-enum AddSubCapabilityExtendedOp : uint32_t {
-  AddSubCapabilityExtendedFixed = 0xC2A00000,
-  AddSubCapabilityExtendedFMask = 0xFFE00000,
-  AddSubCapabilityExtendedMask = 0x0FF80000,
-  ADDCAP_c_ext = AddSubCapabilityExtendedFixed,
-};
-
 enum GetField1Op : uint32_t {
   GetField1Fixed = 0xC2C01000,
   GetField1FMask = 0xFFFF1C00,

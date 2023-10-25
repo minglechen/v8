@@ -820,12 +820,17 @@ class V8_EXPORT_PRIVATE Assembler : public AssemblerBase {
   // Add a capability
   void addc(const Register& ct, const Register& cn,
 	    const Operand& operand);
+  // Conditional select: cd = cond ? cn : cm.
+  void cselc(const Register& cd, const Register& cn, const Register& cm,
+            Condition cond);
   // Store a capability
   void strc(const Register& rt, const MemOperand& dst);
   // Load a capability
-  void ldrc(const Register& rt, const MemOperand& dst);
+  void ldrc(const Register& rt, const MemOperand& src);
+  void ldrc(const Register& rt, const Operand& operand);
+  void ldrc(const Register& rt, const Immediate& imm);
   // Copies a capability register
-  void cpy(const Register& ct, const Register& cn);
+  void cpy(const Register& cd, const Register& cn);
   // Subtract a capability
   void subc(const Register& ct, const Register& cn,
 	    const Operand& operand);
@@ -835,10 +840,9 @@ class V8_EXPORT_PRIVATE Assembler : public AssemblerBase {
   // Load a pair of capabilities
   void ldpc(const Register& ct, const Register& ct2,
             const MemOperand& src);
-  // Store a capability value field
-  void gcvalue(const Register& cd, const Register& cn,
-	       const Register& rm);
   // Load a capability value field
+  void gcvalue(const Register& cd, const Register& rd);
+  // Store a capability value field
   void scvalue(const Register& cd, const Register& cn,
 	       const Register& rm);
 #endif // __CHERI_PURE_CAPABILITY__
@@ -2544,9 +2548,9 @@ class V8_EXPORT_PRIVATE Assembler : public AssemblerBase {
   void LoadStoreCapability(const Register& ct, const MemOperand& addr,
 		           const LoadStoreCapOp op);
   void AddSubCapability(const Register& cd, const Register& cn,
-                        const Operand& operand, AddSubCapabilityOp op);
+                        const Operand& operand, AddSubOp op);
   void LoadStorePairCap(const Register& rt, const Register& rt2,
-                        const MemOperand& addr, LoadStorePairCapOp op);
+                        const MemOperand& addr, LoadStorePairOp op);
 #endif // __CHERI_PURE_CAPABILITY__
   void LoadStorePair(const CPURegister& rt, const CPURegister& rt2,
                      const MemOperand& addr, LoadStorePairOp op);
@@ -2602,6 +2606,10 @@ class V8_EXPORT_PRIVATE Assembler : public AssemblerBase {
   static inline LoadStorePairOp StorePairOpFor(const CPURegister& rt,
                                                const CPURegister& rt2);
   static inline LoadLiteralOp LoadLiteralOpFor(const CPURegister& rt);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  static inline AddSubOp AddOpFor(const CPURegister& rt);
+  static inline AddSubOp SubOpFor(const CPURegister& rt);
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Remove the specified branch from the unbound label link chain.
   // If available, a veneer for this label can be used for other branches in the

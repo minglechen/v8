@@ -4115,8 +4115,12 @@ int DisassemblingDecoder::SubstituteImmediateField(Instruction* instr,
     case 'A': {  // IAddSub.
 #if defined(__CHERI_PURE_CAPABILITY__)
       if (format[7] == 'C') { // IAddSubC
-        DCHECK_LE(instr->ShiftAddSubCapability(), 1);
-        int64_t imm = instr->ImmAddSubCapability() << (12 * instr->ShiftAddSubCapability());
+	// Note: In the Morello capabiltiy add immediate instruction bit 23 is
+	// used to differentiate the addition and subtraction. Using the
+	// ShiftAddSub getter erronously accessess both bits 22 and 23
+	// causing the immediate value to be incorrectly calculated. 
+        int64_t imm = instr->ImmAddSubCapability() <<
+            (12 * instr->Bit(ShiftAddSubCapability_offset));
         AppendToOutput("#0x%" PRIx64 " (%" PRId64 ")", imm, imm);
         return 8;
       }

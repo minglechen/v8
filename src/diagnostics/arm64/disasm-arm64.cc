@@ -1006,6 +1006,9 @@ void DisassemblingDecoder::VisitLoadLiteral(Instruction* instr) {
   V(LDP_q, "ldp", "'Qt, 'Qt2", "4")     \
   V(STP_q, "stp", "'Qt, 'Qt2", "4")
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+#endif // __CHERI_PURE_CAPABILITY__
+
 void DisassemblingDecoder::VisitLoadStorePairPostIndex(Instruction* instr) {
   const char* mnemonic = "unimplemented";
   const char* form = "(LoadStorePairPostIndex)";
@@ -4024,7 +4027,7 @@ int DisassemblingDecoder::SubstituteRegisterField(Instruction* instr,
       return field_len;
 #if defined(__CHERI_PURE_CAPABILITY__)
     case 'Y':
-      reg_type = CPURegister::kCRegister;
+      reg_type = CPURegister::kRegister;
       reg_size = kCRegSizeInBits;
       break;
 #endif // __CHERI_PURE_CAPABILITY__
@@ -4036,13 +4039,6 @@ int DisassemblingDecoder::SubstituteRegisterField(Instruction* instr,
       (format[2] == 's')) {
     reg_num = kSPRegInternalCode;
   }
-
-#if defined(__CHERI_PURE_CAPABILITY__)
-  if ((reg_type == CPURegister::kCRegister) && (reg_num == kZeroRegCode) &&
-      (format[2] == 's')) {
-    reg_num = kSPRegInternalCode;
-  }
-#endif // __CHERI_PURE_CAPABILITY__
 
   AppendRegisterNameToOutput(CPURegister::Create(reg_num, reg_size, reg_type));
 
@@ -4122,7 +4118,7 @@ int DisassemblingDecoder::SubstituteImmediateField(Instruction* instr,
         DCHECK_LE(instr->ShiftAddSubCapability(), 1);
         int64_t imm = instr->ImmAddSubCapability() << (12 * instr->ShiftAddSubCapability());
         AppendToOutput("#0x%" PRIx64 " (%" PRId64 ")", imm, imm);
-        return 10;
+        return 8;
       }
 #endif // __CHERI_PURE_CAPABILITY
       DCHECK_LE(instr->ShiftAddSub(), 1);

@@ -154,6 +154,9 @@ Address ExternalCodeCompressionScheme::DecompressTaggedPointer(
 #else
   Address cage_base = GetPtrComprCageBaseAddress(on_heap_addr);
 #endif
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __attribute__((cheri_no_provenance))
+#endif // __CHERI_PURE_CAPABILITY__
   Address diff = static_cast<Address>(static_cast<uint32_t>(raw_value)) -
                  static_cast<Address>(static_cast<uint32_t>(cage_base));
   // The cage base value was chosen such that it's less or equal than any

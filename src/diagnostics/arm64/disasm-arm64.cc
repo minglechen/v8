@@ -3803,11 +3803,23 @@ void DisassemblingDecoder::AppendRegisterNameToOutput(const CPURegister& reg) {
   if (reg.IsVRegister() || !(reg.Aliases(sp) || reg.Aliases(xzr))) {
 #endif // _CHERI_PRE_CAPABILITY__
     // Filter special registers
+#if defined(__CHERI_PURE_CAPABILITY__)
+    if (reg.IsC() && (reg.code() == 27)) {
+#else
     if (reg.IsX() && (reg.code() == 27)) {
+#endif // _CHERI_PRE_CAPABILITY__
       AppendToOutput("cp");
+#if defined(__CHERI_PURE_CAPABILITY__)
+    } else if (reg.IsC() && (reg.code() == 29)) {
+#else
     } else if (reg.IsX() && (reg.code() == 29)) {
+#endif // _CHERI_PRE_CAPABILITY__
       AppendToOutput("fp");
+#if defined(__CHERI_PURE_CAPABILITY__)
+    } else if (reg.IsC() && (reg.code() == 30)) {
+#else
     } else if (reg.IsX() && (reg.code() == 30)) {
+#endif // _CHERI_PRE_CAPABILITY__
       AppendToOutput("lr");
     } else {
       // A core or scalar/vector register: [wx]0 - 30, [bhsdq]0 - 31.

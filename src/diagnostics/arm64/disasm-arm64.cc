@@ -1006,9 +1006,6 @@ void DisassemblingDecoder::VisitLoadLiteral(Instruction* instr) {
   V(LDP_q, "ldp", "'Qt, 'Qt2", "4")     \
   V(STP_q, "stp", "'Qt, 'Qt2", "4")
 
-#if defined(__CHERI_PURE_CAPABILITY__)
-#endif // __CHERI_PURE_CAPABILITY__
-
 void DisassemblingDecoder::VisitLoadStorePairPostIndex(Instruction* instr) {
   const char* mnemonic = "unimplemented";
   const char* form = "(LoadStorePairPostIndex)";
@@ -1085,8 +1082,8 @@ LOAD_STORE_PAIR_LIST(LSP_OFFSET)
 
 #if defined(__CHERI_PURE_CAPABILITY__)
 #define LOAD_STORE_PAIR_CAP_LIST(V)     \
-  V(STP_x, "stp", "'Yt, 'Yt2", "4")     \
-  V(LDP_x, "ldr", "'Yt, 'Yt2", "4")
+  V(STP_c, "stp", "'Yt, 'Yt2", "4")     \
+  V(LDP_c, "ldp", "'Yt, 'Yt2", "4")
 
 void DisassemblingDecoder::VisitLoadStorePairCapPostIndex(Instruction* instr) {
   const char* mnemonic = "unimplemented";
@@ -1096,7 +1093,7 @@ void DisassemblingDecoder::VisitLoadStorePairCapPostIndex(Instruction* instr) {
 #define LSP_POSTINDEX(A, B, C, D) \
   case A##_post:                  \
     mnemonic = B;                 \
-    form = C ", ['Yns]'ILP 4";    \
+    form = C ", ['Yns]'ILP4";    \
     break;
     LOAD_STORE_PAIR_CAP_LIST(LSP_POSTINDEX)
 #undef LSP_POSTINDEX
@@ -1112,7 +1109,7 @@ void DisassemblingDecoder::VisitLoadStorePairCapPreIndex(Instruction* instr) {
 #define LSP_PREINDEX(A, B, C, D)   \
   case A##_pre:                    \
     mnemonic = B;                  \
-    form = C ", ['Yns'ILP 4 ]!";   \
+    form = C ", ['Yns'ILP4 ]!";   \
     break;
     LOAD_STORE_PAIR_CAP_LIST(LSP_PREINDEX)
 #undef LSP_PREINDEX
@@ -1128,7 +1125,7 @@ void DisassemblingDecoder::VisitLoadStorePairCapOffset(Instruction* instr) {
 #define LSP_OFFSET(A, B, C, D)    \
   case A##_off:                   \
     mnemonic = B;                 \
-    form = C ", ['Yns'ILP 4 ]";   \
+    form = C ", ['Yns'ILP4 ]";   \
     break;
 LOAD_STORE_PAIR_CAP_LIST(LSP_OFFSET)
 #undef LSP_OFFSET

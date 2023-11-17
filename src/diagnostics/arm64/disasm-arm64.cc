@@ -3772,7 +3772,7 @@ void DisassemblingDecoder::AppendRegisterNameToOutput(const CPURegister& reg) {
   if (reg.IsRegister()) {
     reg_char = reg.Is64Bits() ? 'x' : 'w';
 #if defined(__CHERI_PURE_CAPABILITY__)
-  } else if (reg.IsCRegister()) {
+  } else if (reg.IsC()) {
     reg_char = 'c';
 #endif // __CHERI_PURE_CAPABILITY
   } else {
@@ -3815,11 +3815,10 @@ void DisassemblingDecoder::AppendRegisterNameToOutput(const CPURegister& reg) {
     }
   } else if (reg.Aliases(sp)) {
     // Disassemble w31/x31 as stack pointer wsp/sp.
-    AppendToOutput("%s", reg.Is64Bits() ? "sp" : "wsp");
 #if defined(__CHERI_PURE_CAPABILITY__)
-  } else if (reg.Aliases(csp)) {
-    DCHECK(reg.Is128Bits());
-    AppendToOutput("csp");
+    AppendToOutput("%s", reg.Is128Bits() ? "csp" : reg.Is64Bits() ? "sp" : "wsp");
+#else
+    AppendToOutput("%s", reg.Is64Bits() ? "sp" : "wsp");
 #endif // _CHERI_PRE_CAPABILITY__
   } else {
     // Disassemble w31/x31 as zero register wzr/xzr.

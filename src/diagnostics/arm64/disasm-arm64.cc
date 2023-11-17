@@ -3749,7 +3749,7 @@ void DisassemblingDecoder::VisitGetField1(Instruction* instr) {
 
 void DisassemblingDecoder::VisitSetField1(Instruction* instr) {
   DCHECK(instr->Mask(SetField1FMask) == SetField1Fixed);
-  const char* form = "'Xd, 'Yns";
+  const char* form = "'Yds, 'Yns, 'Xm";
   switch(instr->Mask(SetField1Mask)) {
     case SCVALUE:
       Format(instr, "scvalue", form);
@@ -3770,10 +3770,10 @@ void DisassemblingDecoder::AppendRegisterNameToOutput(const CPURegister& reg) {
   char reg_char;
 
   if (reg.IsRegister()) {
-    reg_char = reg.Is64Bits() ? 'x' : 'w';
 #if defined(__CHERI_PURE_CAPABILITY__)
-  } else if (reg.IsC()) {
-    reg_char = 'c';
+    reg_char = reg.Is128Bits() ? 'c' : reg.Is64Bits() ? 'x' : 'w';
+#else
+    reg_char = reg.Is64Bits() ? 'x' : 'w';
 #endif // __CHERI_PURE_CAPABILITY
   } else {
     DCHECK(reg.IsVRegister());

@@ -115,11 +115,7 @@ enum CapabilityRegisterCode {
 
 class CPURegister : public RegisterBase<CPURegister, kRegAfterLast> {
  public:
-#if defined(__CHERI_PURE_CAPABILITY__)
-  enum RegisterType : int8_t { kRegister, kCRegister, kVRegister, kNoRegister };
-#else
   enum RegisterType : int8_t { kRegister, kVRegister, kNoRegister };
-#endif // __CHERI_PURE_CAPABILITY__
 
   static constexpr CPURegister no_reg() {
     return CPURegister{kCode_no_reg, 0, kNoRegister};
@@ -184,9 +180,7 @@ class CPURegister : public RegisterBase<CPURegister, kRegAfterLast> {
   bool IsX() const { return IsRegister() && Is64Bits(); }
 
 #if defined(__CHERI_PURE_CAPABILITY__)
-  bool IsCSP() const;
-  bool IsCRegister() const { return reg_type_ == kCRegister; }
-  bool IsC() const { return IsCRegister() && Is128Bits(); }
+  bool IsC() const { return IsRegister() && Is128Bits(); }
 #endif // __CHERI_PURE_CAPABILITY__
 
   // These assertions ensure that the size and type of the register are as
@@ -234,16 +228,14 @@ class CPURegister : public RegisterBase<CPURegister, kRegAfterLast> {
       : RegisterBase(code), reg_size_(size), reg_type_(type) {}
 
   static constexpr bool IsValidRegister(int code, int size) {
-    return (size == kWRegSizeInBits || size == kXRegSizeInBits) &&
-           (code < kNumberOfRegisters || code == kSPRegInternalCode);
-  }
-
 #if defined(__CHERI_PURE_CAPABILITY__)
-  static constexpr bool IsValidCRegister(int code, int size) {
-    return (size == kCRegSizeInBits) &&
+    return (size == kWRegSizeInBits || size == kXRegSizeInBits ||
+            size == kCRegSizeInBits) &&
+#else
+    return (size == kWRegSizeInBits || size == kXRegSizeInBits) &&
+#endif // __CHERI_PURE_CAPABILITY__
            (code < kNumberOfRegisters || code == kSPRegInternalCode);
   }
-#endif // __CHERI_PURE_CAPABILITY__
 
   static constexpr bool IsValidVRegister(int code, int size) {
     return (size == kBRegSizeInBits || size == kHRegSizeInBits ||
@@ -255,7 +247,7 @@ class CPURegister : public RegisterBase<CPURegister, kRegAfterLast> {
   static constexpr bool IsValid(int code, int size, RegisterType type) {
     return (type == kRegister && IsValidRegister(code, size)) ||
 #if defined(__CHERI_PURE_CAPABILITY__)
-           (type == kCRegister && IsValidCRegister(code, size)) ||
+           (type == kRegister && IsValidRegister(code, size)) ||
 #endif // __CHERI_PURE_CAPABILITY__
            (type == kVRegister && IsValidVRegister(code, size));
   }
@@ -513,10 +505,10 @@ DEFINE_REGISTER(Register, wsp, kSPRegInternalCode, kWRegSizeInBits);
 DEFINE_REGISTER(Register, sp, kSPRegInternalCode, kXRegSizeInBits);
 #if defined(__CHERI_PURE_CAPABILITY__)
 #define DEFINE_REGISTERS(N)                            \
-  DEFINE_REGISTER(Register, c##N, N, kCRegSizeInBits, CPURegister::kCRegister);
+  DEFINE_REGISTER(Register, c##N, N, kCRegSizeInBits);
 CAPABILITY_REGISTER_CODE_LIST(DEFINE_REGISTERS)
 #undef DEFINE_REGISTERS
-DEFINE_REGISTER(Register, csp, kSPRegInternalCode, kCRegSizeInBits, CPURegister::kCRegister);
+DEFINE_REGISTER(Register, csp, kSPRegInternalCode, kCRegSizeInBits);
 #endif // __CHERI_PURE_CAPABILITY__
 
 #define DEFINE_VREGISTERS(N)                            \
@@ -533,27 +525,55 @@ GENERAL_REGISTER_CODE_LIST(DEFINE_VREGISTERS)
 
 // Registers aliases.
 ALIAS_REGISTER(VRegister, v8_, v8);  // Avoid conflicts with namespace v8.
+#if defined(__CHERI_PURE_CAPABILITY__)
+ALIAS_REGISTER(Register, ip0, c16);
+ALIAS_REGISTER(Register, ip1, c17);
+#else
 ALIAS_REGISTER(Register, ip0, x16);
 ALIAS_REGISTER(Register, ip1, x17);
+#endif // _CHERI_PURE_CAPABILITY
 ALIAS_REGISTER(Register, wip0, w16);
 ALIAS_REGISTER(Register, wip1, w17);
 // Root register.
+#if defined(__CHERI_PURE_CAPABILITY__)
+ALIAS_REGISTER(Register, kRootRegister, c26);
+ALIAS_REGISTER(Register, rr, c26);
+#else
 ALIAS_REGISTER(Register, kRootRegister, x26);
 ALIAS_REGISTER(Register, rr, x26);
+#endif // _CHERI_PURE_CAPABILITY
 // Pointer cage base register.
 #ifdef V8_COMPRESS_POINTERS_IN_SHARED_CAGE
+#if defined(__CHERI_PURE_CAPABILITY__)
+ALIAS_REGISTER(Register, kPtrComprCageBaseRegister, c28);
+#else
 ALIAS_REGISTER(Register, kPtrComprCageBaseRegister, x28);
+#endif // _CHERI_PURE_CAPABILITY
+#else
+#if defined(__CHERI_PURE_CAPABILITY__)
+ALIAS_REGISTER(Register, kPtrComprCageBaseRegister, kRootRegister);
 #else
 ALIAS_REGISTER(Register, kPtrComprCageBaseRegister, kRootRegister);
+#endif // _CHERI_PURE_CAPABILITY
 #endif
 // Context pointer register.
+#if defined(__CHERI_PURE_CAPABILITY__)
+ALIAS_REGISTER(Register, cp, c27);
+ALIAS_REGISTER(Register, fp, c29);
+ALIAS_REGISTER(Register, lr, c30);
+#else
 ALIAS_REGISTER(Register, cp, x27);
 ALIAS_REGISTER(Register, fp, x29);
 ALIAS_REGISTER(Register, lr, x30);
+#endif // _CHERI_PURE_CAPABILITY
 ALIAS_REGISTER(Register, xzr, x31);
 ALIAS_REGISTER(Register, wzr, w31);
 
 // Register used for padding stack slots.
+#if defined(__CHERI_PURE_CAPABILITY__)
+ALIAS_REGISTER(Register, padregc, c31);
+ALIAS_REGISTER(Register, padregx, x31);
+#endif // _CHERI_PURE_CAPABILITY
 ALIAS_REGISTER(Register, padreg, x31);
 
 // Keeps the 0 double value.
@@ -619,6 +639,32 @@ DEFINE_REGISTER_NAMES(Register, GENERAL_REGISTERS)
 DEFINE_REGISTER_NAMES(VRegister, VECTOR_REGISTERS)
 
 // Give alias names to registers for calling conventions.
+#if defined(__CHERI_PURE_CAPABILITY__)
+constexpr Register kReturnRegister0 = c0;
+constexpr Register kReturnRegister1 = c1;
+constexpr Register kReturnRegister2 = c2;
+constexpr Register kJSFunctionRegister = c1;
+constexpr Register kContextRegister = cp;
+constexpr Register kAllocateSizeRegister = c1;
+
+constexpr Register kInterpreterAccumulatorRegister = c0;
+constexpr Register kInterpreterBytecodeOffsetRegister = x19;
+constexpr Register kInterpreterBytecodeArrayRegister = c20;
+constexpr Register kInterpreterDispatchTableRegister = c21;
+
+constexpr Register kJavaScriptCallArgCountRegister = x0;
+constexpr Register kJavaScriptCallCodeStartRegister = c2;
+constexpr Register kJavaScriptCallTargetRegister = kJSFunctionRegister;
+constexpr Register kJavaScriptCallNewTargetRegister = c3;
+constexpr Register kJavaScriptCallExtraArg1Register = c2;
+
+constexpr Register kOffHeapTrampolineRegister = ip0;
+constexpr Register kRuntimeCallFunctionRegister = c1;
+constexpr Register kRuntimeCallArgCountRegister = c0;
+constexpr Register kRuntimeCallArgvRegister = c11;
+constexpr Register kWasmInstanceRegister = c7;
+constexpr Register kWasmCompileLazyFuncIndexRegister = c8;
+#else
 constexpr Register kReturnRegister0 = x0;
 constexpr Register kReturnRegister1 = x1;
 constexpr Register kReturnRegister2 = x2;
@@ -643,6 +689,7 @@ constexpr Register kRuntimeCallArgCountRegister = x0;
 constexpr Register kRuntimeCallArgvRegister = x11;
 constexpr Register kWasmInstanceRegister = x7;
 constexpr Register kWasmCompileLazyFuncIndexRegister = x8;
+#endif // _CHERI_PURE_CAPABILITY
 
 constexpr DoubleRegister kFPReturnRegister0 = d0;
 

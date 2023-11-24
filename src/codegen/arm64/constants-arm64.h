@@ -563,12 +563,16 @@ enum PCRelAddressingOp : uint32_t {
 // Add/sub (immediate, shifted and extended.)
 const int kSFOffset = 31;
 enum AddSubOp : uint32_t {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  ADD_c = 0x00000000,
+  SUB_c = 0x00800000,
+  CompareCapabilitiesFixed = 0xC2E09800,
+  CompareCapabilitiesFMask = 0xC2E09800,
+  CompareCapabilitiesMask = 0xC2E09800,
+  SUBS_c = CompareCapabilitiesFixed,
+#endif // __CHERI_PURE_CAPABILITY__
   AddSubOpMask = 0x60000000,
   AddSubSetFlagsBit = 0x20000000,
-#if defined(__CHERI_PURE_CAPABILITY__)
-  ADDCAP = 0x00000000,
-  SUBCAP = 0x00800000,
-#endif // __CHERI_PURE_CAPABILITY__
   ADD = 0x00000000,
   ADDS = ADD | AddSubSetFlagsBit,
   SUB = 0x40000000,
@@ -578,20 +582,20 @@ enum AddSubOp : uint32_t {
 #define ADD_SUB_OP_LIST(V) V(ADD), V(ADDS), V(SUB), V(SUBS)
 
 #if defined(__CHERI_PURE_CAPABILITY__)
-#define ADD_SUB_CAP_OP_LIST(V) V(ADDCAP), V(SUBCAP),
+#define ADD_SUB_CAP_OP_LIST(V) V(ADD_c), V(SUB_c),
 #endif // __CHERI_PURE_CAPABILITY__
 
 enum AddSubImmediateOp : uint32_t {
 #if defined(__CHERI_PURE_CAPABILITY__)
-  AddSubCapabilityImmediateFixed = 0x02000000,
-  AddSubCapabilityImmediateFMask = 0xFF000000,
-  AddSubCapabilityImmediateMask = 0x0FF80000,
+  AddSubCapImmediateFixed = 0x02000000,
+  AddSubCapImmediateFMask = 0xFF000000,
+  AddSubCapImmediateMask = 0xFFC00000,
   // 4.4.2 ADD (Immediate)
-  // Add (immediate_ copies a cpability from the source Capability register
+  // Add (immediate_ copies a capability from the source Capability register
   // to the destination Capability register with an optionally shifted
   // immediate value added to the value field.
 #define ADD_SUB_CAP_IMMEDIATE(A)            \
-  A##_c_imm = AddSubCapabilityImmediateFixed | A
+  A##_imm = AddSubCapImmediateFixed | A
   ADD_SUB_CAP_OP_LIST(ADD_SUB_CAP_IMMEDIATE)
 #undef ADD_SUB_CAP_IMMEDIATE
 #endif // __CHERI_PURE_CAPABILITY__
@@ -618,13 +622,14 @@ enum AddSubShiftedOp : uint32_t {
 
 enum AddSubExtendedOp : uint32_t {
 #if defined(__CHERI_PURE_CAPABILITY__)
-  AddSubCapabilityExtendedFixed = 0xC2A00000,
-  AddSubCapabilityExtendedFMask = 0xFFE00000,
-  AddSubCapabilityExtendedMask = 0x0FF80000,
-#define ADD_SUB_CAP_EXTENDED(A)            \
-  A##_c_ext = AddSubCapabilityExtendedFixed | A
-  ADD_SUB_CAP_OP_LIST(ADD_SUB_CAP_EXTENDED)
-#undef ADD_SUB_CAP_IMMEDIATE
+  AddSubCapExtendedFixed = 0xC2A00000,
+  AddSubCapExtendedFMask = 0xFFE00000,
+  AddSubCapExtendedMask = 0xFFE00000,
+  // 4.1.1 Add (extended register)
+  // Add (extend register) adds a Capability register value field and a sign
+  // or zero-extened register value, followed by an optional left shift amount,
+  // and writes the result to the destination Cpability register value field.
+  ADD_c_ext = AddSubCapExtendedFixed,
 #endif // __CHERI_PURE_CAPABILITY__
   AddSubExtendedFixed = 0x0B200000,
   AddSubExtendedFMask = 0x1F200000,
@@ -734,6 +739,9 @@ enum CopyCapabilityOp : uint32_t {
   CopyCapabilityFixed = 0xC2C19000,
   CopyCapabilityFMask = 0xFFFF9C00,
   CopyCapabilityMask = 0xFFFFFC00,
+  // 4.4.35 CPY
+  // Copy Capability register copies a capability from the source Capability
+  // register to the destination Capability register.
   CPY = CopyCapabilityFixed | 0x00004000,
 };
 #endif // __CHERI_PURE_CAPABILITY__
@@ -780,9 +788,19 @@ enum UnconditionalBranchToRegisterOp : uint32_t {
 #if defined(__CHERI_PURE_CAPABILITY__)
   UnconditionalBranchToRegisterFixed = 0xC2C21000,
   UnconditionalBranchToRegisterFMask = 0xFFFF9C1F,
-  UnconditionalBranchToRegisterMask = 0x00006000,
-  BR = UnconditionalBranchToRegisterFixed | 0x00000000,
+  UnconditionalBranchToRegisterMask = 0xFFFFFC1F,
+  // 4.4.14 BR (indirect)
+  // Branch to capability Regsiter branches unconditionally to an address in a
+  // Capability register, with a hint that this is not a subroutine return.
+  BR = UnconditionalBranchToRegisterFixed,
+  // 4.4.9 BLR (indirect)
+  // Branch with Link to capability Register calls a subroutine at an
+  // address in the source register, setting C30 tp PCC+4.
   BLR = UnconditionalBranchToRegisterFixed | 0x00002000,
+  // 4.4.108 RET
+  // Return from subroutine branches unconditionally to an address in the
+  // source Capability register, with a hint that this is a subroutine
+  // return.
   RET = UnconditionalBranchToRegisterFixed | 0x00004000
 #else
   UnconditionalBranchToRegisterFixed = 0xD6000000,
@@ -884,12 +902,20 @@ enum SystemPAuthOp : uint32_t {
 
 // Any load or store (including pair).
 enum LoadStoreAnyOp : uint32_t {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  LoadStoreCapAnyFMask = 0x82000000,
+  LoadStoreCapAnyFixed = 0xFF000000,
+#endif // __CHERI_PURE_CAPABILITY__
   LoadStoreAnyFMask = 0x0a000000,
   LoadStoreAnyFixed = 0x08000000
 };
 
 // Any load pair or store pair.
 enum LoadStorePairAnyOp : uint32_t {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  LoadStorePairCapAnyFMask = 0xFF800000,
+  LoadStorePairCapAnyFixed = 0x02800000,
+#endif // __CHERI_PURE_CAPABILITY__
   LoadStorePairAnyFMask = 0x3a000000,
   LoadStorePairAnyFixed = 0x28000000
 };
@@ -902,8 +928,9 @@ enum LoadStorePairAnyOp : uint32_t {
       V(LDP, q, 0x84400000)
 
 #if defined(__CHERI_PURE_CAPABILITY__)
-#define LOAD_STORE_PAIR_CAP_OP_LIST(V)                                     \
-  V(LDP, c, 0x00400000), V(STP, c, 0x00000000),
+#define LOAD_STORE_PAIR_CAP_OP_LIST(V)    \
+  V(LDP, c, 0x00400000),                  \
+  V(STP, c, 0x00000000),
 #endif // __CHERI_PURE_CAPABILITY__
 
 // Load/store pair (post, pre and offset.)
@@ -981,15 +1008,19 @@ enum LoadStorePairOffsetOp : uint32_t {
 
 // Load literal.
 enum LoadLiteralOp : uint32_t {
-  LoadLiteralFixed = 0x18000000,
-  LoadLiteralFMask = 0x3B000000,
-  LoadLiteralMask = 0xFF000000,
 #if defined(__CHERI_PURE_CAPABILITY__)
+  LoadLiteralCapFixed = 0x82000000,
+  LoadLiteralCapFMask = 0xFFC00000,
+  LoadLiteralCapMask = 0xFFC00000,
+  // 4.2.39 LDR (literal)
   // Load capability (literal) calculates an address from the PCC and an
   // immediate offset, loads a capability from memory and writes it to a
   // Capability register.
   LDR_c_lit = 0x82000000,
 #endif // __CHERI_PURE_CAPABILITY__
+  LoadLiteralFixed = 0x18000000,
+  LoadLiteralFMask = 0x3B000000,
+  LoadLiteralMask = 0xFF000000,
   LDR_w_lit = LoadLiteralFixed | 0x00000000,
   LDR_x_lit = LoadLiteralFixed | 0x40000000,
   LDRSW_x_lit = LoadLiteralFixed | 0x80000000,
@@ -1025,8 +1056,9 @@ enum LoadLiteralOp : uint32_t {
   V(LD, R, q,   0x04C00000)
 
 #if defined(__CHERI_PURE_CAPABILITY__)
-#define LOAD_STORE_CAP_OP_LIST(V)                                     \
-  V(LD, R, c, 0x00400000), V(ST, R, c, 0x00000000)
+#define LOAD_STORE_CAP_OP_LIST(V)    \
+  V(LD, R, c, 0x00400000),           \
+  V(ST, R, c, 0x00000000)
 #endif // __CHERI_PURE_CAPABILITY__
 
 // clang-format on
@@ -1034,45 +1066,45 @@ enum LoadLiteralOp : uint32_t {
 // Load/store unscaled offset.
 enum LoadStoreUnscaledOffsetOp : uint32_t {
 #if defined(__CHERI_PURE_CAPABILITY__)
-  LoadStoreCapUnscaledOffsetAlternativeBaseFixed = 0xE2000000,
-  LoadStoreCapUnscaledOffsetAlternativeBaseFMask = 0xFF000000,
-  LoadStoreCapUnscaledOffsetAlternativeBaseMask = 0x00C00600,
-  LoadCapUnscaledOffsetAlternativeBase = 0x00C00C00,
-  StoreCapUnscaledOffsetAlternativeBase = 0x00800C00,
-  LoadStoreCapUnscaledOffsetNormalBaseFixed = 0xA2000000,
-  LoadStoreCapUnscaledOffsetNormalBaseFMask = 0xFF000000,
-  LoadStoreCapUnscaledOffsetNormalBaseMask = 0x00C00600,
-  LoadCapUnscaledOffsetNormalBase = 0x00400000,
-  StoreCapUnscaledOffsetNormalBase = 0x00000000,
+  LoadStoreCapUnscaledOffsetAlternativeFixed = 0xE2000000,
+  LoadStoreCapUnscaledOffsetAlternativeFMask = 0xFF000000,
+  LoadStoreCapUnscaledOffsetAlternativeMask = 0xFFC00600,
+  LoadCapUnscaledOffsetAlternative = 0x00C00C00,
+  StoreCapUnscaledOffsetAlternative = 0x00800C00,
+  LoadStoreCapUnscaledOffsetNormalFixed = 0xA2000000,
+  LoadStoreCapUnscaledOffsetNormalFMask = 0xFF200C00,
+  LoadStoreCapUnscaledOffsetNormalMask = 0xFFE00C00,
+  LoadCapUnscaledOffsetNormal = 0x00400000,
+  StoreCapUnscaledOffsetNormal = 0x00000000,
   LoadStoreCapUnscaledOffsetIntegerFixed = 0xA2000000,
   LoadStoreCapUnscaledOffsetIntegerFMask = 0xFF000000,
-  LoadStoreCapUnscaledOffsetIntegerMask = 0x00C00600,
+  LoadStoreCapUnscaledOffsetIntegerMask = 0xFFC00600,
   LoadCapUnscaledOffsetInteger = 0x00000400,
   StoreCapUnscaledOffsetInteger = 0x00000000,
   LoadStoreCapUnscaledOffsetIntegerDoubleword = 0x00C00000,
   LoadStoreCapUnscaledOffsetIntegerWord = 0x00800000,
 
   // 4.4.92 LDUR (capability, alternative base)
-  LDRU_c_capability_alternative = LoadStoreCapUnscaledOffsetAlternativeBaseFixed |
-	                          LoadCapUnscaledOffsetAlternativeBase,
+  LDRU_c_capability_alternative = LoadStoreCapUnscaledOffsetAlternativeFixed |
+	                          LoadCapUnscaledOffsetAlternative,
   // 4.4.93 LDUR (capability, normal base)
-  LDRU_c_capability_normal = LoadStoreCapUnscaledOffsetNormalBaseFixed |
-	                     LoadCapUnscaledOffsetNormalBase,
+  LDRU_c_normal = LoadStoreCapUnscaledOffsetNormalFixed |
+	          LoadCapUnscaledOffsetNormal,
+  // 4.4.148 STUR (capability, normal base)
+  STRU_c_normal = LoadStoreCapUnscaledOffsetNormalFixed |
+	          StoreCapUnscaledOffsetNormal,
   // 4.4.94 LDUR (integer)
-  LDRU_c_integer_w = LoadStoreCapUnscaledOffsetNormalBaseFixed |
+  LDRU_c_integer_w = LoadStoreCapUnscaledOffsetNormalFixed |
 	             LoadCapUnscaledOffsetInteger | LoadStoreCapUnscaledOffsetIntegerWord,
-  LDRU_c_integer_d = LoadStoreCapUnscaledOffsetNormalBaseFixed |
+  LDRU_c_integer_d = LoadStoreCapUnscaledOffsetNormalFixed |
 	             LoadCapUnscaledOffsetInteger | LoadStoreCapUnscaledOffsetIntegerDoubleword,
   // 4.4.147 STUR (capability, alternative base)
-  STRU_c_capability_alternative = LoadStoreCapUnscaledOffsetAlternativeBaseFixed |
-	                          StoreCapUnscaledOffsetAlternativeBase,
-  // 4.4.148 STUR (capability, normal base)
-  STRU_c_unscaled_capability_normal = LoadStoreCapUnscaledOffsetNormalBaseFixed |
-	                              StoreCapUnscaledOffsetNormalBase,
+  STRU_c_capability_alternative = LoadStoreCapUnscaledOffsetAlternativeFixed |
+	                          StoreCapUnscaledOffsetAlternative,
   // 4.4.149 STUR (integer)
-  STRU_c_integer_w = LoadStoreCapUnscaledOffsetNormalBaseFixed |
+  STRU_c_integer_w = LoadStoreCapUnscaledOffsetNormalFixed |
 	             StoreCapUnscaledOffsetInteger | LoadStoreCapUnscaledOffsetIntegerWord,
-  STRU_c_integer_d = LoadStoreCapUnscaledOffsetNormalBaseFixed |
+  STRU_c_integer_d = LoadStoreCapUnscaledOffsetNormalFixed |
 	             StoreCapUnscaledOffsetInteger | LoadStoreCapUnscaledOffsetIntegerWord,
 #endif // __CHERI_PURE_CAPABILITY
   LoadStoreUnscaledOffsetFixed = 0x38000000,
@@ -1087,7 +1119,7 @@ enum LoadStoreUnscaledOffsetOp : uint32_t {
 // Load/store (post, pre, offset and unsigned.)
 enum LoadStoreOp : uint32_t {
 #if defined(__CHERI_PURE_CAPABILITY__)
-  LoadStoreCapMask = 0x00C00000,
+  LoadStoreCapMask = 0x00400000,
 #define LOAD_STORE(A, B, C, D) A##B##_##C = D
   LOAD_STORE_CAP_OP_LIST(LOAD_STORE),
 #undef LOAD_STORE
@@ -1098,13 +1130,6 @@ enum LoadStoreOp : uint32_t {
 #undef LOAD_STORE
   PRFM = 0xC0800000
 };
-
-#if defined(__CHERI_PURE_CAPABILITY__)
-enum LoadStoreCapOp : uint32_t {
-  LoadCap,
-  StoreCap
-};
-#endif // __CHERI_PURE_CAPABILITY__
 
 // Load/store post index.
 enum LoadStorePostIndex : uint32_t {
@@ -1138,13 +1163,17 @@ enum LoadStorePreIndex : uint32_t {
 #if defined(__CHERI_PURE_CAPABILITY__)
   LoadStorePreCapIndexFixed = 0xA2000C00,
   LoadStorePreCapIndexFMask = 0xFF200C00,
-  LoadStorePreCapIndexMask = 0xFFC00C00,
+  LoadStorePreCapIndexMask = 0xFFE00C00,
   LoadPreCapIndex = 0x00400000,
   StorePreCapIndex = 0x00000000,
   // 4.4.78 (pre-indexed)
   // Load capability (immediate pre-indexed) loads a capability from memory
   // and writes it to a Capability register.
   LDR_c_pre = LoadStorePreCapIndexFixed | LoadPreCapIndex,
+  // 4.4.132 (pre-indexed)
+  // Store capability (immediate pre-index_ determines the base register to be
+  // used, derives an address from the base register, ansd stores to memory
+  // from a Capability regsiter.
   STR_c_pre = LoadStorePreCapIndexFixed | StorePreCapIndex,
 #endif // __CHERI_PURE_CAPABILITY__
   LoadStorePreIndexFixed = 0x38000C00,
@@ -1181,13 +1210,15 @@ enum LoadStoreUnsignedOffset : uint32_t {
   // register to be used, derives an address from the base register, loads a
   // capability drom memory, and writes the result to the destination
   // Cpability register.
-  LDR_c_unsigned_cap_alternate = LoadStoreCapUnsignedOffsetCapAlternativeFixed | LoadCapUnsignedOffsetCapAlternative,
+  LDR_c_unsigned_cap_alternate = LoadStoreCapUnsignedOffsetCapAlternativeFixed |
+                                 LoadCapUnsignedOffsetCapAlternative,
   // 4.4.84 LDR (unsigned offset, capability, normal base)
   // Load capability (unsigned offset) determeines the base register to be
   // used, derives an address from the base regsiter and an immediate
   // offset, loads a capability from memory and writes the resutl to the
   // destination Capability register.
-  LDR_c_unsigned_cap_normal = LoadStoreCapUnsignedOffsetCapNormalFixed | LoadCapUnsignedOffsetCapNormal,
+  LDR_c_unsigned_cap_normal = LoadStoreCapUnsignedOffsetCapNormalFixed |
+	                      LoadCapUnsignedOffsetCapNormal,
   // 4.4.85 LDR (unsiged offset, integer)
   // Load Register (unsigned offset) via an alternative base determines the
   // base register to be used, derives an address from the base register
@@ -1195,26 +1226,32 @@ enum LoadStoreUnsignedOffset : uint32_t {
   // from memory, zero-extends it, and writes the result to the destination
   // register.
   LDR_c_unsigned_d = LoadStoreCapUnsignedOffsetIntegerFixed |
-	             LoadCapUnsignedOffsetInteger | LoadStoreCapUnsignedOffsetIntegerDoubleword,
+	             LoadCapUnsignedOffsetInteger |
+		     LoadStoreCapUnsignedOffsetIntegerDoubleword,
   LDR_c_unsigned_w = LoadStoreCapUnsignedOffsetIntegerFixed |
-	             LoadCapUnsignedOffsetInteger | LoadStoreCapUnsignedOffsetIntegerWord,
+	             LoadCapUnsignedOffsetInteger |
+		     LoadStoreCapUnsignedOffsetIntegerWord,
   // 4.4.141 STR (unsigned offset, capability, normal base)
   // Store capability (unsigned offset) stores a capability to memory from a
   // Capability register.
-  STR_c_unsigned_cap_alternate = LoadStoreCapUnsignedOffsetCapAlternativeFixed | StoreCapUnsignedOffsetCapAlternative,
+  STR_c_unsigned_cap_alternate = LoadStoreCapUnsignedOffsetCapAlternativeFixed |
+	                         StoreCapUnsignedOffsetCapAlternative,
   // 4.4.141 STR (unsigned offset, capability, normal base)
   // Store capability (unsigned offset) stores a capability to memory from
   // a Capability register.
-  STR_c_unsigned_cap_normal = LoadStoreCapUnsignedOffsetCapNormalFixed | StoreCapUnsignedOffsetCapNormal,
+  STR_c_unsigned_cap_normal = LoadStoreCapUnsignedOffsetCapNormalFixed |
+	                      StoreCapUnsignedOffsetCapNormal,
   // 4.4.142 STR (unsigned offset, integer)
   // Store Register (unsigned offset) via alternate base determines the base
   // register to be used, derives an address from the base register and an
   // immeditae offset, and stores a 32-bit word or 64-bit doubleword to the
   // calucluated address in memory.
   STR_c_unsigned_d = LoadStoreCapUnsignedOffsetIntegerFixed |
-	             StoreCapUnsignedOffsetInteger | LoadStoreCapUnsignedOffsetIntegerDoubleword,
+	             StoreCapUnsignedOffsetInteger |
+		     LoadStoreCapUnsignedOffsetIntegerDoubleword,
   STR_c_unsigned_w = LoadStoreCapUnsignedOffsetIntegerFixed |
-	             StoreCapUnsignedOffsetInteger | LoadStoreCapUnsignedOffsetIntegerWord,
+	             StoreCapUnsignedOffsetInteger |
+		     LoadStoreCapUnsignedOffsetIntegerWord,
 #endif // __CHERI_PURE_CAPABILITY__
   LoadStoreUnsignedOffsetFixed = 0x39000000,
   LoadStoreUnsignedOffsetFMask = 0x3B000000,
@@ -1230,32 +1267,52 @@ enum LoadStoreUnsignedOffset : uint32_t {
 enum LoadStoreRegisterOffset : uint32_t {
 #if defined(__CHERI_PURE_CAPABILITY__)
   LoadStoreCapRegisterOffsetAlternativeFixed = 0xC2E04400,
-  LoadStoreCapRegisterOffsetAlternativeFMask= 0xFFE04400,
+  LoadStoreCapRegisterOffsetAlternativeFMask = 0xFFE04400,
   LoadStoreCapRegisterOffsetAlternativeMask = 0xFFE04C00,
-  LoadStoreCapRegisterOffsetNormalFixed = 0xA2204800,
-  LoadStoreCapRegisterOffsetNormalFMask= 0xFF204C00,
-  LoadStoreCapRegisterOffsetNormalMask = 0xFFE04C00,
-  LoadStoreCapRegisterOffsetIntegerFixed = 0x82A04000,
-  LoadStoreCapRegisterOffsetIntegerFMask = 0xFFA04000,
-  LoadStoreCapRegisterOffsetIntegerMask = 0xFFE04C00,
   // 4.4.79 LDR (register offset, capability, alternative base)
   // Load capability (register) via alternative base determins the base
   // register to be used, derives an address from the base register and
   // an offset register, loads a capability from memory, and writes it
-  // to the destination Capability register
-  LDR_c_reg_offset_alternative = LoadStoreCapRegisterOffsetAlternativeFixed | 0x00000800,
-  // 4.4.80 LDR (register offset, capability, normal base)
-  LDR_c_reg_offset_normal = LoadStoreCapRegisterOffsetNormalFixed | 0xA0000000,
-  // 4.4.81 LDR (register offset, integer)
-  LDR_c_reg_offset_integer_d = LoadStoreCapRegisterOffsetIntegerFixed | 0x00400400,
-  LDR_c_reg_offset_integer_w = LoadStoreCapRegisterOffsetIntegerFixed | 0x00400000,
+  // to the destination Capability register.
+  LDR_c_reg_alt = LoadStoreCapRegisterOffsetAlternativeFixed | 0x00000800,
   // 4.4.136 STR (register offset, capability, alternative base)
-  STR_c_reg_offset_alternative = LoadStoreCapRegisterOffsetAlternativeFixed | 0x00000000,
+  // Store capability (register) via alternative base determines the base
+  // register to be used, derives an address from the base register and an
+  // offset register, and stores a capability to the calculated address
+  // in memory. 
+  STR_c_reg_alt = LoadStoreCapRegisterOffsetAlternativeFixed,
+  
+  LoadStoreCapRegisterOffsetNormalFixed = 0xA2204800,
+  LoadStoreCapRegisterOffsetNormalFMask= 0xFF204C00,
+  LoadStoreCapRegisterOffsetNormalMask = 0xFFE04C00,
+  // 4.4.80 LDR (register offset, capability, normal base)
+  // Load capability (register) determins the base register to be used,
+  // derives an address from thoe base register and an offset register,
+  // loads a capabiltiy from memory, and writes in to the destination
+  // Capability register
+  LDR_c_reg_normal = LoadStoreCapRegisterOffsetNormalFixed | 0x00400000,
   // 4.4.137 STR (register offset, capability, normal base)
-  STR_c_reg_offset_normal = LoadStoreCapRegisterOffsetNormalFixed | 0xA0000000,
-  // 4.4.137 STR (register offset, integer)
-  STR_c_reg_offset_integer_d = LoadStoreCapRegisterOffsetIntegerFixed | 0x00000C00,
-  STR_c_reg_offset_integer_w = LoadStoreCapRegisterOffsetIntegerFixed | 0x00000800,
+  // Store capability (register) determines the base rgsiter to be used,
+  // derives an address from the base register and an offset regsiter, and
+  // stores a capability to the calculated addess in memory
+  STR_c_reg_normal = LoadStoreCapRegisterOffsetNormalFixed,
+
+  LoadStoreCapRegisterOffsetIntegerFixed = 0x82A04000,
+  LoadStoreCapRegisterOffsetIntegerFMask = 0xFFA04000,
+  LoadStoreCapRegisterOffsetIntegerMask = 0xFFE04C00,
+  // 4.4.81 LDR (register offset, integer)
+  // Load Register (register) via an alternate base determines the base
+  // register to be used, dereived an addrrsss from teh base register and an
+  // offset register, loads a word from memory, and writes the result to the
+  // destination register
+  LDR_c_reg_d = LoadStoreCapRegisterOffsetIntegerFixed | 0x00400400,
+  LDR_c_reg_w = LoadStoreCapRegisterOffsetIntegerFixed | 0x00400000,
+  // 4.4.138 STR (register offset, integer)
+  // Store capability (register) determines the base regsiter to be used,
+  // derives an address from the base register and an offset register, and
+  // stores a capability to the calculated address in memory 
+  STR_c_reg_d = LoadStoreCapRegisterOffsetIntegerFixed | 0x00000400,
+  STR_c_reg_w = LoadStoreCapRegisterOffsetIntegerFixed | 0x00000000,
 #endif // __CHERI_PURE_CAPABILITY
   LoadStoreRegisterOffsetFixed = 0x38200800,
   LoadStoreRegisterOffsetFMask = 0x3B200C00,
@@ -1325,7 +1382,11 @@ enum ConditionalSelectOp : uint32_t {
   ConditionalSelectCapFixed = 0xC2C00C00,
   ConditionalSelectCapFMask = 0xFFE00C00,
   ConditionalSelectCapMask = 0xFFE00C00,
-  CSEL_c = ConditionalSelectCapFixed | 0x00000000,
+  // 4.4.39 CSEL
+  // Conditional Select writes, in the destination capabiltiy register, the
+  // value of the first source register if the condition is TRUE, and
+  // otherwise writes the value of the second source capability register.
+  CSEL_c = ConditionalSelectCapFixed,
 #endif // __CHERI_PURE_CAPABILITY__
   ConditionalSelectFixed = 0x1A800000,
   ConditionalSelectFMask = 0x1FE00000,
@@ -2433,7 +2494,8 @@ enum GetField1Op : uint32_t {
   GetField1FMask = 0xFFFF1C00,
   GetField1Mask = 0xFFFFFC00,
   // 4.4.61 GCVALUE
-  // Get the Value field of a capability.
+  // Get the Value field of a capability gets the range of the Value field of
+  // a capability and writes the result to the destination register.
   GCVALUE = GetField1Fixed | 0x00004000 
 };
 
@@ -2442,7 +2504,9 @@ enum SetField1Op : uint32_t {
   SetField1FMask = 0xFFE09C00,
   SetField1Mask = 0xFFE0FC00,
   // 4.4.120 SCVALUE
-  // Set value field of a capability.
+  // Set value field of a capability, writes the source Capability register
+  // to the destination Capability register with the Value field set to a
+  // value based on a 64-bit general-purpose register.
   SCVALUE = SetField1Fixed | 0x00004000 
 };
 #endif // __CHERI_PURE_CAPABILITY__

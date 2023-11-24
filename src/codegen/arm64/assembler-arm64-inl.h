@@ -114,7 +114,7 @@ inline Register Register::CRegFromCode(unsigned code) {
     return csp;
   } else {
     DCHECK_LT(code, static_cast<unsigned>(kNumberOfRegisters));
-    return Register::Create(code, kCRegSizeInBits);
+    return Register::Create(code, kCRegSizeInBits, kRegister);
   }
 }
 #endif // __CHERI_PURE_CAPABILITY__
@@ -365,10 +365,18 @@ Operand Operand::ToExtendedRegister() const {
 
 Operand Operand::ToW() const {
   if (IsShiftedRegister()) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    DCHECK(reg_.Is64Bits() || reg_.Is128Bits());
+#else
     DCHECK(reg_.Is64Bits());
+#endif // __CHERI_PURE_CAPABILITY__
     return Operand(reg_.W(), shift(), shift_amount());
   } else if (IsExtendedRegister()) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    DCHECK(reg_.Is64Bits() || reg_.Is128Bits());
+#else
     DCHECK(reg_.Is64Bits());
+#endif // __CHERI_PURE_CAPABILITY__
     return Operand(reg_.W(), extend(), shift_amount());
   }
   DCHECK(IsImmediate());
@@ -507,7 +515,12 @@ MemOperand::MemOperand(Register base, const Operand& offset, AddrMode addrmode)
     offset_ = 0;
 
     // These assertions match those in the shifted-register constructor.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    DCHECK(regoffset_.Is64Bits() || regoffset_.Is128Bits() &&
+           !regoffset_.IsSP());
+#else
     DCHECK(regoffset_.Is64Bits() && !regoffset_.IsSP());
+#endif // __CHERI_PURE_CAPABILITY__
     DCHECK(shift_ == LSL);
   } else {
     DCHECK(offset.IsExtendedRegister());
@@ -543,14 +556,22 @@ void Assembler::Unreachable() { debug("UNREACHABLE", __LINE__, BREAK); }
 
 Address Assembler::target_pointer_address_at(Address pc) {
   Instruction* instr = reinterpret_cast<Instruction*>(pc);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  DCHECK(instr->IsLdrLiteralC() || instr->IsLdrLiteralX() || instr->IsLdrLiteralW());
+#else
   DCHECK(instr->IsLdrLiteralX() || instr->IsLdrLiteralW());
+#endif // __CHERI_PURE_CAPABILITY__
   return reinterpret_cast<Address>(instr->ImmPCOffsetTarget());
 }
 
 // Read/Modify the code target address in the branch/call instruction at pc.
 Address Assembler::target_address_at(Address pc, Address constant_pool) {
   Instruction* instr = reinterpret_cast<Instruction*>(pc);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  if (instr->IsLdrLiteralC()) {
+#else
   if (instr->IsLdrLiteralX()) {
+#endif // __CHERI_PURE_CAPABILITY__
     return Memory<Address>(target_pointer_address_at(pc));
   } else {
     DCHECK(instr->IsBranchAndLink() || instr->IsUnconditionalBranch());
@@ -567,7 +588,11 @@ Tagged_t Assembler::target_compressed_address_at(Address pc,
 
 Handle<CodeT> Assembler::code_target_object_handle_at(Address pc) {
   Instruction* instr = reinterpret_cast<Instruction*>(pc);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  if (instr->IsLdrLiteralC()) {
+#else
   if (instr->IsLdrLiteralX()) {
+#endif // __CHERI_PURE_CAPABILITY__
     return Handle<CodeT>(reinterpret_cast<Address*>(
         Assembler::target_address_at(pc, 0 /* unused */)));
   } else {
@@ -581,13 +606,14 @@ Handle<CodeT> Assembler::code_target_object_handle_at(Address pc) {
 AssemblerBase::EmbeddedObjectIndex
 Assembler::embedded_object_index_referenced_from(Address pc) {
   Instruction* instr = reinterpret_cast<Instruction*>(pc);
-  if (instr->IsLdrLiteralX()) {
 #if defined(__CHERI_PURE_CAPABILITY__)
-    return Memory<EmbeddedObjectIndex>(static_cast<size_t>(target_pointer_address_at(pc)));
+  if (instr->IsLdrLiteralC()) {
+    static_assert(sizeof(EmbeddedObjectIndex) == sizeof(ptraddr_t));
 #else
+  if (instr->IsLdrLiteralX()) {
     static_assert(sizeof(EmbeddedObjectIndex) == sizeof(intptr_t));
-    return Memory<EmbeddedObjectIndex>(target_pointer_address_at(pc));
 #endif // __CHERI_PURE_CAPABILITY__
+    return Memory<EmbeddedObjectIndex>(target_pointer_address_at(pc));
   } else {
     DCHECK(instr->IsLdrLiteralW());
     return Memory<uint32_t>(target_pointer_address_at(pc));
@@ -597,7 +623,11 @@ Assembler::embedded_object_index_referenced_from(Address pc) {
 void Assembler::set_embedded_object_index_referenced_from(
     Address pc, EmbeddedObjectIndex data) {
   Instruction* instr = reinterpret_cast<Instruction*>(pc);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  if (instr->IsLdrLiteralC()) {
+#else
   if (instr->IsLdrLiteralX()) {
+#endif // __CHERI_PURE_CAPABILITY__
     Memory<EmbeddedObjectIndex>(target_pointer_address_at(pc)) = data;
   } else {
     DCHECK(instr->IsLdrLiteralW());
@@ -614,7 +644,11 @@ Handle<HeapObject> Assembler::target_object_handle_at(Address pc) {
 
 Address Assembler::runtime_entry_at(Address pc) {
   Instruction* instr = reinterpret_cast<Instruction*>(pc);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  if (instr->IsLdrLiteralC()) {
+#else
   if (instr->IsLdrLiteralX()) {
+#endif // __CHERI_PURE_CAPABILITY__
     return Assembler::target_address_at(pc, 0 /* unused */);
   } else {
     DCHECK(instr->IsBranchAndLink() || instr->IsUnconditionalBranch());
@@ -629,9 +663,9 @@ int Assembler::deserialization_special_target_size(Address location) {
   } else {
     DCHECK_EQ(instr->InstructionBits(), 0);
 #if defined(__CHERI_PURE_CAPABILITY__)
-    return kSystemPointerAddrSize;
-#else
     return kSystemPointerSize;
+#else
+    return kSystemPointerAddrSize;
 #endif // __CHERI_PURE_CAPABILITY__
   }
 }
@@ -668,7 +702,11 @@ void Assembler::set_target_address_at(Address pc, Address constant_pool,
                                       Address target,
                                       ICacheFlushMode icache_flush_mode) {
   Instruction* instr = reinterpret_cast<Instruction*>(pc);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  if (instr->IsLdrLiteralC()) {
+#else
   if (instr->IsLdrLiteralX()) {
+#endif // __CHERI_PURE_CAPABILITY__
     Memory<Address>(target_pointer_address_at(pc)) = target;
     // Intuitively, we would think it is necessary to always flush the
     // instruction cache after patching a target address in the code. However,
@@ -702,11 +740,13 @@ int RelocInfo::target_address_size() {
     return Assembler::kSpecialTargetSize;
   } else {
     Instruction* instr = reinterpret_cast<Instruction*>(pc_);
-    DCHECK(instr->IsLdrLiteralX() || instr->IsLdrLiteralW());
 #if defined(__CHERI_PURE_CAPABILITY__)
-    return instr->IsLdrLiteralW() ? kTaggedSize : kSystemPointerAddrSize;
+    DCHECK(instr->IsLdrLiteralC() || instr->IsLdrLiteralX() || instr->IsLdrLiteralW());
+    return instr->IsLdrLiteralW() ? kTaggedSize : instr->IsLdrLiteralX() ?
+        kSystemPointerAddrSize : kSystemPointerSize;
 #else
-    return instr->IsLdrLiteralW() ? kTaggedSize : kSystemPointerSize;
+    DCHECK(instr->IsLdrLiteralX() || instr->IsLdrLiteralW());
+    return instr->IsLdrLiteralW() ? kTaggedSize : kSystemPointerAddrSize;
 #endif // __CHERI_PURE_CAPABILITY__
   }
 }
@@ -732,7 +772,11 @@ Address RelocInfo::target_address_address() {
   // address. We make sure that RelocInfo is ordered by the
   // target_address_address so that we do not skip over any relocatable
   // instruction sequences.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  if (instr->IsLdrLiteralC()) {
+#else
   if (instr->IsLdrLiteralX()) {
+#endif // __CHERI_PURE_CAPABILITY__
     return constant_pool_entry_address();
   } else {
     DCHECK(instr->IsBranchAndLink() || instr->IsUnconditionalBranch());
@@ -936,7 +980,11 @@ LoadStorePairOp Assembler::StorePairOpFor(const CPURegister& rt,
 
 LoadLiteralOp Assembler::LoadLiteralOpFor(const CPURegister& rt) {
   if (rt.IsRegister()) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    return rt.Is128Bits() ? LDR_c_lit : rt.Is64Bits() ? LDR_x_lit : LDR_w_lit;
+#else
     return rt.Is64Bits() ? LDR_x_lit : LDR_w_lit;
+#endif // __CHERI_PURE_CAPABILITY__
   } else {
     DCHECK(rt.IsVRegister());
     return rt.Is64Bits() ? LDR_d_lit : LDR_s_lit;
@@ -946,7 +994,7 @@ LoadLiteralOp Assembler::LoadLiteralOpFor(const CPURegister& rt) {
 #if defined(__CHERI_PURE_CAPABILITY__)
 AddSubOp Assembler::AddOpFor(const CPURegister& rt) {
   if (rt.IsC()) {
-    return ADDCAP;
+    return ADD_c;
   } else {
     return ADD;
   }
@@ -954,7 +1002,7 @@ AddSubOp Assembler::AddOpFor(const CPURegister& rt) {
 
 AddSubOp Assembler::SubOpFor(const CPURegister& rt) {
   if (rt.IsC()) {
-    return SUBCAP;
+    return SUB_c;
   } else {
     return SUB;
   }
@@ -1198,7 +1246,9 @@ Instr Assembler::ImmAddSubCapability(int imm) {
 
 const Register& Assembler::AppropriateZeroRegFor(const CPURegister& reg) const {
 #if defined(__CHERI_PURE_CAPABILITY__)
-  if (reg.IsC()) return czr;
+  if (reg.IsC()) {
+    return czr;
+  }
 #endif // __CHERI_PURE_CAPABILITY__
   return reg.Is64Bits() ? xzr : wzr;
 }

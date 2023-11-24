@@ -262,7 +262,11 @@ void TurboAssembler::LogicalMacro(const Register& rd, const Register& rn,
 
 void TurboAssembler::Mov(const Register& rd, uint64_t imm) {
   DCHECK(allow_macro_instructions());
+#if defined(__CHERI_PURE_CAPABILITY__)
+  DCHECK(is_uint32(imm) || is_int32(imm) || rd.Is64Bits() || rd.Is128Bits());
+#else
   DCHECK(is_uint32(imm) || is_int32(imm) || rd.Is64Bits());
+#endif // __CHERI_PURE_CAPABILITY__
   DCHECK(!rd.IsZero());
 
   // TODO(all) extend to support more immediates.
@@ -354,14 +358,22 @@ void TurboAssembler::Mov(const Register& rd, const Operand& operand,
       if (operand.ImmediateRMode() == RelocInfo::EXTERNAL_REFERENCE) {
         Address addr = static_cast<Address>(operand.ImmediateValue());
         ExternalReference reference = base::bit_cast<ExternalReference>(addr);
+#if defined(__CHERI_PURE_CAPABILITY__)
+        IndirectLoadExternalReference(rd.C(), reference);
+#else
         IndirectLoadExternalReference(rd, reference);
+#endif // __CHERI_PURE_CAPABILITY__
         return;
       } else if (RelocInfo::IsEmbeddedObjectMode(operand.ImmediateRMode())) {
         Handle<HeapObject> x(
             reinterpret_cast<Address*>(operand.ImmediateValue()));
         // TODO(v8:9706): Fix-it! This load will always uncompress the value
         // even when we are loading a compressed embedded object.
+#if defined(__CHERI_PURE_CAPABILITY__)
+        IndirectLoadConstant(rd.C(), x);
+#else
         IndirectLoadConstant(rd.X(), x);
+#endif // __CHERI_PURE_CAPABILITY__
         return;
       }
     }
@@ -391,7 +403,16 @@ void TurboAssembler::Mov(const Register& rd, const Operand& operand,
     // If sp is an operand, add #0 is emitted, otherwise, orr #0.
     if (rd != operand.reg() ||
         (rd.Is32Bits() && (discard_mode == kDontDiscardForSameWReg))) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+      if (rd.IsC()) {
+	DCHECK(operand.reg().IsC());
+        Assembler::cpy(rd, operand.reg());
+      } else {
+        Assembler::mov(rd, operand.reg());
+      }
+#else
       Assembler::mov(rd, operand.reg());
+#endif // __CHERI_PURE_CAPABILITY__
     }
     // This case can handle writes into the system stack pointer directly.
     dst = rd;
@@ -674,7 +695,11 @@ void TurboAssembler::Csel(const Register& rd, const Register& rn,
       csinv(rd, rn, zr, cond);
     } else {
       UseScratchRegisterScope temps(this);
+#if defined(__CHERI_PURE_CAPABILITY__)
+      Register temp = rd.IsC() ? temps.AcquireX() : temps.AcquireSameSizeAs(rn);
+#else
       Register temp = temps.AcquireSameSizeAs(rn);
+#endif // __CHERI_PURE_CAPABILITY__
       Mov(temp, imm);
       csel(rd, rn, temp, cond);
     }
@@ -773,7 +798,11 @@ void TurboAssembler::AddSubMacro(const Register& rd, const Register& rn,
 
   if (operand.NeedsRelocation(this)) {
     UseScratchRegisterScope temps(this);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Register temp = temps.AcquireC();
+#else
     Register temp = temps.AcquireX();
+#endif // __CHERI_PURE_CAPABILITY__
     Ldr(temp, operand.immediate());
     AddSubMacro(rd, rn, temp, S, op);
   } else if ((operand.IsImmediate() &&
@@ -781,7 +810,11 @@ void TurboAssembler::AddSubMacro(const Register& rd, const Register& rn,
              (rn.IsZero() && !operand.IsShiftedRegister()) ||
              (operand.IsShiftedRegister() && (operand.shift() == ROR))) {
     UseScratchRegisterScope temps(this);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Register temp = rd.IsC() ? temps.AcquireX() : temps.AcquireSameSizeAs(rn);
+#else
     Register temp = temps.AcquireSameSizeAs(rn);
+#endif // __CHERI_PURE_CAPABILITY__
     if (operand.IsImmediate()) {
       PreShiftImmMode mode = kAnyShift;
 
@@ -792,6 +825,10 @@ void TurboAssembler::AddSubMacro(const Register& rd, const Register& rn,
         // If the destination is SP and flags will be set, we can't pre-shift
         // the immediate at all.
         mode = (S == SetFlags) ? kNoShift : kLimitShiftForSP;
+#if defined(__CHERI_PURE_CAPABILITY__)
+      } else if (rn == csp) {
+        mode = kLimitShiftForSP;
+#endif // __CHERI_PURE_CAPABILITY__
       } else if (rn == sp) {
         mode = kLimitShiftForSP;
       }
@@ -870,16 +907,21 @@ void TurboAssembler::LoadStoreMacro(const CPURegister& rt,
     // Immediate offset that can't be encoded using unsigned or unscaled
     // addressing modes.
     UseScratchRegisterScope temps(this);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Register temp = addr.base().IsC() ? temps.AcquireX() :
+        temps.AcquireSameSizeAs(addr.base());
+#else
     Register temp = temps.AcquireSameSizeAs(addr.base());
+#endif // __CHERI_PURE_CAPABILITY__
     Mov(temp, addr.offset());
     LoadStore(rt, MemOperand(addr.base(), temp), op);
   } else if (addr.IsPostIndex() && !IsImmLSUnscaled(offset)) {
     // Post-index beyond unscaled addressing range.
     LoadStore(rt, MemOperand(addr.base()), op);
-    add(addr.base(), addr.base(), offset);
+    Add(addr.base(), addr.base(), offset);
   } else if (addr.IsPreIndex() && !IsImmLSUnscaled(offset)) {
     // Pre-index beyond unscaled addressing range.
-    add(addr.base(), addr.base(), offset);
+    Add(addr.base(), addr.base(), offset);
     LoadStore(rt, MemOperand(addr.base()), op);
   } else {
     // Encodable in one load/store instruction.
@@ -887,6 +929,7 @@ void TurboAssembler::LoadStoreMacro(const CPURegister& rt,
   }
 }
 
+/*
 #if defined(__CHERI_PURE_CAPABILITY__)
 void TurboAssembler::LoadStoreCapMacro(const Register& ct,
                                        const MemOperand& addr,
@@ -894,8 +937,7 @@ void TurboAssembler::LoadStoreCapMacro(const Register& ct,
   int64_t offset = addr.offset();
   constexpr unsigned size = 4;
 
-  DCHECK_EQ(ct.type(), CPURegister::kCRegister);
-  DCHECK_EQ(ct.SizeInBits(), kCRegSizeInBits);
+  DCHECK(ct.IsC());
   // Check if an immediate offset fits in the immediate field of the
   // appropriate instruction. If not, emit two instructions to perform
   // the operation.
@@ -904,16 +946,16 @@ void TurboAssembler::LoadStoreCapMacro(const Register& ct,
     // Immediate offset that can't be encoded using unsigned or unscaled
     // addressing modes.
     UseScratchRegisterScope temps(this);
-    Register temp = temps.AcquireSameSizeAs(addr.base());
+    Register temp = temps.AcquireX();
     Mov(temp, addr.offset());
     LoadStoreCapability(ct, MemOperand(addr.base(), temp), op);
   } else if (addr.IsPostIndex() && !IsImmLSUnscaled(offset)) {
     // Post-index beyond unscaled addressing range.
     LoadStoreCapability(ct, MemOperand(addr.base()), op);
-    add(addr.base(), addr.base(), offset);
+    Add(addr.base(), addr.base(), offset);
   } else if (addr.IsPreIndex() && !IsImmLSUnscaled(offset)) {
     // Pre-index beyond unscaled addressing range.
-    add(addr.base(), addr.base(), offset);
+    Add(addr.base(), addr.base(), offset);
     LoadStoreCapability(ct, MemOperand(addr.base()), op);
   } else {
     // Encodable in one load/store instruction.
@@ -921,6 +963,7 @@ void TurboAssembler::LoadStoreCapMacro(const Register& ct,
   }
 }
 #endif // __CHERI_PURE_CAPABILITY__
+*/
 
 void TurboAssembler::LoadStorePairMacro(const CPURegister& rt,
                                         const CPURegister& rt2,
@@ -955,11 +998,11 @@ void TurboAssembler::LoadStorePairMacro(const CPURegister& rt,
   }
 }
 
-#if defined(__CHERI_PURE_CAPABILITY__)
+#if defined(__CHERI_PURE_CAPABILITY__) && 0
 void TurboAssembler::LoadStorePairCapMacro(const Register& ct,
                                            const Register& ct2,
                                            const MemOperand& addr,
-                                           LoadStorePairCapOp op) {
+                                           LoadStorePairOp op) {
   DCHECK(!addr.IsRegisterOffset());
 
   int64_t offset = addr.offset();
@@ -1256,23 +1299,41 @@ void TurboAssembler::PushHelper(int count, int size, const CPURegister& src0,
   switch (count) {
     case 1:
       DCHECK(src1.IsNone() && src2.IsNone() && src3.IsNone());
+#if defined(__CHERI_PURE_CAPABILITY__)
+      str(src0, MemOperand(csp, -1 * size, PreIndex));
+#else
       str(src0, MemOperand(sp, -1 * size, PreIndex));
+#endif // __CHERI_PURE_CAPABILITY__
       break;
     case 2:
       DCHECK(src2.IsNone() && src3.IsNone());
+#if defined(__CHERI_PURE_CAPABILITY__)
+      stp(src1, src0, MemOperand(csp, -2 * size, PreIndex));
+#else
       stp(src1, src0, MemOperand(sp, -2 * size, PreIndex));
+#endif // __CHERI_PURE_CAPABILITY__
       break;
     case 3:
       DCHECK(src3.IsNone());
+#if defined(__CHERI_PURE_CAPABILITY__)
+      stp(src2, src1, MemOperand(csp, -3 * size, PreIndex));
+      str(src0, MemOperand(csp, 2 * size));
+#else
       stp(src2, src1, MemOperand(sp, -3 * size, PreIndex));
       str(src0, MemOperand(sp, 2 * size));
+#endif // __CHERI_PURE_CAPABILITY__
       break;
     case 4:
       // Skip over 4 * size, then fill in the gap. This allows four W registers
       // to be pushed using sp, whilst maintaining 16-byte alignment for sp
       // at all times.
+#if defined(__CHERI_PURE_CAPABILITY__)
+      stp(src3, src2, MemOperand(csp, -4 * size, PreIndex));
+      stp(src1, src0, MemOperand(csp, 2 * size));
+#else
       stp(src3, src2, MemOperand(sp, -4 * size, PreIndex));
       stp(src1, src0, MemOperand(sp, 2 * size));
+#endif // __CHERI_PURE_CAPABILITY__
       break;
     default:
       UNREACHABLE();
@@ -1293,24 +1354,42 @@ void TurboAssembler::PopHelper(int count, int size, const CPURegister& dst0,
   switch (count) {
     case 1:
       DCHECK(dst1.IsNone() && dst2.IsNone() && dst3.IsNone());
+#if defined(__CHERI_PURE_CAPABILITY__)
+      ldr(dst0, MemOperand(csp, 1 * size, PostIndex));
+#else
       ldr(dst0, MemOperand(sp, 1 * size, PostIndex));
+#endif // __CHERI_PURE_CAPABILITY__
       break;
     case 2:
       DCHECK(dst2.IsNone() && dst3.IsNone());
+#if defined(__CHERI_PURE_CAPABILITY__)
+      ldp(dst0, dst1, MemOperand(csp, 2 * size, PostIndex));
+#else
       ldp(dst0, dst1, MemOperand(sp, 2 * size, PostIndex));
+#endif // __CHERI_PURE_CAPABILITY__
       break;
     case 3:
       DCHECK(dst3.IsNone());
+#if defined(__CHERI_PURE_CAPABILITY__)
+      ldr(dst2, MemOperand(csp, 2 * size));
+      ldp(dst0, dst1, MemOperand(csp, 3 * size, PostIndex));
+#else
       ldr(dst2, MemOperand(sp, 2 * size));
       ldp(dst0, dst1, MemOperand(sp, 3 * size, PostIndex));
+#endif // __CHERI_PURE_CAPABILITY__
       break;
     case 4:
       // Load the higher addresses first, then load the lower addresses and
       // skip the whole block in the second instruction. This allows four W
       // registers to be popped using sp, whilst maintaining 16-byte alignment
       // for sp at all times.
+#if defined(__CHERI_PURE_CAPABILITY__)
+      ldp(dst2, dst3, MemOperand(csp, 2 * size));
+      ldp(dst0, dst1, MemOperand(csp, 4 * size, PostIndex));
+#else
       ldp(dst2, dst3, MemOperand(sp, 2 * size));
       ldp(dst0, dst1, MemOperand(sp, 4 * size, PostIndex));
+#endif // __CHERI_PURE_CAPABILITY__
       break;
     default:
       UNREACHABLE();
@@ -1427,6 +1506,80 @@ void TurboAssembler::CopySlots(Register dst, Register src,
   CopyDoubleWords(dst, src, slot_count);
 }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+void TurboAssembler::CopyCapabilities(Register dst, Register src, Register count,
+                                      CopyCapabilitiesMode mode) {
+  ASM_CODE_COMMENT(this);
+  DCHECK(!AreAliased(dst, src, count));
+
+  if (FLAG_debug_code) {
+    Register pointer1 = dst;
+    Register pointer2 = src;
+    if (mode == kCapSrcLessThanDst) {
+      pointer1 = src;
+      pointer2 = dst;
+    }
+    // Copy requires pointer1 < pointer2 || (pointer1 - pointer2) >= count.
+    Label pointer1_below_pointer2;
+    Subs(pointer1, pointer1, pointer2);
+    B(lt, &pointer1_below_pointer2);
+    UseScratchRegisterScope temps(this);
+    Register temp = temps.AcquireX();
+    Gcvalue(pointer1, temp);
+    Cmp(temp, count);
+    Check(ge, AbortReason::kOffsetOutOfRange);
+    Bind(&pointer1_below_pointer2);
+    Add(pointer1, pointer1, pointer2);
+  }
+
+  static_assert(kSystemPointerSize == kCRegSize,
+                "pointers must be the same size as capabilities");
+
+  if (mode == kCapDstLessThanSrcAndReverse) {
+    Add(src, src, Operand(count, LSL, kSystemPointerSizeLog2));
+    Sub(src, src, kSystemPointerSize);
+  }
+
+  int src_direction = (mode == kCapDstLessThanSrc) ? 1 : -1;
+  int dst_direction = (mode == kSrcLessThanDst) ? -1 : 1;
+
+  UseScratchRegisterScope scope(this);
+  Register temp0 = scope.AcquireC();
+  Register temp1 = scope.AcquireC();
+
+  Label pairs, loop, done;
+
+  Tbz(count, 0, &pairs);
+  Ldr(temp0, MemOperand(src, src_direction * kSystemPointerSize, PostIndex));
+  Sub(count, count, 1);
+  Str(temp0, MemOperand(dst, dst_direction * kSystemPointerSize, PostIndex));
+
+  Bind(&pairs);
+  if (mode == kCapSrcLessThanDst) {
+    // Adjust pointers for post-index ldp/stp with negative offset:
+    Sub(dst, dst, kSystemPointerSize);
+    Sub(src, src, kSystemPointerSize);
+  } else if (mode == kCapDstLessThanSrcAndReverse) {
+    Sub(src, src, kSystemPointerSize);
+  }
+  Bind(&loop);
+  Cbz(count, &done);
+  Ldp(temp0, temp1,
+      MemOperand(src, 2 * src_direction * kSystemPointerSize, PostIndex));
+  Sub(count, count, 2);
+  if (mode == kCapDstLessThanSrcAndReverse) {
+    Stp(temp1, temp0,
+        MemOperand(dst, 2 * dst_direction * kSystemPointerSize, PostIndex));
+  } else {
+    Stp(temp0, temp1,
+        MemOperand(dst, 2 * dst_direction * kSystemPointerSize, PostIndex));
+  }
+  B(&loop);
+
+  Bind(&done);
+}
+#endif
+
 void TurboAssembler::CopyDoubleWords(Register dst, Register src, Register count,
                                      CopyDoubleWordsMode mode) {
   ASM_CODE_COMMENT(this);
@@ -1537,11 +1690,19 @@ void TurboAssembler::CopyDoubleWords(Register dst, Register src, Register count,
 }
 
 void TurboAssembler::SlotAddress(Register dst, int slot_offset) {
-  Add(dst, sp, slot_offset << kSystemPointerSizeLog2);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Add(dst, csp, slot_offset << kSystemPointerSizeLog2);
+#else
+  Add(dst, sp, slot_offset << kSystemPointerAddrSizeLog2);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 void TurboAssembler::SlotAddress(Register dst, Register slot_offset) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Add(dst, csp, Operand(slot_offset, LSL, kSystemPointerSizeLog2));
+#else
   Add(dst, sp, Operand(slot_offset, LSL, kSystemPointerSizeLog2));
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 void TurboAssembler::AssertFPCRState(Register fpcr) {
@@ -1589,7 +1750,11 @@ void TurboAssembler::LoadRoot(Register destination, RootIndex index) {
 void TurboAssembler::PushRoot(RootIndex index) {
   ASM_CODE_COMMENT(this);
   UseScratchRegisterScope temps(this);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register tmp = temps.AcquireC();
+#else
   Register tmp = temps.AcquireX();
+#endif // __CHERI_PURE_CAPABILITY__
   LoadRoot(tmp, index);
   Push(tmp);
 }
@@ -1649,7 +1814,16 @@ void TurboAssembler::AssertSmi(Register object, AbortReason reason) {
   if (!FLAG_debug_code) return;
   ASM_CODE_COMMENT(this);
   static_assert(kSmiTag == 0);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  if (object.IsC()) {
+    UseScratchRegisterScope temps(this);
+    Register temp = temps.AcquireX();
+    Gcvalue(object, temp);
+    Tst(temp, kSmiTagMask);
+  }
+#else
   Tst(object, kSmiTagMask);
+#endif // __CHERI_PURE_CAPABILITY__
   Check(eq, reason);
 }
 
@@ -1657,7 +1831,16 @@ void MacroAssembler::AssertNotSmi(Register object, AbortReason reason) {
   if (!FLAG_debug_code) return;
   ASM_CODE_COMMENT(this);
   static_assert(kSmiTag == 0);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  if (object.IsC()) {
+    UseScratchRegisterScope temps(this);
+    Register temp = temps.AcquireX();
+    Gcvalue(object, temp);
+    Tst(temp, kSmiTagMask);
+  }
+#else
   Tst(object, kSmiTagMask);
+#endif // __CHERI_PURE_CAPABILITY__
   Check(ne, reason);
 }
 
@@ -1667,9 +1850,15 @@ void MacroAssembler::AssertCodeT(Register object) {
   AssertNotSmi(object, AbortReason::kOperandIsNotACodeT);
 
   UseScratchRegisterScope temps(this);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register temp_object = temps.AcquireC();
+  Register temp_type = temps.AcquireX();
+  CompareObjectType(object, temp_object, temp_type, CODET_TYPE);
+#else
   Register temp = temps.AcquireX();
-
   CompareObjectType(object, temp, temp, CODET_TYPE);
+#endif // __CHERI_PURE_CAPABILITY__
+
   Check(eq, AbortReason::kOperandIsNotACodeT);
 }
 
@@ -1679,7 +1868,11 @@ void MacroAssembler::AssertConstructor(Register object) {
   AssertNotSmi(object, AbortReason::kOperandIsASmiAndNotAConstructor);
 
   UseScratchRegisterScope temps(this);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register temp = temps.AcquireC();
+#else
   Register temp = temps.AcquireX();
+#endif // __CHERI_PURE_CAPABILITY__
 
   LoadMap(temp, object);
   Ldrb(temp, FieldMemOperand(temp, Map::kBitFieldOffset));
@@ -1694,9 +1887,17 @@ void MacroAssembler::AssertFunction(Register object) {
   AssertNotSmi(object, AbortReason::kOperandIsASmiAndNotAFunction);
 
   UseScratchRegisterScope temps(this);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register temp = temps.AcquireC();
+#else
   Register temp = temps.AcquireX();
+#endif // __CHERI_PURE_CAPABILITY__
   LoadMap(temp, object);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  CompareInstanceTypeRange(temp, temp.X(), FIRST_JS_FUNCTION_TYPE,
+#else
   CompareInstanceTypeRange(temp, temp, FIRST_JS_FUNCTION_TYPE,
+#endif // __CHERI_PURE_CAPABILITY__
                            LAST_JS_FUNCTION_TYPE);
   Check(ls, AbortReason::kOperandIsNotAFunction);
 }
@@ -1707,9 +1908,17 @@ void MacroAssembler::AssertCallableFunction(Register object) {
   AssertNotSmi(object, AbortReason::kOperandIsASmiAndNotAFunction);
 
   UseScratchRegisterScope temps(this);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register temp = temps.AcquireC();
+#else
   Register temp = temps.AcquireX();
+#endif // __CHERI_PURE_CAPABILITY__
   LoadMap(temp, object);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  CompareInstanceTypeRange(temp, temp.X(), FIRST_CALLABLE_JS_FUNCTION_TYPE,
+#else
   CompareInstanceTypeRange(temp, temp, FIRST_CALLABLE_JS_FUNCTION_TYPE,
+#endif // __CHERI_PURE_CAPABILITY__
                            LAST_CALLABLE_JS_FUNCTION_TYPE);
   Check(ls, AbortReason::kOperandIsNotACallableFunction);
 }
@@ -1720,9 +1929,17 @@ void MacroAssembler::AssertBoundFunction(Register object) {
   AssertNotSmi(object, AbortReason::kOperandIsASmiAndNotABoundFunction);
 
   UseScratchRegisterScope temps(this);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register temp = temps.AcquireC();
+#else
   Register temp = temps.AcquireX();
+#endif // __CHERI_PURE_CAPABILITY__
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  CompareObjectType(object, temp, temp.X(), JS_BOUND_FUNCTION_TYPE);
+#else
   CompareObjectType(object, temp, temp, JS_BOUND_FUNCTION_TYPE);
+#endif // __CHERI_PURE_CAPABILITY__
   Check(eq, AbortReason::kOperandIsNotABoundFunction);
 }
 
@@ -1734,7 +1951,11 @@ void MacroAssembler::AssertGeneratorObject(Register object) {
   // Load map
   UseScratchRegisterScope temps(this);
   Register temp = temps.AcquireX();
+#if defined(__CHERI_PURE_CAPABILITY__)
+  LoadMap(temp.C(), object);
+#else
   LoadMap(temp, object);
+#endif // __CHERI_PURE_CAPABILITY__
 
   Label do_check;
   // Load instance type and check if JSGeneratorObject
@@ -1757,12 +1978,21 @@ void MacroAssembler::AssertUndefinedOrAllocationSite(Register object) {
   if (!FLAG_debug_code) return;
   ASM_CODE_COMMENT(this);
   UseScratchRegisterScope temps(this);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register scratch = temps.AcquireC();
+#else
   Register scratch = temps.AcquireX();
+#endif // __CHERI_PURE_CAPABILITY__
   Label done_checking;
   AssertNotSmi(object);
   JumpIfRoot(object, RootIndex::kUndefinedValue, &done_checking);
   LoadMap(scratch, object);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register temp_type = temps.AcquireX();
+  CompareInstanceType(scratch, temp_type, ALLOCATION_SITE_TYPE);
+#else
   CompareInstanceType(scratch, scratch, ALLOCATION_SITE_TYPE);
+#endif // __CHERI_PURE_CAPABILITY__
   Assert(eq, AbortReason::kExpectedUndefinedOrCell);
   Bind(&done_checking);
 }
@@ -1789,7 +2019,11 @@ void MacroAssembler::CallRuntime(const Runtime::Function* f, int num_arguments,
 
   // Place the necessary arguments.
   Mov(x0, num_arguments);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Mov(c1, ExternalReference::Create(f));
+#else
   Mov(x1, ExternalReference::Create(f));
+#endif // __CHERI_PURE_CAPABILITY__
 
   Handle<CodeT> code =
       CodeFactory::CEntry(isolate(), f->result_size, save_doubles);
@@ -1851,7 +2085,11 @@ void TurboAssembler::CallCFunction(ExternalReference function,
                                    int num_of_double_args) {
   ASM_CODE_COMMENT(this);
   UseScratchRegisterScope temps(this);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register temp = temps.AcquireC();
+#else
   Register temp = temps.AcquireX();
+#endif
   Mov(temp, function);
   CallCFunction(temp, num_of_reg_args, num_of_double_args);
 }
@@ -1867,8 +2105,13 @@ void TurboAssembler::CallCFunction(Register function, int num_of_reg_args,
 
   // Save the frame pointer and PC so that the stack layout remains iterable,
   // even without an ExitFrame which normally exists between JS and C frames.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register pc_scratch = c4;
+  Register addr_scratch = c5;
+#else
   Register pc_scratch = x4;
   Register addr_scratch = x5;
+#endif // __CHERI_PURE_CAPABILITY__
   Push(pc_scratch, addr_scratch);
 
   Label get_pc;
@@ -2037,7 +2280,11 @@ void TurboAssembler::Jump(Handle<CodeT> code, RelocInfo::Mode rmode,
 
 void TurboAssembler::Jump(const ExternalReference& reference) {
   UseScratchRegisterScope temps(this);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register scratch = temps.AcquireC();
+#else
   Register scratch = temps.AcquireX();
+#endif // __CHERI_PURE_CAPABILITY__
   Mov(scratch, reference);
   Jump(scratch);
 }
@@ -2084,7 +2331,11 @@ void TurboAssembler::Call(Handle<CodeT> code, RelocInfo::Mode rmode) {
 
 void TurboAssembler::Call(ExternalReference target) {
   UseScratchRegisterScope temps(this);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register temp = temps.AcquireC();
+#else
   Register temp = temps.AcquireX();
+#endif // __CHERI_PURE_CAPABILITY__
   Mov(temp, target);
   Call(temp);
 }
@@ -2238,11 +2489,19 @@ void TurboAssembler::JumpCodeObject(Register code_object, JumpMode jump_mode) {
   LoadCodeObjectEntry(code_object, code_object);
 
   UseScratchRegisterScope temps(this);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  if (code_object != c17) {
+    temps.Exclude(c17);
+    Mov(c17, code_object);
+  }
+  Jump(c17);
+#else
   if (code_object != x17) {
     temps.Exclude(x17);
     Mov(x17, code_object);
   }
   Jump(x17);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 void TurboAssembler::LoadCodeDataContainerEntry(
@@ -2281,11 +2540,19 @@ void TurboAssembler::JumpCodeDataContainerObject(
   LoadCodeDataContainerEntry(code_data_container_object,
                              code_data_container_object);
   UseScratchRegisterScope temps(this);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  if (code_data_container_object != c17) {
+    temps.Exclude(c17);
+    Mov(c17, code_data_container_object);
+  }
+  Jump(c17);
+#else
   if (code_data_container_object != x17) {
     temps.Exclude(x17);
     Mov(x17, code_data_container_object);
   }
   Jump(x17);
+#endif // _CHERI_PURE_CAPABILITY__
 }
 
 void TurboAssembler::LoadCodeTEntry(Register destination, Register code) {
@@ -2326,24 +2593,38 @@ void TurboAssembler::StoreReturnAddressAndCall(Register target) {
   temps.Exclude(x16, x17);
 
   Label return_location;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Adr(c17, &return_location);
+#else
   Adr(x17, &return_location);
+#endif // __CHERI_PURE_CAPABILITY__
 #ifdef V8_ENABLE_CONTROL_FLOW_INTEGRITY
 #if defined(__CHERI_PURE_CAPABILITY__)
-  Add(x16, sp, kSystemPointerAddrSize);
+  Add(c16, sp, kSystemPointerSize);
 #else
-  Add(x16, sp, kSystemPointerSize);
-#endif
+  Add(x16, sp, kSystemPointerAddrSize);
+#endif // __CHERI_PURE_CAPABILITY__
   Pacib1716();
 #endif
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Poke(c17, 0);
+#else
   Poke(x17, 0);
+#endif // __CHERI_PURE_CAPABILITY__
 
   if (FLAG_debug_code) {
     ASM_CODE_COMMENT_STRING(this, "Verify fp[kSPOffset]-8");
     // Verify that the slot below fp[kSPOffset]-8 points to the signed return
     // location.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Ldr(c16, MemOperand(fp, ExitFrameConstants::kSPOffset));
+    Ldr(c16, MemOperand(c16, -static_cast<int64_t>(kCRegSize)));
+    Cmp(c16, c17);
+#else
     Ldr(x16, MemOperand(fp, ExitFrameConstants::kSPOffset));
     Ldr(x16, MemOperand(x16, -static_cast<int64_t>(kXRegSize)));
     Cmp(x16, x17);
+#endif // __CHERI_PURE_CAPABILITY__
     Check(eq, AbortReason::kReturnAddressNotFoundInFrame);
   }
 
@@ -2354,7 +2635,11 @@ void TurboAssembler::StoreReturnAddressAndCall(Register target) {
 void TurboAssembler::IndirectCall(Address target, RelocInfo::Mode rmode) {
   ASM_CODE_COMMENT(this);
   UseScratchRegisterScope temps(this);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register temp = temps.AcquireC();
+#else
   Register temp = temps.AcquireX();
+#endif // __CHERI_PURE_CAPABILITY__
   Mov(temp, Immediate(target, rmode));
   Blr(temp);
 }
@@ -2402,9 +2687,21 @@ void MacroAssembler::StackOverflowCheck(Register num_args,
   LoadStackLimit(scratch, StackLimitKind::kRealStackLimit);
   // Make scratch the space we have left. The stack might already be overflowed
   // here which will cause scratch to become negative.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  {
+    Register temp = temps.AcquireX();
+    Gcvalue(csp, temp);
+    Sub(scratch, temp, scratch);
+  }
+#else
   Sub(scratch, sp, scratch);
+#endif // __CHERI_PURE_CAPABILITY__
   // Check if the arguments will overflow the stack.
+#if defined(__CHERI_PURE_CAPABILITY__)
   Cmp(scratch, Operand(num_args, LSL, kSystemPointerSizeLog2));
+#else
+  Cmp(scratch, Operand(num_args, LSL, kSystemPointerAddrSizeLog2));
+#endif // __CHERI_PURE_CAPABILITY__
   B(le, stack_overflow);
 }
 
@@ -2468,20 +2765,37 @@ void MacroAssembler::InvokePrologue(Register formal_parameter_count,
 
   // Move the arguments already in the stack including the receiver.
   {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Register src = c6;
+    Register dst = c7;
+#else
     Register src = x6;
     Register dst = x7;
+#endif // __CHERI_PURE_CAPABILITY__
     SlotAddress(src, slots_to_claim);
     SlotAddress(dst, 0);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    CopyCapabilities(dst, src, slots_to_copy);
+#else
     CopyDoubleWords(dst, src, slots_to_copy);
+#endif // __CHERI_PURE_CAPABILITY__
   }
 
   Bind(&skip_move);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register pointer_next_value = c5;
+#else
   Register pointer_next_value = x5;
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Copy extra arguments as undefined values.
   {
     Label loop;
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Register undefined_value = c6;
+#else
     Register undefined_value = x6;
+#endif // __CHERI_PURE_CAPABILITY__
     Register count = x7;
     LoadRoot(undefined_value, RootIndex::kUndefinedValue);
     SlotAddress(pointer_next_value, actual_argument_count);
@@ -2489,10 +2803,10 @@ void MacroAssembler::InvokePrologue(Register formal_parameter_count,
     Bind(&loop);
     Str(undefined_value,
 #if defined(__CHERI_PURE_CAPABILITY__)
-        MemOperand(pointer_next_value, kSystemPointerAddrSize, PostIndex));
-#else
         MemOperand(pointer_next_value, kSystemPointerSize, PostIndex));
-#endif
+#else
+        MemOperand(pointer_next_value, kSystemPointerAddrSize, PostIndex));
+#endif // __CHERI_PURE_CAPABILITY__
     Subs(count, count, 1);
     Cbnz(count, &loop);
   }
@@ -2528,17 +2842,30 @@ void MacroAssembler::CallDebugOnFunctionCall(Register fun, Register new_target,
   FrameScope frame(
       this, has_frame() ? StackFrame::NO_FRAME_TYPE : StackFrame::INTERNAL);
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  if (!new_target.is_valid()) new_target = padregc;
+#else
   if (!new_target.is_valid()) new_target = padreg;
+#endif // _CHERI_PURE_CAPABILITY__
 
   // Save values on stack.
   SmiTag(expected_parameter_count);
   SmiTag(actual_parameter_count);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Push(expected_parameter_count.C(), actual_parameter_count.C(), new_target, fun);
+  Push(fun, c4);
+#else
   Push(expected_parameter_count, actual_parameter_count, new_target, fun);
   Push(fun, x4);
+#endif // _CHERI_PURE_CAPABILITY__
   CallRuntime(Runtime::kDebugOnFunctionCall);
 
   // Restore values from stack.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Pop(fun, new_target, actual_parameter_count.C(), expected_parameter_count.C());
+#else
   Pop(fun, new_target, actual_parameter_count, expected_parameter_count);
+#endif // _CHERI_PURE_CAPABILITY__
   SmiUntag(actual_parameter_count);
   SmiUntag(expected_parameter_count);
 }
@@ -2550,8 +2877,13 @@ void MacroAssembler::InvokeFunctionCode(Register function, Register new_target,
   ASM_CODE_COMMENT(this);
   // You can't call a function without a valid frame.
   DCHECK_IMPLIES(type == InvokeType::kCall, has_frame());
+#if defined(__CHERI_PURE_CAPABILITY__)
+  DCHECK_EQ(function, c1);
+  DCHECK_IMPLIES(new_target.is_valid(), new_target == c3);
+#else
   DCHECK_EQ(function, x1);
   DCHECK_IMPLIES(new_target.is_valid(), new_target == x3);
+#endif // __CHERI_PURE_CAPABILITY__
 
   // On function call, call into the debugger if necessary.
   Label debug_hook, continue_after_hook;
@@ -2564,7 +2896,11 @@ void MacroAssembler::InvokeFunctionCode(Register function, Register new_target,
 
   // Clear the new.target register if not given.
   if (!new_target.is_valid()) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    LoadRoot(c3, RootIndex::kUndefinedValue);
+#else
     LoadRoot(x3, RootIndex::kUndefinedValue);
+#endif // __CHERI_PURE_CAPABILITY__
   }
 
   Label done;
@@ -2636,7 +2972,11 @@ void MacroAssembler::InvokeFunctionWithNewTarget(
 
   // Contract with called JS functions requires that function is passed in x1.
   // (See FullCodeGenerator::Generate().)
+#if defined(__CHERI_PURE_CAPABILITY__)
+  DCHECK_EQ(function, c1);
+#else
   DCHECK_EQ(function, x1);
+#endif // __CHERI_PURE_CAPABILITY__
 
   Register expected_parameter_count = x2;
 
@@ -2646,7 +2986,11 @@ void MacroAssembler::InvokeFunctionWithNewTarget(
   // (kDontAdaptArgumentsSentinel), so we need sign
   // extension to correctly handle it.
   LoadTaggedPointerField(
+#if defined(__CHERI_PURE_CAPABILITY__)
+      expected_parameter_count.C(),
+#else
       expected_parameter_count,
+#endif // __CHERI_PURE_CAPABILITY__
       FieldMemOperand(function, JSFunction::kSharedFunctionInfoOffset));
   Ldrh(expected_parameter_count,
        FieldMemOperand(expected_parameter_count,
@@ -2666,7 +3010,11 @@ void MacroAssembler::InvokeFunction(Register function,
 
   // Contract with called JS functions requires that function is passed in x1.
   // (See FullCodeGenerator::Generate().)
+#if defined(__CHERI_PURE_CAPABILITY__)
+  DCHECK_EQ(function, c1);
+#else
   DCHECK_EQ(function, x1);
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Set up the context.
   LoadTaggedPointerField(cp,
@@ -2757,9 +3105,17 @@ void TurboAssembler::TruncateDoubleToI(Isolate* isolate, Zone* zone,
 void TurboAssembler::Prologue() {
   ASM_CODE_COMMENT(this);
   Push<TurboAssembler::kSignLR>(lr, fp);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  cpy(fp, csp);
+#else
   mov(fp, sp);
+#endif // __CHERI_PURE_CAPABILITY__
   static_assert(kExtraSlotClaimedByPrologue == 1);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Push(cp, kJSFunctionRegister, kJavaScriptCallArgCountRegister.C(), padregc);
+#else
   Push(cp, kJSFunctionRegister, kJavaScriptCallArgCountRegister, padreg);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 void TurboAssembler::EnterFrame(StackFrame::Type type) {
@@ -2772,14 +3128,20 @@ void TurboAssembler::EnterFrame(StackFrame::Type type) {
   ) {
     Register type_reg = temps.AcquireX();
     Mov(type_reg, StackFrame::TypeToMarker(type));
-    Push<TurboAssembler::kSignLR>(lr, fp, type_reg, padreg);
-    const int kFrameSize =
 #if defined(__CHERI_PURE_CAPABILITY__)
-        TypedFrameConstants::kFixedFrameSizeFromFp + kSystemPointerAddrSize;
+    Push<TurboAssembler::kSignLR>(lr, fp, type_reg.C(), padregc);
 #else
-        TypedFrameConstants::kFixedFrameSizeFromFp + kSystemPointerSize;
-#endif
+    Push<TurboAssembler::kSignLR>(lr, fp, type_reg, padreg);
+#endif // __CHERI_PURE_CAPABILITY__
+    const int kFrameSize =
+        TypedFrameConstants::kFixedFrameSizeFromFp +
+#if defined(__CHERI_PURE_CAPABILITY__)
+	kSystemPointerSize;
+    Add(fp, csp, kFrameSize);
+#else
+        kSystemPointerAddrSize;
     Add(fp, sp, kFrameSize);
+#endif // __CHERI_PURE_CAPABILITY__
     // sp[3] : lr
     // sp[2] : fp
     // sp[1] : type
@@ -2791,7 +3153,11 @@ void TurboAssembler::EnterFrame(StackFrame::Type type) {
     Register type_reg = temps.AcquireX();
     Mov(type_reg, StackFrame::TypeToMarker(type));
     Push<TurboAssembler::kSignLR>(lr, fp);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Mov(fp, csp);
+#else
     Mov(fp, sp);
+#endif // __CHERI_PURE_CAPABILITY__
     Push(type_reg, kWasmInstanceRegister);
     // sp[3] : lr
     // sp[2] : fp
@@ -2804,16 +3170,21 @@ void TurboAssembler::EnterFrame(StackFrame::Type type) {
 
     // Users of this frame type push a context pointer after the type field,
     // so do it here to keep the stack pointer aligned.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Push<TurboAssembler::kSignLR>(lr, fp, type_reg.C(), cp);
+#else
     Push<TurboAssembler::kSignLR>(lr, fp, type_reg, cp);
+#endif // __CHERI_PURE_CAPABILITY__
 
     // The context pointer isn't part of the fixed frame, so add an extra slot
     // to account for it.
-    Add(fp, sp,
 #if defined(__CHERI_PURE_CAPABILITY__)
-        TypedFrameConstants::kFixedFrameSizeFromFp + kSystemPointerAddrSize);
-#else
+    Add(fp, csp,
         TypedFrameConstants::kFixedFrameSizeFromFp + kSystemPointerSize);
-#endif
+#else
+    Add(fp, sp,
+        TypedFrameConstants::kFixedFrameSizeFromFp + kSystemPointerAddrSize);
+#endif // __CHERI_PURE_CAPABILITY__
     // sp[3] : lr
     // sp[2] : fp
     // sp[1] : type
@@ -2823,7 +3194,11 @@ void TurboAssembler::EnterFrame(StackFrame::Type type) {
     // Just push a minimal "machine frame", saving the frame pointer and return
     // address, without any markers.
     Push<TurboAssembler::kSignLR>(lr, fp);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Mov(fp, csp);
+#else
     Mov(fp, sp);
+#endif // __CHERI_PURE_CAPABILITY__
     // sp[1] : lr
     // sp[0] : fp
   }
@@ -2833,7 +3208,11 @@ void TurboAssembler::LeaveFrame(StackFrame::Type type) {
   ASM_CODE_COMMENT(this);
   // Drop the execution stack down to the frame pointer and restore
   // the caller frame pointer and return address.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Mov(csp, fp);
+#else
   Mov(sp, fp);
+#endif // __CHERI_PURE_CAPABILITY__
   Pop<TurboAssembler::kAuthLR>(fp, lr);
 }
 
@@ -2868,7 +3247,11 @@ void MacroAssembler::EnterExitFrame(bool save_doubles, const Register& scratch,
 
   // Set up the new stack frame.
   Push<TurboAssembler::kSignLR>(lr, fp);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Mov(fp, csp);
+#else
   Mov(fp, sp);
+#endif // __CHERI_PURE_CAPABILITY__
   Mov(scratch, StackFrame::TypeToMarker(frame_type));
   Push(scratch, xzr);
   //          fp[8]: CallerPC (lr)
@@ -2876,7 +3259,7 @@ void MacroAssembler::EnterExitFrame(bool save_doubles, const Register& scratch,
   //          fp[-8]: STUB marker
   //    sp -> fp[-16]: Space reserved for SPOffset.
 #if defined(__CHERI_PURE_CAPABILITY__)
-    static_assert((2 * kSystemPointerAddrSize) ==
+  static_assert((2 * kSystemPointerAddrSize) ==
                 ExitFrameConstants::kCallerSPOffset);
   static_assert((1 * kSystemPointerAddrSize) ==
                 ExitFrameConstants::kCallerPCOffset);
@@ -2884,7 +3267,7 @@ void MacroAssembler::EnterExitFrame(bool save_doubles, const Register& scratch,
                 ExitFrameConstants::kCallerFPOffset);
 static_assert((-2 * kSystemPointerAddrSize) == ExitFrameConstants::kSPOffset);
 #else
-   static_assert((2 * kSystemPointerSize) ==
+  static_assert((2 * kSystemPointerSize) ==
                 ExitFrameConstants::kCallerSPOffset);
   static_assert((1 * kSystemPointerSize) ==
                 ExitFrameConstants::kCallerPCOffset);
@@ -2963,7 +3346,11 @@ void MacroAssembler::LeaveExitFrame(bool restore_doubles,
   //         fp[8]: CallerPC (lr)
   //   fp -> fp[0]: CallerFP (old fp)
   //         fp[...]: The rest of the frame.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Mov(csp, fp);
+#else
   Mov(sp, fp);
+#endif // __CHERI_PURE_CAPABILITY__
   Pop<TurboAssembler::kAuthLR>(fp, lr);
 }
 
@@ -2975,6 +3362,24 @@ void MacroAssembler::LoadGlobalProxy(Register dst) {
 void MacroAssembler::LoadWeakValue(Register out, Register in,
                                    Label* target_if_cleared) {
   ASM_CODE_COMMENT(this);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  if (out.IsC()) {
+    DCHECK(in.IsC());
+    UseScratchRegisterScope temps(this);
+    Register temp_in = temps.AcquireX();
+    Gcvalue(in, temp_in);
+
+    CompareAndBranch(temp_in.W(), Operand(kClearedWeakHeapObjectLower32), eq,
+                     target_if_cleared);
+
+    Register temp_out = temps.AcquireX();
+    Gcvalue(out, temp_out);
+    and_(temp_out, temp_in, Operand(~kWeakHeapObjectMask));
+    Scvalue(out, out, temp_out);
+    return;
+  }
+#endif // __CHERI_PURE_CAPABILITY__
+
   CompareAndBranch(in.W(), Operand(kClearedWeakHeapObjectLower32), eq,
                    target_if_cleared);
 
@@ -3050,7 +3455,11 @@ void MacroAssembler::LoadElementsKindFromMap(Register result, Register map) {
 void MacroAssembler::CompareRoot(const Register& obj, RootIndex index) {
   ASM_CODE_COMMENT(this);
   UseScratchRegisterScope temps(this);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register temp = temps.AcquireC();
+#else
   Register temp = temps.AcquireX();
+#endif // __CHERI_PURE_CAPABILITY__
   DCHECK(!AreAliased(obj, temp));
   LoadRoot(temp, index);
   CmpTagged(obj, temp);
@@ -3158,7 +3567,11 @@ void TurboAssembler::DecompressTaggedPointer(const Register& destination,
 void TurboAssembler::DecompressTaggedPointer(const Register& destination,
                                              const Register& source) {
   ASM_CODE_COMMENT(this);
+#if defined(__CHERI_PURE_CAPABILITY__)
   Add(destination, kPtrComprCageBaseRegister, Operand(source, UXTW));
+#else
+  Add(destination, kPtrComprCageBaseRegister, Operand(source, UXTW));
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 void TurboAssembler::DecompressAnyTagged(const Register& destination,
@@ -3243,7 +3656,13 @@ void MacroAssembler::RecordWriteField(Register object, int offset,
     UseScratchRegisterScope temps(this);
     Register scratch = temps.AcquireX();
     DCHECK(!AreAliased(object, value, scratch));
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Register temp = temps.AcquireX();
+    Gcvalue(object, temp);
+    Add(scratch, temp, offset - kHeapObjectTag);
+#else
     Add(scratch, object, offset - kHeapObjectTag);
+#endif // __CHERI_PURE_CAPABILITY__
     Tst(scratch, kTaggedSize - 1);
     B(eq, &ok);
     Abort(AbortReason::kUnalignedCellInWriteBarrier);
@@ -3269,8 +3688,19 @@ void TurboAssembler::EncodeSandboxedPointer(const Register& value) {
 void TurboAssembler::DecodeSandboxedPointer(const Register& value) {
   ASM_CODE_COMMENT(this);
 #ifdef V8_SANDBOXED_POINTERS
+#if defined(__CHERI_PURE_CAPABILITY__)
+  {
+    UseScratchRegisterScope temps(this);
+    Register temp = temps.AcquireX();
+    Gcvalue(value, temp);
+    Lsr(temp, temp, kSandboxedPointerShift);
+    Add(value, kPtrComprCageBaseRegister,
+        Operand(temp));
+  }
+#else
   Add(value, kPtrComprCageBaseRegister,
       Operand(value, LSR, kSandboxedPointerShift));
+#endif // __CHERI_PURE_CAPABILITY__
 #else
   UNREACHABLE();
 #endif
@@ -3301,8 +3731,13 @@ void TurboAssembler::LoadExternalPointerField(Register destination,
   ASM_CODE_COMMENT(this);
 #ifdef V8_SANDBOXED_EXTERNAL_POINTERS
   DCHECK_NE(kExternalPointerNullTag, tag);
+  {
   UseScratchRegisterScope temps(this);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register external_table = temps.AcquireC();
+#else
   Register external_table = temps.AcquireX();
+#endif  // __CHERI_PURE_CAPABILITY__
   if (isolate_root == no_reg) {
     DCHECK(root_array_available_);
     isolate_root = kRootRegister;
@@ -3314,10 +3749,20 @@ void TurboAssembler::LoadExternalPointerField(Register destination,
   Ldr(destination.W(), field_operand);
   // MemOperand doesn't support LSR currently (only LSL), so here we do the
   // offset computation separately first.
+#if defined(__CHERI_PURE_CAPABILITY__)
   static_assert(kExternalPointerIndexShift > kSystemPointerSizeLog2);
   int shift_amount = kExternalPointerIndexShift - kSystemPointerSizeLog2;
+#else
+  static_assert(kExternalPointerIndexShift > kSystemPointerAddrSizeLog2);
+  int shift_amount = kExternalPointerIndexShift - kSystemPointerAddrSizeLog2;
+#endif  // __CHERI_PURE_CAPABILITY__
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Mov(destination.X(), Operand(destination.X(), LSR, shift_amount));
+#else
   Mov(destination, Operand(destination, LSR, shift_amount));
+#endif  // __CHERI_PURE_CAPABILITY__
   Ldr(destination, MemOperand(external_table, destination));
+  }
   And(destination, destination, Immediate(~tag));
 #else
   Ldr(destination, field_operand);
@@ -3327,7 +3772,11 @@ void TurboAssembler::LoadExternalPointerField(Register destination,
 void TurboAssembler::MaybeSaveRegisters(RegList registers) {
   if (registers.is_empty()) return;
   ASM_CODE_COMMENT(this);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  CPURegList regs(kCRegSizeInBits, registers);
+#else
   CPURegList regs(kXRegSizeInBits, registers);
+#endif // __CHERI_PURE_CAPABILITY__
   // If we were saving LR, we might need to sign it.
   DCHECK(!regs.IncludesAliasOf(lr));
   regs.Align();
@@ -3337,7 +3786,11 @@ void TurboAssembler::MaybeSaveRegisters(RegList registers) {
 void TurboAssembler::MaybeRestoreRegisters(RegList registers) {
   if (registers.is_empty()) return;
   ASM_CODE_COMMENT(this);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  CPURegList regs(kCRegSizeInBits, registers);
+#else
   CPURegList regs(kXRegSizeInBits, registers);
+#endif // __CHERI_PURE_CAPABILITY__
   // If we were saving LR, we might need to sign it.
   DCHECK(!regs.IncludesAliasOf(lr));
   regs.Align();
@@ -3450,11 +3903,19 @@ void MacroAssembler::RecordWrite(Register object, Operand offset,
   if (FLAG_debug_code) {
     ASM_CODE_COMMENT_STRING(this, "Verify slot_address");
     UseScratchRegisterScope temps(this);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Register temp = temps.AcquireC();
+#else
     Register temp = temps.AcquireX();
+#endif // __CHERI_PURE_CAPABILITY__
     DCHECK(!AreAliased(object, value, temp));
     Add(temp, object, offset);
     LoadTaggedPointerField(temp, MemOperand(temp));
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Cmp(temp.X(), value);
+#else
     Cmp(temp, value);
+#endif // __CHERI_PURE_CAPABILITY__
     Check(eq, AbortReason::kWrongAddressOrValuePassedToRecordWrite);
   }
 
@@ -3478,7 +3939,11 @@ void MacroAssembler::RecordWrite(Register object, Operand offset,
 
   // Record the actual write.
   if (lr_status == kLRHasNotBeenSaved) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Push<TurboAssembler::kSignLR>(lr);
+#else
     Push<TurboAssembler::kSignLR>(padreg, lr);
+#endif // __CHERI_PURE_CAPABILITY__
   }
   Register slot_address = WriteBarrierDescriptor::SlotAddressRegister();
   DCHECK(!AreAliased(object, slot_address, value));
@@ -3487,9 +3952,17 @@ void MacroAssembler::RecordWrite(Register object, Operand offset,
   Add(slot_address, object, offset);
   CallRecordWriteStub(object, slot_address, fp_mode);
   if (lr_status == kLRHasNotBeenSaved) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Pop<TurboAssembler::kAuthLR>(lr);
+#else
     Pop<TurboAssembler::kAuthLR>(lr, padreg);
-  }
+#endif // __CHERI_PURE_CAPABILITY__
+ }
+#if defined(__CHERI_PURE_CAPABILITY__)
+  if (FLAG_debug_code) Mov(slot_address.X(), Operand(kZapValue));
+#else
   if (FLAG_debug_code) Mov(slot_address, Operand(kZapValue));
+#endif // __CHERI_PURE_CAPABILITY__
 
   Bind(&done);
 }

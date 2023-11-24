@@ -15,15 +15,22 @@ namespace internal {
 
 // List macro containing all visitors needed by the decoder class.
 #if defined(__CHERI_PURE_CAPABILITY__)
-#define VISITOR_LIST(V)                	        \
-	ARM64_VISITOR_LIST(V)		        \
-	V(AddSubCapabilityImmediate)            \
+#define VISITOR_LIST(V)				\
+	ARM64_VISITOR_LIST(V)			\
+	V(AddSubCapExtended)                    \
+	V(AddSubCapImmediate)                   \
+	V(CompareCapabilities)                  \
 	V(CopyCapability)                       \
+	V(ConditionalSelectCap)                 \
+	V(GetField1)                            \
+	V(LoadStoreCapUnscaledOffsetNormal)     \
 	V(LoadStoreCapUnsignedOffsetCapNormal)  \
+	V(LoadStoreCapRegisterOffsetNormal)     \
+	V(LoadStorePostCapIndex)                \
+	V(LoadStorePreCapIndex)                 \
 	V(LoadStorePairCapPostIndex)            \
 	V(LoadStorePairCapPreIndex)             \
 	V(LoadStorePairCapOffset)               \
-	V(GetField1)                            \
 	V(SetField1)
 #else
 #define VISITOR_LIST(V)                 \
@@ -262,23 +269,23 @@ class Decoder : public V {
   // Decode the Morello load_store_misc4 instructions,
   // and call the corresponding visitors.
   void DecodeMorelloLoadStoreMisc4(Instruction* instr);
-  
+
   // Decode the Morello load/store register via laternative base instructions,
   // and call the corresponding visitors.
   void DecodeMorelloLoadStoreRegisterViaAlternativeBase(Instruction* instr);
- 
+
   // Decode the Morello load/store unsigned offset instructions,
   // and call the corresponding visitors.
   void DecodeMorelloLoadStoreUnsignedOffset(Instruction* instr);
-  
+
   // Decode the Morello load/store unsigned offset voa alternative base instructions,
   // and call the corresponding visitors.
   void DecodeMorelloLoadStoreUnsignedOffsetViaAlternativeBase(Instruction* instr);
-  
+
   // Decode the Morello load/store unscaled immediate via altenative base instructions,
   // and call the corresponding visitors.
   void DecodeMorelloLoadStoreUnscaledImmediateViaAlternateBase(Instruction* instr);
-	    
+
   // Decode the Morello misc instructions,
   // and call the corresponding visitors.
   void DecodeMorelloMisc(Instruction* instr);

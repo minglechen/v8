@@ -817,23 +817,13 @@ class V8_EXPORT_PRIVATE Assembler : public AssemblerBase {
   void str(const CPURegister& rt, const MemOperand& dst);
 
 #if defined(__CHERI_PURE_CAPABILITY__)
-  // Add a capability
-  void addc(const Register& ct, const Register& cn,
-	    const Operand& operand);
   // Conditional select: cd = cond ? cn : cm.
   void cselc(const Register& cd, const Register& cn, const Register& cm,
             Condition cond);
-  // Store a capability
-  void strc(const Register& rt, const MemOperand& dst);
-  // Load a capability
-  void ldrc(const Register& rt, const MemOperand& src);
-  void ldrc(const Register& rt, const Operand& operand);
-  void ldrc(const Register& rt, const Immediate& imm);
+  // Subtract capability and update status flags.
+  void subsc(const Register& rd, const Register& cn, const Operand& operand);
   // Copies a capability register
   void cpy(const Register& cd, const Register& cn);
-  // Subtract a capability
-  void subc(const Register& ct, const Register& cn,
-	    const Operand& operand);
   // Store a pair of capabilities
   void stpc(const Register& ct, const Register& ct2,
             const MemOperand& src);
@@ -2545,10 +2535,6 @@ class V8_EXPORT_PRIVATE Assembler : public AssemblerBase {
 
   void LoadStore(const CPURegister& rt, const MemOperand& addr, LoadStoreOp op);
 #if defined(__CHERI_PURE_CAPABILITY__)
-  void LoadStoreCapability(const Register& ct, const MemOperand& addr,
-		           const LoadStoreCapOp op);
-  void AddSubCapability(const Register& cd, const Register& cn,
-                        const Operand& operand, AddSubOp op);
   void LoadStorePairCap(const Register& rt, const Register& rt2,
                         const MemOperand& addr, LoadStorePairOp op);
 #endif // __CHERI_PURE_CAPABILITY__

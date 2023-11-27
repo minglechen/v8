@@ -255,6 +255,16 @@ class Instruction {
     return Mask(AddSubExtendedFMask) == AddSubExtendedFixed;
   }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  bool IsAddSubCapImmediate() const {
+    return Mask(AddSubCapImmediateFMask) == AddSubCapImmediateFixed;
+  }
+
+  bool IsAddSubCapExtended() const {
+    return Mask(AddSubCapExtendedFMask) == AddSubCapExtendedFixed;
+  }
+#endif // __CHERI_PURE_CAPABILITY__
+
   // Match any loads or stores, including pairs.
   bool IsLoadOrStore() const {
     return Mask(LoadStoreAnyFMask) == LoadStoreAnyFixed;
@@ -273,7 +283,12 @@ class Instruction {
     //  Add/sub (extended) when not setting the flags.
     //  Logical (immediate) when not setting the flags.
     // Otherwise, r31 is the zero register.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    if (IsAddSubImmediate() || IsAddSubExtended() ||
+        IsAddSubCapImmediate() || IsAddSubCapExtended()) {
+#else
     if (IsAddSubImmediate() || IsAddSubExtended()) {
+#endif // __CHERI_PURE_CAPABILITY__
       if (Mask(AddSubSetFlagsBit)) {
         return Reg31IsZeroRegister;
       } else {
@@ -302,7 +317,12 @@ class Instruction {
     //  Add/sub (immediate).
     //  Add/sub (extended).
     // Otherwise, r31 is the zero register.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    if (IsLoadOrStore() || IsAddSubImmediate() || IsAddSubExtended() ||
+	IsAddSubCapImmediate() || IsAddSubCapExtended()) {
+#else
     if (IsLoadOrStore() || IsAddSubImmediate() || IsAddSubExtended()) {
+#endif // __CHERI_PURE_CAPABILITY__
       return Reg31IsStackPointer;
     }
     return Reg31IsZeroRegister;
@@ -519,6 +539,9 @@ const unsigned kPrintfMaxArgCount = 4;
 enum PrintfArgPattern {
   kPrintfArgW = 1,
   kPrintfArgX = 2,
+#if defined(__CHERI_PURE_CAPABILITY__)
+  kPrintfArgC = 2,
+#endif // __CHERI_PURE_CAPABILITY__
   // There is no kPrintfArgS because floats are always converted to doubles in C
   // varargs calls.
   kPrintfArgD = 3

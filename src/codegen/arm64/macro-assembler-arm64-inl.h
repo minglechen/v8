@@ -268,7 +268,7 @@ void TurboAssembler::Subsc(const Register& rd, const Register& cn,
   DCHECK(operand.reg().IsC());
   if (cn.code() == kSPRegInternalCode) {
     UseScratchRegisterScope temps(this);
-    Register temp = temps.AcquireSameSizeAs(cn);
+    Register temp = temps.AcquireC();
     Cpy(temp, cn);
     subsc(rd, temp, operand);
   } else {

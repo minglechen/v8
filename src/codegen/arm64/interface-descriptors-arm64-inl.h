@@ -15,7 +15,11 @@ namespace v8 {
 namespace internal {
 
 constexpr auto CallInterfaceDescriptor::DefaultRegisterArray() {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  auto registers = RegisterArray(c0, c1, c2, c3, c4);
+#else
   auto registers = RegisterArray(x0, x1, x2, x3, x4);
+#endif // __CHERI_PURE_CAPABILITY__
   static_assert(registers.size() == kMaxBuiltinRegisterParams);
   return registers;
 }
@@ -24,6 +28,17 @@ constexpr auto CallInterfaceDescriptor::DefaultRegisterArray() {
 template <typename DerivedDescriptor>
 void StaticCallInterfaceDescriptor<DerivedDescriptor>::
     VerifyArgumentRegisterCount(CallInterfaceDescriptorData* data, int argc) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  RegList allocatable_regs = data->allocatable_registers();
+  if (argc >= 1) DCHECK(allocatable_regs.has(c0));
+  if (argc >= 2) DCHECK(allocatable_regs.has(c1));
+  if (argc >= 3) DCHECK(allocatable_regs.has(c2));
+  if (argc >= 4) DCHECK(allocatable_regs.has(c3));
+  if (argc >= 5) DCHECK(allocatable_regs.has(c4));
+  if (argc >= 6) DCHECK(allocatable_regs.has(c5));
+  if (argc >= 7) DCHECK(allocatable_regs.has(c6));
+  if (argc >= 8) DCHECK(allocatable_regs.has(c7));
+#else
   RegList allocatable_regs = data->allocatable_registers();
   if (argc >= 1) DCHECK(allocatable_regs.has(x0));
   if (argc >= 2) DCHECK(allocatable_regs.has(x1));
@@ -33,17 +48,26 @@ void StaticCallInterfaceDescriptor<DerivedDescriptor>::
   if (argc >= 6) DCHECK(allocatable_regs.has(x5));
   if (argc >= 7) DCHECK(allocatable_regs.has(x6));
   if (argc >= 8) DCHECK(allocatable_regs.has(x7));
+#endif // __CHERI_PURE_CAPABILITY__
 }
 #endif  // DEBUG
 
 // static
 constexpr auto WriteBarrierDescriptor::registers() {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return RegisterArray(c1, c5, c4, c2, c0, c3, kContextRegister);
+#else
   // TODO(leszeks): Remove x7 which is just there for padding.
   return RegisterArray(x1, x5, x4, x2, x0, x3, kContextRegister, x7);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 // static
+#if defined(__CHERI_PURE_CAPABILITY__)
+constexpr Register LoadDescriptor::ReceiverRegister() { return c1; }
+#else
 constexpr Register LoadDescriptor::ReceiverRegister() { return x1; }
+#endif // __CHERI_PURE_CAPABILITY__
 // static
 constexpr Register LoadDescriptor::NameRegister() { return x2; }
 // static
@@ -88,6 +112,16 @@ LoadWithReceiverAndVectorDescriptor::LookupStartObjectRegister() {
   return x4;
 }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+// static
+constexpr Register StoreDescriptor::ReceiverRegister() { return c1; }
+// static
+constexpr Register StoreDescriptor::NameRegister() { return c2; }
+// static
+constexpr Register StoreDescriptor::ValueRegister() { return c0; }
+// static
+constexpr Register StoreDescriptor::SlotRegister() { return c4; }
+#else
 // static
 constexpr Register StoreDescriptor::ReceiverRegister() { return x1; }
 // static
@@ -96,6 +130,7 @@ constexpr Register StoreDescriptor::NameRegister() { return x2; }
 constexpr Register StoreDescriptor::ValueRegister() { return x0; }
 // static
 constexpr Register StoreDescriptor::SlotRegister() { return x4; }
+#endif // __CHERI_PURE_CAPABILITY__
 
 // static
 constexpr Register StoreWithVectorDescriptor::VectorRegister() { return x3; }
@@ -104,14 +139,28 @@ constexpr Register StoreWithVectorDescriptor::VectorRegister() { return x3; }
 constexpr Register StoreTransitionDescriptor::MapRegister() { return x5; }
 
 // static
+#if defined(__CHERI_PURE_CAPABILITY__)
+constexpr Register ApiGetterDescriptor::HolderRegister() { return c0; }
+#else
 constexpr Register ApiGetterDescriptor::HolderRegister() { return x0; }
+#endif // __CHERI_PURE_CAPABILITY__
 // static
+#if defined(__CHERI_PURE_CAPABILITY__)
+constexpr Register ApiGetterDescriptor::CallbackRegister() { return c3; }
+#else
 constexpr Register ApiGetterDescriptor::CallbackRegister() { return x3; }
+#endif // __CHERI_PURE_CAPABILITY__
 
 // static
+#if defined(__CHERI_PURE_CAPABILITY__)
+constexpr Register GrowArrayElementsDescriptor::ObjectRegister() { return c0; }
+// static
+constexpr Register GrowArrayElementsDescriptor::KeyRegister() { return c3; }
+#else
 constexpr Register GrowArrayElementsDescriptor::ObjectRegister() { return x0; }
 // static
 constexpr Register GrowArrayElementsDescriptor::KeyRegister() { return x3; }
+#endif // __CHERI_PURE_CAPABILITY__
 
 // static
 constexpr Register BaselineLeaveFrameDescriptor::ParamsSizeRegister() {
@@ -232,13 +281,21 @@ constexpr auto ConstructStubDescriptor::registers() {
 }
 
 // static
+#if defined(__CHERI_PURE_CAPABILITY__)
+constexpr auto AbortDescriptor::registers() { return RegisterArray(c1); }
+#else
 constexpr auto AbortDescriptor::registers() { return RegisterArray(x1); }
+#endif // __CHERI_PURE_CAPABILITY__
 
 // static
 constexpr auto CompareDescriptor::registers() {
   // x1: left operand
   // x0: right operand
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return RegisterArray(c1, c0);
+#else
   return RegisterArray(x1, x0);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 // static
@@ -246,14 +303,22 @@ constexpr auto Compare_BaselineDescriptor::registers() {
   // x1: left operand
   // x0: right operand
   // x2: feedback slot
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return RegisterArray(c1, c0, c2);
+#else
   return RegisterArray(x1, x0, x2);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 // static
 constexpr auto BinaryOpDescriptor::registers() {
   // x1: left operand
   // x0: right operand
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return RegisterArray(c1, c0);
+#else
   return RegisterArray(x1, x0);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 // static
@@ -261,7 +326,11 @@ constexpr auto BinaryOp_BaselineDescriptor::registers() {
   // x1: left operand
   // x0: right operand
   // x2: feedback slot
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return RegisterArray(c1, c0, c2);
+#else
   return RegisterArray(x1, x0, x2);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 // static
@@ -269,50 +338,89 @@ constexpr auto BinarySmiOp_BaselineDescriptor::registers() {
   // x0: left operand
   // x1: right operand
   // x2: feedback slot
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return RegisterArray(c0, c1, c2);
+#else
   return RegisterArray(x0, x1, x2);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 // static
 constexpr auto ApiCallbackDescriptor::registers() {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return RegisterArray(c1,   // kApiFunctionAddress
+                       c2,   // kArgc
+                       c3,   // kCallData
+                       c0);  // kHolder
+#else
   return RegisterArray(x1,   // kApiFunctionAddress
                        x2,   // kArgc
                        x3,   // kCallData
                        x0);  // kHolder
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 // static
 constexpr auto InterpreterDispatchDescriptor::registers() {
+#if defined(__CHERI_PURE_CAPABILITY__)
   return RegisterArray(
+#else
+  return RegisterArray(
+#endif // __CHERI_PURE_CAPABILITY__
       kInterpreterAccumulatorRegister, kInterpreterBytecodeOffsetRegister,
       kInterpreterBytecodeArrayRegister, kInterpreterDispatchTableRegister);
 }
 
 // static
 constexpr auto InterpreterPushArgsThenCallDescriptor::registers() {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return RegisterArray(c0,   // argument count
+                       c2,   // address of first argument
+                       c1);  // the target callable to be call
+#else
   return RegisterArray(x0,   // argument count
                        x2,   // address of first argument
                        x1);  // the target callable to be call
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 // static
 constexpr auto InterpreterPushArgsThenConstructDescriptor::registers() {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return RegisterArray(
+      c0,   // argument count
+      c4,   // address of the first argument
+      c1,   // constructor to call
+      c3,   // new target
+      c2);  // allocation site feedback if available, undefined otherwise
+#else
   return RegisterArray(
       x0,   // argument count
       x4,   // address of the first argument
       x1,   // constructor to call
       x3,   // new target
       x2);  // allocation site feedback if available, undefined otherwise
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 // static
 constexpr auto ResumeGeneratorDescriptor::registers() {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return RegisterArray(c0,   // the value to pass to the generator
+                       c1);  // the JSGeneratorObject to resume
+#else
   return RegisterArray(x0,   // the value to pass to the generator
                        x1);  // the JSGeneratorObject to resume
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 // static
 constexpr auto RunMicrotasksEntryDescriptor::registers() {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return RegisterArray(c0, c1);
+#else
   return RegisterArray(x0, x1);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 }  // namespace internal

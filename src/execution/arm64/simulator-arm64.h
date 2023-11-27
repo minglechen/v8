@@ -240,7 +240,11 @@ class SimMemory {
   static T AddressUntag(T address) {
     // Cast the address using a C-style cast. A reinterpret_cast would be
     // appropriate, but it can't cast one integral type to another.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    uintptr_t bits = (uintptr_t)address;
+#else
     uint64_t bits = (uint64_t)address;
+#endif // __CHERI_PURE_CAPABILITY__
     return (T)(bits & ~kAddressTagMask);
   }
 
@@ -682,6 +686,15 @@ class Simulator : public DecoderVisitor, public SimulatorBase {
       type_ = X_ARG;
     }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+    explicit CallArgument(intptr_t argument) {
+      bits_ = 0;
+      DCHECK(sizeof(argument) <= sizeof(bits_));
+      memcpy(&bits_, &argument, sizeof(argument));
+      type_ = C_ARG;
+    }
+#endif // __CHERI_PURE_CAPABILITY__
+
     explicit CallArgument(double argument) {
       DCHECK(sizeof(argument) == sizeof(bits_));
       memcpy(&bits_, &argument, sizeof(argument));
@@ -706,17 +719,32 @@ class Simulator : public DecoderVisitor, public SimulatorBase {
     // objects can be passed into varargs functions.
     static CallArgument End() { return CallArgument(); }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+    intptr_t bits() const { return bits_; }
+#else
     int64_t bits() const { return bits_; }
+#endif // __CHERI_PURE_CAPABILITY__
     bool IsEnd() const { return type_ == NO_ARG; }
+#if defined(__CHERI_PURE_CAPABILITY__)
+    bool IsC() const { return type_ == X_ARG; }
+#endif // __CHERI_PURE_CAPABILITY__
     bool IsX() const { return type_ == X_ARG; }
     bool IsD() const { return type_ == D_ARG; }
 
    private:
+#if defined(__CHERI_PURE_CAPABILITY__)
+    enum CallArgumentType { X_ARG, C_ARG, D_ARG, NO_ARG };
+#else
     enum CallArgumentType { X_ARG, D_ARG, NO_ARG };
+#endif // __CHERI_PURE_CAPABILITY__
 
     // All arguments are aligned to at least 64 bits and we don't support
     // passing bigger arguments, so the payload size can be fixed at 64 bits.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    intptr_t bits_;
+#else
     int64_t bits_;
+#endif // __CHERI_PURE_CAPABILITY__
     CallArgumentType type_;
 
     CallArgument() { type_ = NO_ARG; }
@@ -739,7 +767,11 @@ class Simulator : public DecoderVisitor, public SimulatorBase {
   // should resume execution after this command completes.
   bool ExecDebugCommand(ArrayUniquePtr<char> command);
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  bool GetValue(const char* desc, intptr_t* value);
+#else
   bool GetValue(const char* desc, int64_t* value);
+#endif // __CHERI_PURE_CAPABILITY__
 
   bool PrintValue(const char* desc);
 

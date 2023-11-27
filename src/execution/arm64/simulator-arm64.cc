@@ -3426,7 +3426,11 @@ void Simulator::VisitSystem(Instruction* instr) {
   }
 }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+bool Simulator::GetValue(const char* desc, intptr_t* value) {
+#else
 bool Simulator::GetValue(const char* desc, int64_t* value) {
+#endif // __CHERI_PURE_CAPABILITY__
   int regnum = CodeFromName(desc);
   if (regnum >= 0) {
     unsigned code = regnum;
@@ -3440,6 +3444,10 @@ bool Simulator::GetValue(const char* desc, int64_t* value) {
     }
     if (desc[0] == 'w') {
       *value = wreg(code, Reg31IsStackPointer);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    } else if (desc[0] == 'c') {
+      *value = creg(code, Reg31IsStackPointer);
+#endif // __CHERI_PURE_CAPABILITY__
     } else {
       *value = xreg(code, Reg31IsStackPointer);
     }

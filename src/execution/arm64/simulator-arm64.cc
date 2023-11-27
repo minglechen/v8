@@ -6064,10 +6064,31 @@ void Simulator::VisitNEONPerm(Instruction* instr) {
 }
 
 #if defined(__CHERI_PURE_CAPABILITY__)
-void Simulator::VisitAddSubCapability(Instruction* instr) {
+void Simulator::VisitAddSubCapExtendedRegister(Instruction* instr) {
+}
+
+void Simulator::VisitAddSubCapImmediate(Instruction* instr) {
+}
+
+void Simulator::VisitCompareCapabilities(Instruction* instr) {
+}
+
+void Simulator::VisitConditionalSelectCapability(Instruction* instr) {
+}
+
+void Simulator::VisitLoadStoreCapUnscaledOffsetNormal(Instruction* instr) {
 }
 
 void Simulator::VisitLoadStoreCapUnsignedOffsetCapNormal(Instruction* instr) {
+}
+
+void Simulator::VisitLoadStoreCapRegisterOffsetNormal(Instruction* instr) {
+}
+
+void Simulator::VisitLoadStorePreCapIndex(Instruction* instr) {
+}
+
+void Simulator::VisitLoadStorePostCapIndex(Instruction* instr) {
 }
 
 void Simulator::VisitCopyCapability(Instruction* instr) {

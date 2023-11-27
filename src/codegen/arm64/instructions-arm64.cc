@@ -54,7 +54,7 @@ bool Instruction::IsLoad() const {
 
 bool Instruction::IsStore() const {
   if (Mask(LoadStoreAnyFMask) == LoadStoreAnyFixed) {
-    LoadStoreOp op = static_cast<LoadStoreOp>(Mask(LoadStorCapeMask));
+    LoadStoreOp op = static_cast<LoadStoreOp>(Mask(LoadStoreCapMask));
     switch (op) {
       case STRB_w:
       case STRH_w:

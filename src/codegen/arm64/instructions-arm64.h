@@ -53,7 +53,7 @@ extern const float16 kFP16DefaultNaN;
 unsigned CalcLSDataSize(LoadStoreOp op);
 unsigned CalcLSPairDataSize(LoadStorePairOp op);
 #if defined(__CHERI_PURE_CAPABILITY__)
-unsigned CalcLSPairCapDataSize(LoadStorePairCapOp op);
+unsigned CalcLSPairCapDataSize(LoadStorePairOp op);
 #endif // __CHERI_PURE_CAPABILITY__
 
 enum ImmBranchType {
@@ -211,10 +211,18 @@ class Instruction {
   }
 
   bool IsLdrLiteral() const {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    return Mask(LoadLiteralFMask) == LoadLiteralFixed ||
+        Mask(LoadLiteralCapFMask) == LoadLiteralCapFixed;
+#else
     return Mask(LoadLiteralFMask) == LoadLiteralFixed;
+#endif // __CHERI_PURE_CAPABILITY__
   }
 
   bool IsLdrLiteralX() const { return Mask(LoadLiteralMask) == LDR_x_lit; }
+#if defined(__CHERI_PURE_CAPABILITY__)
+  bool IsLdrLiteralC() const { return Mask(LoadLiteralCapMask) == LDR_c_lit; }
+#endif // __CHERI_PURE_CAPABILITY__
   bool IsLdrLiteralW() const { return Mask(LoadLiteralMask) == LDR_w_lit; }
 
   bool IsPCRelAddressing() const {

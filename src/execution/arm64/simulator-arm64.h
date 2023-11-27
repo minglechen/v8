@@ -370,7 +370,11 @@ class SimRegisterBase {
   void NotifyRegisterWrite() { written_since_last_log_ = true; }
 };
 
+#if defined(__CHERI_PURE_CAPABILITY__)
 using SimRegister = SimRegisterBase<kXRegSize>;   // r0-r31
+#else
+using SimRegister = SimRegisterBase<kCRegSize>;   // r0-r31
+#endif // __CHERI_PURE_CAPABILITY__
 using SimVRegister = SimRegisterBase<kQRegSize>;  // v0-v31
 
 // Representation of a vector register, with typed getters and setters for lanes
@@ -934,6 +938,12 @@ class Simulator : public DecoderVisitor, public SimulatorBase {
     return reg<int64_t>(code, r31mode);
   }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  int64_t creg(unsigned code, Reg31Mode r31mode = Reg31IsZeroRegister) const {
+    return reg<intptr_t>(code, r31mode);
+  }
+#endif // __CHERI_PURE_CAPABILITY__
+
   enum RegLogMode { LogRegWrites, NoRegLog };
 
   // Write 'value' into an integer register. The value is zero-extended. This
@@ -956,6 +966,13 @@ class Simulator : public DecoderVisitor, public SimulatorBase {
     set_reg(code, value, r31mode);
   }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  void set_creg(unsigned code, intptr_t value,
+                Reg31Mode r31mode = Reg31IsZeroRegister) {
+    set_reg(code, value, r31mode);
+  }
+#endif // __CHERI_PURE_CAPABILITY__
+
   // As above, but don't automatically log the register update.
   template <typename T>
   void set_reg_no_log(unsigned code, T value,
@@ -975,6 +992,13 @@ class Simulator : public DecoderVisitor, public SimulatorBase {
                        Reg31Mode r31mode = Reg31IsZeroRegister) {
     set_reg_no_log(code, value, r31mode);
   }
+
+#if defined(__CHERI_PURE_CAPABILITY__)
+  void set_creg_no_log(unsigned code, intptr_t value,
+                       Reg31Mode r31mode = Reg31IsZeroRegister) {
+    set_reg_no_log(code, value, r31mode);
+  }
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Commonly-used special cases.
   template <typename T>
@@ -2337,6 +2361,9 @@ class Simulator : public DecoderVisitor, public SimulatorBase {
   bool guard_pages_;
 
   static const char* xreg_names[];
+#if defined(__CHERI_PURE_CAPABILITY__)
+  static const char* creg_names[];
+#endif // __CHERI_PURE_CAPABILITY__
   static const char* wreg_names[];
   static const char* sreg_names[];
   static const char* dreg_names[];

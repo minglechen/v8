@@ -958,6 +958,21 @@ const char* Simulator::XRegNameForCode(unsigned code, Reg31Mode mode) {
   return xreg_names[code];
 }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+const char* Simulator::CRegNameForCode(unsigned code, Reg31Mode mode) {
+  static_assert(arraysize(Simulator::xreg_names) == (kNumberOfRegisters + 1),
+                "Array must be large enough to hold all register names.");
+  DCHECK_LT(code, static_cast<unsigned>(kNumberOfRegisters));
+  code %= kNumberOfRegisters;
+
+  // If the code represents the stack pointer, index the name after zr.
+  if ((code == kZeroRegCode) && (mode == Reg31IsStackPointer)) {
+    code = kZeroRegCode + 1;
+  }
+  return creg_names[code];
+}
+#endif // __CHERI_PURE_CAPABILITY__
+
 const char* Simulator::SRegNameForCode(unsigned code) {
   static_assert(arraysize(Simulator::sreg_names) == kNumberOfVRegisters,
                 "Array must be large enough to hold all register names.");
@@ -1519,6 +1534,11 @@ void Simulator::PrintRegisterRawHelper(unsigned code, Reg31Mode r31mode,
     case kXRegSize:
       name = XRegNameForCode(code, r31mode);
       break;
+#if defined(__CHERI_PURE_CAPABILITY__)
+    case kCRegSize:
+      name = CRegNameForCode(code, r31mode);
+      break;
+#endif // __CHERI_PURE_CAPABILITY__
     case kWRegSize:
       name = WRegNameForCode(code, r31mode);
       break;

@@ -206,7 +206,11 @@ bool RelocInfo::IsCodedSpecially() {
   // The deserializer needs to know whether a pointer is specially coded. Being
   // specially coded on ARM64 means that it is an immediate branch.
   Instruction* instr = reinterpret_cast<Instruction*>(pc_);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  if (instr->IsLdrLiteralC()) {
+#else
   if (instr->IsLdrLiteralX()) {
+#endif // __CHERI_PURE_CAPABILITY__
     return false;
   } else {
     DCHECK(instr->IsBranchAndLink() || instr->IsUnconditionalBranch());
@@ -217,14 +221,22 @@ bool RelocInfo::IsCodedSpecially() {
 bool RelocInfo::IsInConstantPool() {
   Instruction* instr = reinterpret_cast<Instruction*>(pc_);
   DCHECK_IMPLIES(instr->IsLdrLiteralW(), COMPRESS_POINTERS_BOOL);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return instr->IsLdrLiteralC() ||
+#else
   return instr->IsLdrLiteralX() ||
+#endif // __CHERI_PURE_CAPABILITY__
          (COMPRESS_POINTERS_BOOL && instr->IsLdrLiteralW());
 }
 
 uint32_t RelocInfo::wasm_call_tag() const {
   DCHECK(rmode_ == WASM_CALL || rmode_ == WASM_STUB_CALL);
   Instruction* instr = reinterpret_cast<Instruction*>(pc_);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  if (instr->IsLdrLiteralC()) {
+#else
   if (instr->IsLdrLiteralX()) {
+#endif // __CHERI_PURE_CAPABILITY__
     return static_cast<uint32_t>(
         Memory<Address>(Assembler::target_pointer_address_at(pc_)));
   } else {
@@ -714,7 +726,11 @@ bool Assembler::IsConstantPoolAt(Instruction* instr) {
   // The constant pool marker is made of two instructions. These instructions
   // will never be emitted by the JIT, so checking for the first one is enough:
   // 0: ldr xzr, #<size of pool>
+#if defined(__CHERI_PURE_CAPABILITY__)
+  bool result = instr->IsLdrLiteralC() && (instr->Rt() == kZeroRegCode);
+#else
   bool result = instr->IsLdrLiteralX() && (instr->Rt() == kZeroRegCode);
+#endif // __CHERI_PURE_CAPABILITY__
 
   // It is still worth asserting the marker is complete.
   // 4: blr xzr

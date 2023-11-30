@@ -18,63 +18,108 @@ class DecoderArm64TestVisitor: public DecoderVisitor {
     DecoderArm64TestVisitor() {};
 
 #define DECLARE(A) virtual void Visit##A(Instruction* instr) {		\
-  	EXPECT_TRUE(false) << "Instruction incorrectly decoded";	\
+	EXPECT_TRUE(false) << "Instruction incorrectly decoded";	\
     };
     VISITOR_LIST(DECLARE)
 #undef DECLARE
 };
 
 #if defined(__CHERI_PURE_CAPABILITY__)
-TEST_F(DecoderArm64Test, DecodeAddCapability) {
+TEST_F(DecoderArm64Test, DecodeAddCapabilityExtended) {
   class AddCapabilityVisitor : public DecoderArm64TestVisitor {
     public:
       AddCapabilityVisitor() {};
 
-      void VisitAddSubCapabilityImmediate(Instruction* instr) override {
-	EXPECT_EQ(instr->Mask(AddSubCapabilityImmediateFMask), AddSubCapabilityImmediateFixed);
-	switch(instr->Mask(AddSubCapabilityImmediateMask)) {
-	  case ADDCAP_c_imm:
+      void VisitAddSubCapExtended(Instruction* instr) override {
+	EXPECT_EQ(instr->Mask(AddSubCapExtendedFMask),
+                  AddSubCapExtendedFixed);
+	switch(instr->Mask(AddSubCapExtendedMask)) {
+	  case ADD_c_ext:
 	    EXPECT_TRUE(true);
-	    EXPECT_EQ(instr->Mask(Cn_mask), Assembler::Cn(c1));
+	    EXPECT_EQ(instr->Mask(Rm_mask), Assembler::Rm(x1));
+	    EXPECT_EQ(instr->Mask(ExtendMode_mask),
+		      Assembler::ExtendMode(Extend::UXTB));
+	    EXPECT_EQ(instr->Mask(ImmExtendShift_mask),
+		      Assembler::ImmExtendShift(1));
 	    EXPECT_EQ(instr->Mask(Cd_mask), Assembler::Cd(c2));
-	    EXPECT_EQ(instr->Mask(ImmAddSubCapability_mask), Assembler::ImmAddSubCapability(10));
+	    EXPECT_EQ(instr->Mask(Cn_mask), Assembler::Cn(c3));
 	    break;
 	  default:
-  	    EXPECT_TRUE(false) << "Add/sub capability incorrectly decoded (" << std::hex << instr->Mask(AddSubCapabilityImmediateMask) << ")";
+	    EXPECT_TRUE(false) << "Add/sub capability incorrectly decoded (" <<
+                std::hex << instr->Mask(AddSubCapExtendedMask) << ")";
 	    break;
 	}
-      } 
+      }
   };
   using TestOp = uint32_t;
-  TestOp addCap = ADDCAP_c_imm | Assembler::ImmAddSubCapability(10) | Assembler::Cn(c1) | Assembler::Cd(c2); 
+  TestOp addCap = ADD_c_ext | Assembler::Rm(x1) |
+		  Assembler::ExtendMode(Extend::UXTB) |
+		  Assembler::ImmExtendShift(1) |
+		  Assembler::CdCSP(c2) | Assembler::CnCSP(c3);
   auto decoder = new Decoder<DispatchingDecoderVisitor>();
   decoder->AppendVisitor(new AddCapabilityVisitor());
   auto addCapInstr = reinterpret_cast<Instruction*>(&addCap);
   decoder->Decode(addCapInstr);
 }
 
-TEST_F(DecoderArm64Test, DecodeSubCapability) {
+TEST_F(DecoderArm64Test, DecodeAddCapabilityImmediate) {
+  class AddCapabilityVisitor : public DecoderArm64TestVisitor {
+    public:
+      AddCapabilityVisitor() {};
+
+      void VisitAddSubCapImmediate(Instruction* instr) override {
+	EXPECT_EQ(instr->Mask(AddSubCapImmediateFMask),
+                  AddSubCapImmediateFixed);
+	switch(instr->Mask(AddSubCapImmediateMask)) {
+	  case ADD_c_imm:
+	    EXPECT_TRUE(true);
+	    EXPECT_EQ(instr->Mask(Cn_mask), Assembler::Cn(c1));
+	    EXPECT_EQ(instr->Mask(Cd_mask), Assembler::Cd(c2));
+	    EXPECT_EQ(instr->Mask(ImmAddSubCapability_mask),
+                      Assembler::ImmAddSubCapability(10));
+	    break;
+	  default:
+	    EXPECT_TRUE(false) << "Add/sub capability incorrectly decoded (" <<
+                std::hex << instr->Mask(AddSubCapImmediateMask) << ")";
+	    break;
+	}
+      }
+  };
+  using TestOp = uint32_t;
+  TestOp addCap = ADD_c_imm | Assembler::ImmAddSubCapability(10) |
+		  Assembler::Cn(c1) | Assembler::Cd(c2);
+  auto decoder = new Decoder<DispatchingDecoderVisitor>();
+  decoder->AppendVisitor(new AddCapabilityVisitor());
+  auto addCapInstr = reinterpret_cast<Instruction*>(&addCap);
+  decoder->Decode(addCapInstr);
+}
+
+TEST_F(DecoderArm64Test, DecodeSubCapabilityImmediate) {
   class SubCapabilityVisitor : public DecoderArm64TestVisitor {
     public:
       SubCapabilityVisitor() {};
 
-      void VisitAddSubCapabilityImmediate(Instruction* instr) override {
-	EXPECT_EQ(instr->Mask(AddSubCapabilityImmediateFMask), AddSubCapabilityImmediateFixed);
-	switch(instr->Mask(AddSubCapabilityImmediateMask)) {
-	  case SUBCAP_c_imm:
+      void VisitAddSubCapImmediate(Instruction* instr) override {
+	EXPECT_EQ(instr->Mask(AddSubCapImmediateFMask),
+		  AddSubCapImmediateFixed);
+	switch(instr->Mask(AddSubCapImmediateMask)) {
+	  case SUB_c_imm:
 	    EXPECT_TRUE(true);
 	    EXPECT_EQ(instr->Mask(Cn_mask), Assembler::Cn(c1));
 	    EXPECT_EQ(instr->Mask(Cd_mask), Assembler::Cd(c2));
-	    EXPECT_EQ(instr->Mask(ImmAddSubCapability_mask), Assembler::ImmAddSubCapability(10));
+	    EXPECT_EQ(instr->Mask(ImmAddSubCapability_mask),
+		      Assembler::ImmAddSubCapability(10));
 	    break;
 	  default:
-  	    EXPECT_TRUE(false) << "Add/sub capability incorrectly decoded (" << std::hex << instr->Mask(AddSubCapabilityImmediateMask) << ")";
+	    EXPECT_TRUE(false) << "Add/sub capability incorrectly decoded ("
+                << std::hex << instr->Mask(AddSubCapImmediateMask) << ")";
 	    break;
 	}
-      } 
+      }
   };
   using TestOp = uint32_t;
-  TestOp subCap = SUBCAP_c_imm | Assembler::ImmAddSubCapability(10) | Assembler::Cn(c1) | Assembler::Cd(c2); 
+  TestOp subCap = SUB_c_imm | Assembler::ImmAddSubCapability(10) |
+		  Assembler::Cn(c1) | Assembler::Cd(c2);
   auto decoder = new Decoder<DispatchingDecoderVisitor>();
   decoder->AppendVisitor(new SubCapabilityVisitor());
   auto subCapInstr = reinterpret_cast<Instruction*>(&subCap);
@@ -95,13 +140,14 @@ TEST_F(DecoderArm64Test, DecodeCopyCapability) {
 	    EXPECT_EQ(instr->Mask(Cd_mask), Assembler::Cd(c2));
 	    break;
 	  default:
-  	    EXPECT_TRUE(false) << "Copy capability incorrectly decoded (" << std::hex << instr->Mask(CopyCapabilityMask) << ")";
+	    EXPECT_TRUE(false) << "Copy capability incorrectly decoded (" <<
+                std::hex << instr->Mask(CopyCapabilityMask) << ")";
 	    break;
 	}
-      } 
+      }
   };
   using TestOp = uint32_t;
-  TestOp copyCap = CPY |  Assembler::Cn(c1) | Assembler::Cd(c2); 
+  TestOp copyCap = CPY |  Assembler::Cn(c1) | Assembler::Cd(c2);
   auto decoder = new Decoder<DispatchingDecoderVisitor>();
   decoder->AppendVisitor(new CopyCapabilityVisitor());
   auto copyCapInstr = reinterpret_cast<Instruction*>(&copyCap);
@@ -113,24 +159,31 @@ TEST_F(DecoderArm64Test, DecodeLoadCapUnsignedOffsetCapNormal) {
     public:
       LoadCapabilityVisitor() {};
 
-      void VisitLoadStoreCapUnsignedOffsetCapNormal(Instruction* instr) override {
-	EXPECT_EQ(instr->Mask(LoadStoreCapUnsignedOffsetCapNormalFMask), LoadStoreCapUnsignedOffsetCapNormalFixed);
+      void VisitLoadStoreCapUnsignedOffsetCapNormal(Instruction* instr)
+          override {
+	EXPECT_EQ(instr->Mask(LoadStoreCapUnsignedOffsetCapNormalFMask),
+                  LoadStoreCapUnsignedOffsetCapNormalFixed);
 	switch(instr->Mask(LoadStoreCapUnsignedOffsetCapNormalMask)) {
           case LDR_c_unsigned_cap_normal:
 	    EXPECT_TRUE(true);
 	    EXPECT_EQ(instr->Mask(Ct_mask), Assembler::Ct(c1));
 	    EXPECT_EQ(instr->Mask(Cn_mask), Assembler::CnCSP(c2));
-	    EXPECT_EQ(instr->Mask(ImmLS_mask), PatchingAssembler::ImmLSUnsigned(1 >> 4));
+	    EXPECT_EQ(instr->Mask(ImmLS_mask),
+		      PatchingAssembler::ImmLSUnsigned(1 >> 4));
 	    break;
 	  default:
-  	    EXPECT_TRUE(false) << "Load capability incorrectly decoded (" << std::hex << instr->Mask(LoadStoreCapUnsignedOffsetCapNormalMask) << ")";
+	    EXPECT_TRUE(false) << "Load capability incorrectly decoded (" <<
+                std::hex <<
+		instr->Mask(LoadStoreCapUnsignedOffsetCapNormalMask) << ")";
 	    break;
 	}
-      } 
+      }
   };
   using TestOp = uint32_t;
   constexpr unsigned size = 4;
-  TestOp loadCap = LDR_c_unsigned_cap_normal |  Assembler::Ct(c1) | Assembler::CnCSP(c2) | PatchingAssembler::ImmLSUnsigned(1 >> size);
+  TestOp loadCap = LDR_c_unsigned_cap_normal |  Assembler::Ct(c1) |
+		   Assembler::CnCSP(c2) |
+		   PatchingAssembler::ImmLSUnsigned(1 >> size);
   auto decoder = new Decoder<DispatchingDecoderVisitor>();
   decoder->AppendVisitor(new LoadCapabilityVisitor());
   auto loadCapInstr = reinterpret_cast<Instruction*>(&loadCap);
@@ -142,24 +195,31 @@ TEST_F(DecoderArm64Test, DecodeStoreCapUnsignedOffsetCapNormal) {
     public:
       StoreCapabilityVisitor() {};
 
-      void VisitLoadStoreCapUnsignedOffsetCapNormal(Instruction* instr) override {
-	EXPECT_EQ(instr->Mask(LoadStoreCapUnsignedOffsetCapNormalFMask), LoadStoreCapUnsignedOffsetCapNormalFixed);
+      void VisitLoadStoreCapUnsignedOffsetCapNormal(Instruction* instr)
+          override {
+	EXPECT_EQ(instr->Mask(LoadStoreCapUnsignedOffsetCapNormalFMask),
+                  LoadStoreCapUnsignedOffsetCapNormalFixed);
 	switch(instr->Mask(LoadStoreCapUnsignedOffsetCapNormalMask)) {
           case STR_c_unsigned_cap_normal:
 	    EXPECT_TRUE(true);
 	    EXPECT_EQ(instr->Mask(Ct_mask), Assembler::Ct(c1));
 	    EXPECT_EQ(instr->Mask(Cn_mask), Assembler::CnCSP(c2));
-	    EXPECT_EQ(instr->Mask(ImmLS_mask), PatchingAssembler::ImmLSUnsigned(1 >> 4));
+	    EXPECT_EQ(instr->Mask(ImmLS_mask),
+		      PatchingAssembler::ImmLSUnsigned(1 >> 4));
 	    break;
 	  default:
-  	    EXPECT_TRUE(false) << "Store capability incorrectly decoded (" << std::hex << instr->Mask(LoadStoreCapUnsignedOffsetCapNormalMask) << ")";
+	    EXPECT_TRUE(false) << "Store capability incorrectly decoded (" <<
+                std::hex <<
+		instr->Mask(LoadStoreCapUnsignedOffsetCapNormalMask) << ")";
 	    break;
 	}
-      } 
+      }
   };
   using TestOp = uint32_t;
   constexpr unsigned size = 4;
-  TestOp storeCap = STR_c_unsigned_cap_normal |  Assembler::Ct(c1) | Assembler::CnCSP(c2) | PatchingAssembler::ImmLSUnsigned(1 >> size);
+  TestOp storeCap = STR_c_unsigned_cap_normal |  Assembler::Ct(c1) |
+                    Assembler::CnCSP(c2) |
+		    PatchingAssembler::ImmLSUnsigned(1 >> size);
   auto decoder = new Decoder<DispatchingDecoderVisitor>();
   decoder->AppendVisitor(new StoreCapabilityVisitor());
   auto storeCapInstr = reinterpret_cast<Instruction*>(&storeCap);
@@ -173,24 +233,28 @@ TEST_F(DecoderArm64Test, DecodeStorePairCapPostIndex) {
       StorePairCapabilityVisitor() {};
 
       void VisitLoadStorePairCapPostIndex(Instruction* instr) override {
-	EXPECT_EQ(instr->Mask(LoadStorePairCapPostIndexFMask), LoadStorePairCapPostIndexFixed);
+	EXPECT_EQ(instr->Mask(LoadStorePairCapPostIndexFMask),
+		  LoadStorePairCapPostIndexFixed);
 	switch(instr->Mask(LoadStorePairCapPostIndexMask)) {
           case STP_c_post:
 	    EXPECT_TRUE(true);
 	    EXPECT_EQ(instr->Mask(Ct_mask), Assembler::Ct(c1));
 	    EXPECT_EQ(instr->Mask(Ct2_mask), Assembler::Ct2(c2));
 	    EXPECT_EQ(instr->Mask(Rt_mask), Assembler::Rt(x1));
-	    EXPECT_EQ(instr->Mask(ImmLSPair_mask), PatchingAssembler::ImmLSPair(16, size));
+	    EXPECT_EQ(instr->Mask(ImmLSPair_mask),
+		      PatchingAssembler::ImmLSPair(16, size));
 	    break;
 	  default:
-  	    EXPECT_TRUE(false) << "Store pair capability incorrectly decoded (" << std::hex << instr->Mask(LoadStorePairCapPostIndexMask) << ")";
+	    EXPECT_TRUE(false) <<
+		"Store pair capability incorrectly decoded (" << std::hex <<
+		instr->Mask(LoadStorePairCapPostIndexMask) << ")";
 	    break;
 	}
-      } 
+      }
   };
   using TestOp = uint32_t;
   TestOp storePairCap = STP_c_post | Assembler::Ct(c1) | Assembler::Ct2(c2) |
-	                Assembler::Rt(x1) | Assembler::ImmLSPair(16, size);
+			Assembler::Rt(x1) | Assembler::ImmLSPair(16, size);
   auto decoder = new Decoder<DispatchingDecoderVisitor>();
   decoder->AppendVisitor(new StorePairCapabilityVisitor());
   auto storePairCapInstr = reinterpret_cast<Instruction*>(&storePairCap);
@@ -204,24 +268,28 @@ TEST_F(DecoderArm64Test, DecodeLoadPairCapPostIndex) {
       LoadPairCapabilityVisitor() {};
 
       void VisitLoadStorePairCapPostIndex(Instruction* instr) override {
-	EXPECT_EQ(instr->Mask(LoadStorePairCapPostIndexFMask), LoadStorePairCapPostIndexFixed);
+	EXPECT_EQ(instr->Mask(LoadStorePairCapPostIndexFMask),
+		  LoadStorePairCapPostIndexFixed);
 	switch(instr->Mask(LoadStorePairCapPostIndexMask)) {
           case LDP_c_post:
 	    EXPECT_TRUE(true);
 	    EXPECT_EQ(instr->Mask(Ct_mask), Assembler::Ct(c1));
 	    EXPECT_EQ(instr->Mask(Ct2_mask), Assembler::Ct2(c2));
 	    EXPECT_EQ(instr->Mask(Rt_mask), Assembler::Rt(x1));
-	    EXPECT_EQ(instr->Mask(ImmLSPair_mask), PatchingAssembler::ImmLSPair(16, size));
+	    EXPECT_EQ(instr->Mask(ImmLSPair_mask),
+		      PatchingAssembler::ImmLSPair(16, size));
 	    break;
 	  default:
-  	    EXPECT_TRUE(false) << "Store pair capability incorrectly decoded (" << std::hex << instr->Mask(LoadStorePairCapPostIndexMask) << ")";
+	    EXPECT_TRUE(false) <<
+		"Store pair capability incorrectly decoded (" << std::hex <<
+		instr->Mask(LoadStorePairCapPostIndexMask) << ")";
 	    break;
 	}
-      } 
+      }
   };
   using TestOp = uint32_t;
   TestOp loadPairCap = LDP_c_post | Assembler::Ct(c1) | Assembler::Ct2(c2) |
-	               Assembler::Rt(x1) | Assembler::ImmLSPair(16, size);
+		       Assembler::Rt(x1) | Assembler::ImmLSPair(16, size);
   auto decoder = new Decoder<DispatchingDecoderVisitor>();
   decoder->AppendVisitor(new LoadPairCapabilityVisitor());
   auto loadPairCapInstr = reinterpret_cast<Instruction*>(&loadPairCap);
@@ -235,24 +303,28 @@ TEST_F(DecoderArm64Test, DecodeStorePairCapPreIndex) {
       StorePairCapabilityVisitor() {};
 
       void VisitLoadStorePairCapPreIndex(Instruction* instr) override {
-	EXPECT_EQ(instr->Mask(LoadStorePairCapPreIndexFMask), LoadStorePairCapPreIndexFixed);
+	EXPECT_EQ(instr->Mask(LoadStorePairCapPreIndexFMask),
+		  LoadStorePairCapPreIndexFixed);
 	switch(instr->Mask(LoadStorePairCapPreIndexMask)) {
           case STP_c_pre:
 	    EXPECT_TRUE(true);
 	    EXPECT_EQ(instr->Mask(Ct_mask), Assembler::Ct(c1));
 	    EXPECT_EQ(instr->Mask(Ct2_mask), Assembler::Ct2(c2));
 	    EXPECT_EQ(instr->Mask(Rt_mask), Assembler::Rt(x1));
-	    EXPECT_EQ(instr->Mask(ImmLSPair_mask), PatchingAssembler::ImmLSPair(16, size));
+	    EXPECT_EQ(instr->Mask(ImmLSPair_mask),
+		      PatchingAssembler::ImmLSPair(16, size));
 	    break;
 	  default:
-  	    EXPECT_TRUE(false) << "Store pair capability incorrectly decoded (" << std::hex << instr->Mask(LoadStorePairCapPreIndexMask) << ")";
+	    EXPECT_TRUE(false) <<
+		"Store pair capability incorrectly decoded (" << std::hex <<
+		instr->Mask(LoadStorePairCapPreIndexMask) << ")";
 	    break;
 	}
-      } 
+      }
   };
   using TestOp = uint32_t;
   TestOp storePairCap = STP_c_pre | Assembler::Ct(c1) | Assembler::Ct2(c2) |
-	                Assembler::Rt(x1) | Assembler::ImmLSPair(16, size);
+			Assembler::Rt(x1) | Assembler::ImmLSPair(16, size);
   auto decoder = new Decoder<DispatchingDecoderVisitor>();
   decoder->AppendVisitor(new StorePairCapabilityVisitor());
   auto storePairCapInstr = reinterpret_cast<Instruction*>(&storePairCap);
@@ -266,24 +338,28 @@ TEST_F(DecoderArm64Test, DecodeLoadPairCapPreIndex) {
       LoadPairCapabilityVisitor() {};
 
       void VisitLoadStorePairCapPreIndex(Instruction* instr) override {
-	EXPECT_EQ(instr->Mask(LoadStorePairCapPreIndexFMask), LoadStorePairCapPreIndexFixed);
+	EXPECT_EQ(instr->Mask(LoadStorePairCapPreIndexFMask),
+		  LoadStorePairCapPreIndexFixed);
 	switch(instr->Mask(LoadStorePairCapPreIndexMask)) {
           case LDP_c_pre:
 	    EXPECT_TRUE(true);
 	    EXPECT_EQ(instr->Mask(Ct_mask), Assembler::Ct(c1));
 	    EXPECT_EQ(instr->Mask(Ct2_mask), Assembler::Ct2(c2));
 	    EXPECT_EQ(instr->Mask(Rt_mask), Assembler::Rt(x1));
-	    EXPECT_EQ(instr->Mask(ImmLSPair_mask), PatchingAssembler::ImmLSPair(16, size));
+	    EXPECT_EQ(instr->Mask(ImmLSPair_mask),
+		      PatchingAssembler::ImmLSPair(16, size));
 	    break;
 	  default:
-  	    EXPECT_TRUE(false) << "Store pair capability incorrectly decoded (" << std::hex << instr->Mask(LoadStorePairCapPreIndexMask) << ")";
+	    EXPECT_TRUE(false) <<
+		"Store pair capability incorrectly decoded (" << std::hex <<
+		instr->Mask(LoadStorePairCapPreIndexMask) << ")";
 	    break;
 	}
-      } 
+      }
   };
   using TestOp = uint32_t;
   TestOp loadPairCap = LDP_c_pre | Assembler::Ct(c1) | Assembler::Ct2(c2) |
-	               Assembler::Rt(x1) | Assembler::ImmLSPair(16, size);
+		       Assembler::Rt(x1) | Assembler::ImmLSPair(16, size);
   auto decoder = new Decoder<DispatchingDecoderVisitor>();
   decoder->AppendVisitor(new LoadPairCapabilityVisitor());
   auto loadPairCapInstr = reinterpret_cast<Instruction*>(&loadPairCap);
@@ -297,24 +373,28 @@ TEST_F(DecoderArm64Test, DecodeStorePairCapOffset) {
       StorePairCapabilityVisitor() {};
 
       void VisitLoadStorePairCapOffset(Instruction* instr) override {
-	EXPECT_EQ(instr->Mask(LoadStorePairCapOffsetFMask), LoadStorePairCapOffsetFixed);
+	EXPECT_EQ(instr->Mask(LoadStorePairCapOffsetFMask),
+		  LoadStorePairCapOffsetFixed);
 	switch(instr->Mask(LoadStorePairCapOffsetMask)) {
           case STP_c_off:
 	    EXPECT_TRUE(true);
 	    EXPECT_EQ(instr->Mask(Ct_mask), Assembler::Ct(c1));
 	    EXPECT_EQ(instr->Mask(Ct2_mask), Assembler::Ct2(c2));
 	    EXPECT_EQ(instr->Mask(Rt_mask), Assembler::Rt(x1));
-	    EXPECT_EQ(instr->Mask(ImmLSPair_mask), PatchingAssembler::ImmLSPair(16, size));
+	    EXPECT_EQ(instr->Mask(ImmLSPair_mask),
+		      PatchingAssembler::ImmLSPair(16, size));
 	    break;
 	  default:
-  	    EXPECT_TRUE(false) << "Store pair capability incorrectly decoded (" << std::hex << instr->Mask(LoadStorePairCapOffsetMask) << ")";
+	    EXPECT_TRUE(false) <<
+		"Store pair capability incorrectly decoded (" << std::hex <<
+		instr->Mask(LoadStorePairCapOffsetMask) << ")";
 	    break;
 	}
-      } 
+      }
   };
   using TestOp = uint32_t;
   TestOp storePairCap = STP_c_off | Assembler::Ct(c1) | Assembler::Ct2(c2) |
-	                Assembler::Rt(x1) | Assembler::ImmLSPair(16, size);
+			Assembler::Rt(x1) | Assembler::ImmLSPair(16, size);
   auto decoder = new Decoder<DispatchingDecoderVisitor>();
   decoder->AppendVisitor(new StorePairCapabilityVisitor());
   auto storePairCapInstr = reinterpret_cast<Instruction*>(&storePairCap);
@@ -328,24 +408,28 @@ TEST_F(DecoderArm64Test, DecodeLoadPairCapOffset) {
       LoadPairCapabilityVisitor() {};
 
       void VisitLoadStorePairCapOffset(Instruction* instr) override {
-	EXPECT_EQ(instr->Mask(LoadStorePairCapOffsetFMask), LoadStorePairCapOffsetFixed);
+	EXPECT_EQ(instr->Mask(LoadStorePairCapOffsetFMask),
+		  LoadStorePairCapOffsetFixed);
 	switch(instr->Mask(LoadStorePairCapOffsetMask)) {
           case LDP_c_off:
 	    EXPECT_TRUE(true);
 	    EXPECT_EQ(instr->Mask(Ct_mask), Assembler::Ct(c1));
 	    EXPECT_EQ(instr->Mask(Ct2_mask), Assembler::Ct2(c2));
 	    EXPECT_EQ(instr->Mask(Rt_mask), Assembler::Rt(x1));
-	    EXPECT_EQ(instr->Mask(ImmLSPair_mask), PatchingAssembler::ImmLSPair(16, size));
+	    EXPECT_EQ(instr->Mask(ImmLSPair_mask),
+		      PatchingAssembler::ImmLSPair(16, size));
 	    break;
 	  default:
-  	    EXPECT_TRUE(false) << "Store pair capability incorrectly decoded (" << std::hex << instr->Mask(LoadStorePairCapOffsetMask) << ")";
+	    EXPECT_TRUE(false) <<
+		"Store pair capability incorrectly decoded (" << std::hex <<
+		instr->Mask(LoadStorePairCapOffsetMask) << ")";
 	    break;
 	}
-      } 
+      }
   };
   using TestOp = uint32_t;
   TestOp loadPairCap = LDP_c_off | Assembler::Ct(c1) | Assembler::Ct2(c2) |
-	               Assembler::Rt(x1) | Assembler::ImmLSPair(16, size);
+		       Assembler::Rt(x1) | Assembler::ImmLSPair(16, size);
   auto decoder = new Decoder<DispatchingDecoderVisitor>();
   decoder->AppendVisitor(new LoadPairCapabilityVisitor());
   auto loadPairCapInstr = reinterpret_cast<Instruction*>(&loadPairCap);
@@ -366,7 +450,8 @@ TEST_F(DecoderArm64Test, DecodeGcvalue) {
 	    EXPECT_EQ(instr->Mask(Rd_mask), Assembler::Rd(x1));
 	    break;
 	  default:
-  	    EXPECT_TRUE(false) << "gcvalue incorrectly decoded (" << std::hex << instr->Mask(GetField1Mask) << ")";
+	    EXPECT_TRUE(false) << "gcvalue incorrectly decoded (" <<
+                std::hex << instr->Mask(GetField1Mask) << ")";
 	    break;
 	}
       }
@@ -377,6 +462,69 @@ TEST_F(DecoderArm64Test, DecodeGcvalue) {
   decoder->AppendVisitor(new GcvalueVisitor());
   auto gcvalueInstr = reinterpret_cast<Instruction*>(&gcvalue);
   decoder->Decode(gcvalueInstr);
+}
+
+TEST_F(DecoderArm64Test, DecodeConditionalSelectCapability) {
+  class ConditionalSelectCapVisitor : public DecoderArm64TestVisitor {
+    public:
+      ConditionalSelectCapVisitor() {};
+
+      void VisitConditionalSelectCap(Instruction* instr) override {
+	EXPECT_EQ(instr->Mask(ConditionalSelectCapFMask),
+                  ConditionalSelectCapFixed);
+	switch(instr->Mask(ConditionalSelectCapMask)) {
+          case CSEL_c:
+	    EXPECT_TRUE(true);
+	    EXPECT_EQ(instr->Mask(Cm_mask), Assembler::Cm(c1));
+	    EXPECT_EQ(instr->Condition(), Condition::eq);
+	    EXPECT_EQ(instr->Mask(Cn_mask), Assembler::Cn(c2));
+	    EXPECT_EQ(instr->Mask(Cd_mask), Assembler::Cd(c3));
+	    break;
+	  default:
+	    EXPECT_TRUE(false) << "csel incorrectly decoded (" <<
+                std::hex << instr->Mask(ConditionalSelectCapMask) << ")";
+	    break;
+	}
+      }
+  };
+  using TestOp = uint32_t;
+  TestOp csel = CSEL_c | Assembler::Cm(c1) | Assembler::Cond(Condition::eq) |
+		Assembler::Cn(c2) | Assembler::Cd(c3);
+  auto decoder = new Decoder<DispatchingDecoderVisitor>();
+  decoder->AppendVisitor(new ConditionalSelectCapVisitor());
+  auto cselInstr = reinterpret_cast<Instruction*>(&csel);
+  decoder->Decode(cselInstr);
+}
+
+TEST_F(DecoderArm64Test, DecodeCompareCapabilities) {
+  class ConditionalSelectCapVisitor : public DecoderArm64TestVisitor {
+    public:
+      ConditionalSelectCapVisitor() {};
+
+      void VisitCopyCapability(Instruction* instr) override {
+	EXPECT_EQ(instr->Mask(ConditionalSelectCapFMask),
+                  ConditionalSelectCapFixed);
+	switch(instr->Mask(ConditionalSelectCapMask)) {
+          case CSEL_c:
+	    EXPECT_TRUE(true);
+	    EXPECT_EQ(instr->Mask(Cm_mask), Assembler::Cm(c1));
+	    EXPECT_EQ(instr->Mask(Cn_mask), Assembler::Cn(c2));
+	    EXPECT_EQ(instr->Mask(Rd_mask), Assembler::Rd(x3));
+	    break;
+	  default:
+	    EXPECT_TRUE(false) << "cmp incorrectly decoded (" <<
+                std::hex << instr->Mask(ConditionalSelectCapMask) << ")";
+	    break;
+	}
+      }
+  };
+  using TestOp = uint32_t;
+  TestOp cmp = SUBS_c | Assembler::Cm(c1) | Assembler::Cn(c2) |
+		Assembler::Rd(x3);
+  auto decoder = new Decoder<DispatchingDecoderVisitor>();
+  decoder->AppendVisitor(new ConditionalSelectCapVisitor());
+  auto cmpInstr = reinterpret_cast<Instruction*>(&cmp);
+  decoder->Decode(cmpInstr);
 }
 
 TEST_F(DecoderArm64Test, DecodeScvalue) {
@@ -394,18 +542,21 @@ TEST_F(DecoderArm64Test, DecodeScvalue) {
 	    EXPECT_EQ(instr->Mask(Cd_mask), Assembler::Cd(c2));
 	    break;
 	  default:
-  	    EXPECT_TRUE(false) << "scvalue incorrectly decoded (" << std::hex << instr->Mask(SetField1Mask) << ")";
+	    EXPECT_TRUE(false) << "scvalue incorrectly decoded (" <<
+		std::hex << instr->Mask(SetField1Mask) << ")";
 	    break;
 	}
       }
   };
   using TestOp = uint32_t;
-  TestOp scvalue = SCVALUE | Assembler::Rm(x1) | Assembler::Cn(c1) | Assembler::Cd(c2);
+  TestOp scvalue = SCVALUE | Assembler::Rm(x1) | Assembler::Cn(c1) |
+		   Assembler::Cd(c2);
   auto decoder = new Decoder<DispatchingDecoderVisitor>();
   decoder->AppendVisitor(new ScvalueVisitor());
   auto scvalueInstr = reinterpret_cast<Instruction*>(&scvalue);
   decoder->Decode(scvalueInstr);
 }
+
 #endif // __CHERI_PURE_CAPABILITY__
 
 }  // namespace internal

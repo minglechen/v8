@@ -3830,7 +3830,7 @@ void Assembler::AddSub(const Register& rd, const Register& rn,
 #if defined(__CHERI_PURE_CAPABILITY__)
     } else if (rn.IsC()) {
       DCHECK(rd.IsC());
-      Emit(AddSubCapExtendedFixed | Rm(operand.ToExtendedRegister().reg()) |
+      Emit(ADD_c_ext | Rm(operand.ToExtendedRegister().reg()) |
            ExtendMode(operand.ToExtendedRegister().extend()) |
 	   ImmExtendShift(operand.shift_amount()) |
            CdCSP(rd) | CnCSP(rn));

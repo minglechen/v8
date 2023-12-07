@@ -1204,6 +1204,11 @@ Instr Assembler::ImmBarrierType(int imm2) {
 
 unsigned Assembler::CalcLSDataSize(LoadStoreOp op) {
   DCHECK((LSSize_offset + LSSize_width) == (kInstrSize * 8));
+#if defined(__CHERI_PURE_CAPABILITY__)
+  if (op == STR_c || op == LDR_c) {
+    return kSystemPointerSizeLog2;
+  }
+#endif // __CHERI_PURE_CAPABILITY_
   unsigned size = static_cast<Instr>(op >> LSSize_offset);
   if ((op & LSVector_mask) != 0) {
     // Vector register memory operations encode the access size in the "size"

@@ -3840,6 +3840,16 @@ void Assembler::AddSub(const Register& rd, const Register& rn,
     // or their 64-bit register equivalents, convert the operand from shifted to
     // extended register mode, and emit an add/sub extended instruction.
     if (rn.IsSP() || rd.IsSP()) {
+ #if defined(__CHERI_PURE_CAPABILITY__)
+      if (rn.IsC()) {
+        DCHECK(rd.IsC());
+        Emit(ADD_c_ext | Rm(operand.ToExtendedRegister().reg()) |
+             ExtendMode(operand.ToExtendedRegister().extend()) |
+	     ImmExtendShift(operand.shift_amount()) |
+             CdCSP(rd) | CnCSP(rn));
+        return;
+      }
+#endif // __CHERI_PURE_CAPABILITY__
       DCHECK(!(rd.IsSP() && (S == SetFlags)));
       DataProcExtendedRegister(rd, rn, operand.ToExtendedRegister(), S,
                                AddSubExtendedFixed | op);
@@ -3848,8 +3858,8 @@ void Assembler::AddSub(const Register& rd, const Register& rn,
       DCHECK(rd.IsC());
       Emit(ADD_c_ext | Rm(operand.ToExtendedRegister().reg()) |
            ExtendMode(operand.ToExtendedRegister().extend()) |
-	   ImmExtendShift(operand.shift_amount()) |
-           CdCSP(rd) | CnCSP(rn));
+           ImmExtendShift(operand.shift_amount()) |
+           Cd(rd) | Cn(rn));
 #endif // __CHERI_PURE_CAPABILITY__
     } else {
       DataProcShiftedRegister(rd, rn, operand, S, AddSubShiftedFixed | op);
@@ -4201,6 +4211,10 @@ void Assembler::LoadStore(const CPURegister& rt, const MemOperand& addr,
       ext = UXTX;
     }
 
+    // Shifts are encoded in one bit, indicating a left shift by the memory
+    // access size.
+    DCHECK((shift_amount == 0) ||
+           (shift_amount == static_cast<unsigned>(CalcLSDataSize(op))));
 #if defined(__CHERI_PURE_CAPABILITY__)
     if (rt.IsC()) {
       Emit(LoadStoreCapRegisterOffsetNormalFixed | memop |
@@ -4209,10 +4223,6 @@ void Assembler::LoadStore(const CPURegister& rt, const MemOperand& addr,
       return;
     }
 #endif // __CHERI_PURE_CAPABILITY__
-    // Shifts are encoded in one bit, indicating a left shift by the memory
-    // access size.
-    DCHECK((shift_amount == 0) ||
-           (shift_amount == static_cast<unsigned>(CalcLSDataSize(op))));
    Emit(LoadStoreRegisterOffsetFixed | memop | Rm(addr.regoffset()) |
          ExtendMode(ext) | ImmShiftLS((shift_amount > 0) ? 1 : 0));
   } else {

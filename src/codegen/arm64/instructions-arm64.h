@@ -488,7 +488,15 @@ class Instruction {
   }
 
   V8_INLINE ptrdiff_t DistanceTo(Instruction* target) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    // If PSTATE.C64 = 1: The current instruction set if C64
+    // PSTATE.C64 = Capability Value[0]
+    const ptraddr_t c64_bitmask = 0x1;
+    return (reinterpret_cast<Address>(target) & ~c64_bitmask) -
+      reinterpret_cast<Address>(this);
+#else
     return reinterpret_cast<Address>(target) - reinterpret_cast<Address>(this);
+#endif // defined(__CHERI_PURE_CAPABILITY__)
   }
 
   static const int ImmPCRelRangeBitwidth = 21;

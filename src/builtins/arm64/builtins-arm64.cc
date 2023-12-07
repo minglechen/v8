@@ -61,21 +61,39 @@ static void GenerateTailCallToReturnedCode(MacroAssembler* masm,
     // argument count.
     __ SmiTag(kJavaScriptCallArgCountRegister);
     __ Push(kJavaScriptCallTargetRegister, kJavaScriptCallNewTargetRegister,
+#if defined(__CHERI_PURE_CAPABILITY__)
+            kJavaScriptCallArgCountRegister.C(), padregc);
+#else
             kJavaScriptCallArgCountRegister, padreg);
+#endif // __CHERI_PURE_CAPABILITY__
+
     // Push another copy as a parameter to the runtime call.
     __ PushArgument(kJavaScriptCallTargetRegister);
 
     __ CallRuntime(function_id, 1);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Mov(c2, c0);
+#else
     __ Mov(x2, x0);
+#endif // __CHERI_PURE_CAPABILITY__
 
     // Restore target function, new target and actual argument count.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Pop(padregc, kJavaScriptCallArgCountRegister.C(),
+#else
     __ Pop(padreg, kJavaScriptCallArgCountRegister,
+#endif // __CHERI_PURE_CAPABILITY__
            kJavaScriptCallNewTargetRegister, kJavaScriptCallTargetRegister);
     __ SmiUntag(kJavaScriptCallArgCountRegister);
   }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  static_assert(kJavaScriptCallCodeStartRegister == c2, "ABI mismatch");
+  __ JumpCodeTObject(c2);
+#else
   static_assert(kJavaScriptCallCodeStartRegister == x2, "ABI mismatch");
   __ JumpCodeTObject(x2);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 namespace {
@@ -103,8 +121,13 @@ void Generate_JSBuiltinsConstructStubHelper(MacroAssembler* masm) {
 
     if (FLAG_debug_code) {
       // Check that FrameScope pushed the context on to the stack already.
+#if defined(__CHERI_PURE_CAPABILITY__)
+      __ Peek(c2, 0);
+      __ Cmp(c2, cp);
+#else
       __ Peek(x2, 0);
       __ Cmp(x2, cp);
+#endif // _CHERI_PURE_CAPABILITY__
       __ Check(eq, AbortReason::kUnexpectedValue);
     }
 
@@ -120,15 +143,27 @@ void Generate_JSBuiltinsConstructStubHelper(MacroAssembler* masm) {
     __ Claim(slot_count);
 
     // Preserve the incoming parameters on the stack.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ LoadRoot(c4, RootIndex::kTheHoleValue);
+#else
     __ LoadRoot(x4, RootIndex::kTheHoleValue);
+#endif // _CHERI_PURE_CAPABILITY__
 
     // Compute a pointer to the slot immediately above the location on the
     // stack to which arguments will be later copied.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ SlotAddress(c2, argc);
+#else
     __ SlotAddress(x2, argc);
+#endif // _CHERI_PURE_CAPABILITY__
 
     // Store padding, if needed.
     __ Tbnz(slot_count_without_rounding, 0, &already_aligned);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Str(padregc, MemOperand(c2));
+#else
     __ Str(padreg, MemOperand(x2));
+#endif // _CHERI_PURE_CAPABILITY__
     __ Bind(&already_aligned);
 
     // TODO(victorgomes): When the arguments adaptor is completely removed, we
@@ -139,17 +174,35 @@ void Generate_JSBuiltinsConstructStubHelper(MacroAssembler* masm) {
     // Copy arguments to the expression stack.
     {
       Register count = x2;
+#if defined(__CHERI_PURE_CAPABILITY__)
+      Register dst = c10;
+      Register src = c11;
+#else
       Register dst = x10;
       Register src = x11;
+#endif // _CHERI_PURE_CAPABILITY__
       __ SlotAddress(dst, 0);
       // Poke the hole (receiver).
+#if defined(__CHERI_PURE_CAPABILITY__)
+      __ Str(c4, MemOperand(dst));
+      __ Add(dst, dst, kSystemPointerSize);  // Skip receiver.
+#else
       __ Str(x4, MemOperand(dst));
       __ Add(dst, dst, kSystemPointerAddrSize);  // Skip receiver.
+#endif // _CHERI_PURE_CAPABILITY__
       __ Add(src, fp,
              StandardFrameConstants::kCallerSPOffset +
+#if defined(__CHERI_PURE_CAPABILITY__)
+                 kSystemPointerSize);  // Skip receiver.
+#else
                  kSystemPointerAddrSize);  // Skip receiver.
+#endif // _CHERI_PURE_CAPABILITY__
       __ Sub(count, argc, kJSArgcReceiverSlots);
+#if defined(__CHERI_PURE_CAPABILITY__)
+      __ CopyCapabilities(dst, src, count);
+#else
       __ CopyDoubleWords(dst, src, count);
+#endif // _CHERI_PURE_CAPABILITY__
     }
 
     // ----------- S t a t e -------------
@@ -157,28 +210,32 @@ void Generate_JSBuiltinsConstructStubHelper(MacroAssembler* masm) {
     //  --                           x1: constructor function
     //  --                           x3: new target
     // If argc is odd:
-    //  --     sp[0*kSystemPointerAddrSize]: the hole (receiver)
-    //  --     sp[1*kSystemPointerAddrSize]: argument 1
+    //  --     sp[0*kSystemPointerSize]: the hole (receiver)
+    //  --     sp[1*kSystemPointerSize]: argument 1
     //  --             ...
-    //  -- sp[(n-1)*kSystemPointerAddrSize]: argument (n - 1)
-    //  -- sp[(n+0)*kSystemPointerAddrSize]: argument n
-    //  -- sp[(n+1)*kSystemPointerAddrSize]: padding
-    //  -- sp[(n+2)*kSystemPointerAddrSize]: padding
-    //  -- sp[(n+3)*kSystemPointerAddrSize]: number of arguments (tagged)
-    //  -- sp[(n+4)*kSystemPointerAddrSize]: context (pushed by FrameScope)
+    //  -- sp[(n-1)*kSystemPointerSize]: argument (n - 1)
+    //  -- sp[(n+0)*kSystemPointerSize]: argument n
+    //  -- sp[(n+1)*kSystemPointerSize]: padding
+    //  -- sp[(n+2)*kSystemPointerSize]: padding
+    //  -- sp[(n+3)*kSystemPointerSize]: number of arguments (tagged)
+    //  -- sp[(n+4)*kSystemPointerSize]: context (pushed by FrameScope)
     // If argc is even:
-    //  --     sp[0*kSystemPointerAddrSize]: the hole (receiver)
-    //  --     sp[1*kSystemPointerAddrSize]: argument 1
+    //  --     sp[0*kSystemPointerSize]: the hole (receiver)
+    //  --     sp[1*kSystemPointerSize]: argument 1
     //  --             ...
-    //  -- sp[(n-1)*kSystemPointerAddrSize]: argument (n - 1)
-    //  -- sp[(n+0)*kSystemPointerAddrSize]: argument n
-    //  -- sp[(n+1)*kSystemPointerAddrSize]: padding
-    //  -- sp[(n+2)*kSystemPointerAddrSize]: number of arguments (tagged)
-    //  -- sp[(n+3)*kSystemPointerAddrSize]: context (pushed by FrameScope)
+    //  -- sp[(n-1)*kSystemPointerSize]: argument (n - 1)
+    //  -- sp[(n+0)*kSystemPointerSize]: argument n
+    //  -- sp[(n+1)*kSystemPointerSize]: padding
+    //  -- sp[(n+2)*kSystemPointerSize]: number of arguments (tagged)
+    //  -- sp[(n+3)*kSystemPointerSize]: context (pushed by FrameScope)
     // -----------------------------------
 
     // Call the function.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ InvokeFunctionWithNewTarget(c1, c3, argc, InvokeType::kCall);
+#else
     __ InvokeFunctionWithNewTarget(x1, x3, argc, InvokeType::kCall);
+#endif // _CHERI_PURE_CAPABILITY__
 
     // Restore the context from the frame.
     __ Ldr(cp, MemOperand(fp, ConstructFrameConstants::kContextOffset));
@@ -215,7 +272,6 @@ void Builtins::Generate_JSConstructStubGeneric(MacroAssembler* masm) {
   // -----------------------------------
 
   ASM_LOCATION("Builtins::Generate_JSConstructStubGeneric");
-
   FrameScope scope(masm, StackFrame::MANUAL);
   // Enter a construct frame.
   __ EnterFrame(StackFrame::CONSTRUCT);
@@ -223,26 +279,41 @@ void Builtins::Generate_JSConstructStubGeneric(MacroAssembler* masm) {
 
   if (FLAG_debug_code) {
     // Check that FrameScope pushed the context on to the stack already.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Peek(c2, 0);
+    __ Cmp(c2, cp);
+#else
     __ Peek(x2, 0);
     __ Cmp(x2, cp);
+#endif // _CHERI_PURE_CAPABILITY__
     __ Check(eq, AbortReason::kUnexpectedValue);
   }
 
   // Preserve the incoming parameters on the stack.
   __ SmiTag(x0);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Push(x0, padreg);
+  __ Push(c1, c3);
+#else
   __ Push(x0, x1, padreg, x3);
+#endif // _CHERI_PURE_CAPABILITY__
 
   // ----------- S t a t e -------------
-  //  --        sp[0*kSystemPointerAddrSize]: new target
-  //  --        sp[1*kSystemPointerAddrSize]: padding
-  //  -- x1 and sp[2*kSystemPointerAddrSize]: constructor function
-  //  --        sp[3*kSystemPointerAddrSize]: number of arguments (tagged)
-  //  --        sp[4*kSystemPointerAddrSize]: context (pushed by FrameScope)
+  //  --        sp[0*kSystemPointerSize]: new target
+  //  --        sp[1*kSystemPointerSize]: padding
+  //  -- x1 and sp[2*kSystemPointerSize]: constructor function
+  //  --        sp[3*kSystemPointerSize]: number of arguments (tagged)
+  //  --        sp[4*kSystemPointerSize]: context (pushed by FrameScope)
   // -----------------------------------
 
   __ LoadTaggedPointerField(
+#if defined(__CHERI_PURE_CAPABILITY__)
+      c4, FieldMemOperand(c1, JSFunction::kSharedFunctionInfoOffset));
+  __ Ldr(w4, FieldMemOperand(c4, SharedFunctionInfo::kFlagsOffset));
+#else
       x4, FieldMemOperand(x1, JSFunction::kSharedFunctionInfoOffset));
   __ Ldr(w4, FieldMemOperand(x4, SharedFunctionInfo::kFlagsOffset));
+#endif // _CHERI_PURE_CAPABILITY__
   __ DecodeField<SharedFunctionInfo::FunctionKindBits>(w4);
   __ JumpIfIsInRange(
       w4, static_cast<uint32_t>(FunctionKind::kDefaultDerivedConstructor),
@@ -256,15 +327,19 @@ void Builtins::Generate_JSConstructStubGeneric(MacroAssembler* masm) {
 
   // Else: use TheHoleValue as receiver for constructor call
   __ Bind(&not_create_implicit_receiver);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ LoadRoot(c0, RootIndex::kTheHoleValue);
+#else
   __ LoadRoot(x0, RootIndex::kTheHoleValue);
+#endif // _CHERI_PURE_CAPABILITY__
 
   // ----------- S t a t e -------------
   //  --                                x0: receiver
-  //  -- Slot 4 / sp[0*kSystemPointerAddrSize]: new target
-  //  -- Slot 3 / sp[1*kSystemPointerAddrSize]: padding
-  //  -- Slot 2 / sp[2*kSystemPointerAddrSize]: constructor function
-  //  -- Slot 1 / sp[3*kSystemPointerAddrSize]: number of arguments (tagged)
-  //  -- Slot 0 / sp[4*kSystemPointerAddrSize]: context
+  //  -- Slot 4 / sp[0*kSystemPointerSize]: new target
+  //  -- Slot 3 / sp[1*kSystemPointerSize]: padding
+  //  -- Slot 2 / sp[2*kSystemPointerSize]: constructor function
+  //  -- Slot 1 / sp[3*kSystemPointerSize]: number of arguments (tagged)
+  //  -- Slot 0 / sp[4*kSystemPointerSize]: context
   // -----------------------------------
   // Deoptimizer enters here.
   masm->isolate()->heap()->SetConstructStubCreateDeoptPCOffset(
@@ -273,10 +348,18 @@ void Builtins::Generate_JSConstructStubGeneric(MacroAssembler* masm) {
   __ Bind(&post_instantiation_deopt_entry);
 
   // Restore new target from the top of the stack.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Peek(c3, 0 * kSystemPointerSize);
+#else
   __ Peek(x3, 0 * kSystemPointerAddrSize);
+#endif // _CHERI_PURE_CAPABILITY__
 
   // Restore constructor function and argument count.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Ldr(c1, MemOperand(fp, ConstructFrameConstants::kConstructorOffset));
+#else
   __ Ldr(x1, MemOperand(fp, ConstructFrameConstants::kConstructorOffset));
+#endif // _CHERI_PURE_CAPABILITY__
   __ SmiUntag(x12, MemOperand(fp, ConstructFrameConstants::kLengthOffset));
 
   // Copy arguments to the expression stack. The called function pops the
@@ -284,7 +367,11 @@ void Builtins::Generate_JSConstructStubGeneric(MacroAssembler* masm) {
   // stack, in case we have to return it later.
 
   // Overwrite the new target with a receiver.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Poke(c0, 0);
+#else
   __ Poke(x0, 0);
+#endif // _CHERI_PURE_CAPABILITY__
 
   // Push two further copies of the receiver. One will be popped by the called
   // function. The second acts as padding if the number of arguments plus
@@ -292,19 +379,23 @@ void Builtins::Generate_JSConstructStubGeneric(MacroAssembler* masm) {
   // that we don't have to handle the even and odd cases specially on
   // InvokeFunction's return, as top of stack will be the receiver in either
   // case.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Push(c0, c0);
+#else
   __ Push(x0, x0);
+#endif // _CHERI_PURE_CAPABILITY__
 
   // ----------- S t a t e -------------
   //  --                              x3: new target
   //  --                             x12: number of arguments (untagged)
-  //  --        sp[0*kSystemPointerAddrSize]: implicit receiver (overwrite if argc
+  //  --        sp[0*kSystemPointerSize]: implicit receiver (overwrite if argc
   //  odd)
-  //  --        sp[1*kSystemPointerAddrSize]: implicit receiver
-  //  --        sp[2*kSystemPointerAddrSize]: implicit receiver
-  //  --        sp[3*kSystemPointerAddrSize]: padding
-  //  -- x1 and sp[4*kSystemPointerAddrSize]: constructor function
-  //  --        sp[5*kSystemPointerAddrSize]: number of arguments (tagged)
-  //  --        sp[6*kSystemPointerAddrSize]: context
+  //  --        sp[1*kSystemPointerSize]: implicit receiver
+  //  --        sp[2*kSystemPointerSize]: implicit receiver
+  //  --        sp[3*kSystemPointerSize]: padding
+  //  -- x1 and sp[4*kSystemPointerSize]: constructor function
+  //  --        sp[5*kSystemPointerSize]: number of arguments (tagged)
+  //  --        sp[6*kSystemPointerSize]: context
   // -----------------------------------
 
   // Round the number of arguments down to the next even number, and claim
@@ -327,26 +418,44 @@ void Builtins::Generate_JSConstructStubGeneric(MacroAssembler* masm) {
   // Copy the arguments.
   {
     Register count = x2;
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Register dst = c10;
+    Register src = c11;
+#else
     Register dst = x10;
     Register src = x11;
+#endif // __CHERI_PURE_CAPABILITY__
     __ Mov(count, argc_without_receiver);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Poke(c0, 0);          // Add the receiver.
+#else
     __ Poke(x0, 0);          // Add the receiver.
+#endif // __CHERI_PURE_CAPABILITY__
     __ SlotAddress(dst, 1);  // Skip receiver.
     __ Add(src, fp,
+#if defined(__CHERI_PURE_CAPABILITY__)
+           StandardFrameConstants::kCallerSPOffset + kSystemPointerSize);
+    __ CopyCapabilities(dst, src, count);
+#else
            StandardFrameConstants::kCallerSPOffset + kSystemPointerAddrSize);
     __ CopyDoubleWords(dst, src, count);
+#endif // __CHERI_PURE_CAPABILITY__
   }
 
   // Call the function.
   __ Mov(x0, x12);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ InvokeFunctionWithNewTarget(c1, c3, x0, InvokeType::kCall);
+#else
   __ InvokeFunctionWithNewTarget(x1, x3, x0, InvokeType::kCall);
+#endif // __CHERI_PURE_CAPABILITY__
 
   // ----------- S t a t e -------------
-  //  -- sp[0*kSystemPointerAddrSize]: implicit receiver
-  //  -- sp[1*kSystemPointerAddrSize]: padding
-  //  -- sp[2*kSystemPointerAddrSize]: constructor function
-  //  -- sp[3*kSystemPointerAddrSize]: number of arguments
-  //  -- sp[4*kSystemPointerAddrSize]: context
+  //  -- sp[0*kSystemPointerSize]: implicit receiver
+  //  -- sp[1*kSystemPointerSize]: padding
+  //  -- sp[2*kSystemPointerSize]: constructor function
+  //  -- sp[3*kSystemPointerSize]: number of arguments
+  //  -- sp[4*kSystemPointerSize]: context
   // -----------------------------------
 
   // Store offset of return address for deoptimizer.
@@ -359,14 +468,23 @@ void Builtins::Generate_JSConstructStubGeneric(MacroAssembler* masm) {
   Label use_receiver, do_throw, leave_and_return, check_receiver;
 
   // If the result is undefined, we jump out to using the implicit receiver.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ CompareRoot(c0, RootIndex::kUndefinedValue);
+#else
   __ CompareRoot(x0, RootIndex::kUndefinedValue);
+#endif // __CHERI_PURE_CAPABILITY__
   __ B(ne, &check_receiver);
 
   // Throw away the result of the constructor invocation and use the
   // on-stack receiver as the result.
   __ Bind(&use_receiver);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Peek(c0, 0 * kSystemPointerSize);
+  __ CompareRoot(c0, RootIndex::kTheHoleValue);
+#else
   __ Peek(x0, 0 * kSystemPointerAddrSize);
   __ CompareRoot(x0, RootIndex::kTheHoleValue);
+#endif // __CHERI_PURE_CAPABILITY__
   __ B(eq, &do_throw);
 
   __ Bind(&leave_and_return);
@@ -383,12 +501,20 @@ void Builtins::Generate_JSConstructStubGeneric(MacroAssembler* masm) {
   __ bind(&check_receiver);
 
   // If the result is a smi, it is *not* an object in the ECMA sense.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ JumpIfSmi(c0, &use_receiver);
+#else
   __ JumpIfSmi(x0, &use_receiver);
+#endif // _CHERI_PURE_CAPABILITY__
 
   // If the type of the result (stored in its map) is less than
   // FIRST_JS_RECEIVER_TYPE, it is not an object in the ECMA sense.
   static_assert(LAST_JS_RECEIVER_TYPE == LAST_TYPE);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ JumpIfObjectType(c0, c4, x5, FIRST_JS_RECEIVER_TYPE, &leave_and_return,
+#else
   __ JumpIfObjectType(x0, x4, x5, FIRST_JS_RECEIVER_TYPE, &leave_and_return,
+#endif // _CHERI_PURE_CAPABILITY__
                       ge);
   __ B(&use_receiver);
 
@@ -410,7 +536,11 @@ void Builtins::Generate_JSBuiltinsConstructStub(MacroAssembler* masm) {
 
 void Builtins::Generate_ConstructedNonConstructable(MacroAssembler* masm) {
   FrameScope scope(masm, StackFrame::INTERNAL);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ PushArgument(c1);
+#else
   __ PushArgument(x1);
+#endif // _CHERI_PURE_CAPABILITY__
   __ CallRuntime(Runtime::kThrowConstructedNonConstructable);
   __ Unreachable();
 }
@@ -438,17 +568,29 @@ static void GetSharedFunctionInfoBytecodeOrBaseline(MacroAssembler* masm,
                                                     Label* is_baseline) {
   ASM_CODE_COMMENT(masm);
   Label done;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ CompareObjectType(sfi_data, scratch1, scratch1.X(), CODET_TYPE);
+#else
   __ CompareObjectType(sfi_data, scratch1, scratch1, CODET_TYPE);
+#endif // __CHERI_PURE_CAPABILITY__
   if (FLAG_debug_code) {
     Label not_baseline;
     __ B(ne, &not_baseline);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    AssertCodeTIsBaseline(masm, sfi_data, scratch1.X());
+#else
     AssertCodeTIsBaseline(masm, sfi_data, scratch1);
+#endif // __CHERI_PURE_CAPABILITY__
     __ B(eq, is_baseline);
     __ Bind(&not_baseline);
   } else {
     __ B(eq, is_baseline);
   }
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Cmp(scratch1.X(), INTERPRETER_DATA_TYPE);
+#else
   __ Cmp(scratch1, INTERPRETER_DATA_TYPE);
+#endif // __CHERI_PURE_CAPABILITY__
   __ B(ne, &done);
   __ LoadTaggedPointerField(
       sfi_data,
@@ -463,35 +605,61 @@ void Builtins::Generate_ResumeGeneratorTrampoline(MacroAssembler* masm) {
   //  -- x1 : the JSGeneratorObject to resume
   //  -- lr : return address
   // -----------------------------------
-
   // Store input value into generator object.
   __ StoreTaggedField(
+#if defined(__CHERI_PURE_CAPABILITY__)
+      c0, FieldMemOperand(c1, JSGeneratorObject::kInputOrDebugPosOffset));
+  __ RecordWriteField(c1, JSGeneratorObject::kInputOrDebugPosOffset, c0,
+#else
       x0, FieldMemOperand(x1, JSGeneratorObject::kInputOrDebugPosOffset));
   __ RecordWriteField(x1, JSGeneratorObject::kInputOrDebugPosOffset, x0,
+#endif // __CHERI_PURE_CAPABILITY__
                       kLRHasNotBeenSaved, SaveFPRegsMode::kIgnore);
   // Check that x1 is still valid, RecordWrite might have clobbered it.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ AssertGeneratorObject(c1);
+#else
   __ AssertGeneratorObject(x1);
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Load suspended function and context.
   __ LoadTaggedPointerField(
+#if defined(__CHERI_PURE_CAPABILITY__)
+      c4, FieldMemOperand(c1, JSGeneratorObject::kFunctionOffset));
+#else
       x4, FieldMemOperand(x1, JSGeneratorObject::kFunctionOffset));
+#endif // __CHERI_PURE_CAPABILITY__
   __ LoadTaggedPointerField(cp,
+#if defined(__CHERI_PURE_CAPABILITY__)
+                            FieldMemOperand(c4, JSFunction::kContextOffset));
+#else
                             FieldMemOperand(x4, JSFunction::kContextOffset));
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Flood function if we are stepping.
   Label prepare_step_in_if_stepping, prepare_step_in_suspended_generator;
   Label stepping_prepared;
   ExternalReference debug_hook =
       ExternalReference::debug_hook_on_function_call_address(masm->isolate());
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Mov(c10, debug_hook);
+  __ Ldrsb(x10, MemOperand(c10));
+#else
   __ Mov(x10, debug_hook);
   __ Ldrsb(x10, MemOperand(x10));
+#endif // __CHERI_PURE_CAPABILITY__
   __ CompareAndBranch(x10, Operand(0), ne, &prepare_step_in_if_stepping);
 
   // Flood function if we need to continue stepping in the suspended generator.
   ExternalReference debug_suspended_generator =
       ExternalReference::debug_suspended_generator_address(masm->isolate());
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Mov(c10, debug_suspended_generator);
+  __ Ldr(x10, MemOperand(c10));
+#else
   __ Mov(x10, debug_suspended_generator);
   __ Ldr(x10, MemOperand(x10));
+#endif // __CHERI_PURE_CAPABILITY__
   __ CompareAndBranch(x10, Operand(x1), eq,
                       &prepare_step_in_suspended_generator);
   __ Bind(&stepping_prepared);
@@ -505,9 +673,17 @@ void Builtins::Generate_ResumeGeneratorTrampoline(MacroAssembler* masm) {
 
   // Get number of arguments for generator function.
   __ LoadTaggedPointerField(
+#if defined(__CHERI_PURE_CAPABILITY__)
+      c10, FieldMemOperand(c4, JSFunction::kSharedFunctionInfoOffset));
+#else
       x10, FieldMemOperand(x4, JSFunction::kSharedFunctionInfoOffset));
+#endif // __CHERI_PURE_CAPABILITY__
   __ Ldrh(w10, FieldMemOperand(
+#if defined(__CHERI_PURE_CAPABILITY__)
+                   c10, SharedFunctionInfo::kFormalParameterCountOffset));
+#else
                    x10, SharedFunctionInfo::kFormalParameterCountOffset));
+#endif // __CHERI_PURE_CAPABILITY__
 
   __ Sub(x10, x10, kJSArgcReceiverSlots);
   // Claim slots for arguments and receiver (rounded up to a multiple of two).
@@ -517,12 +693,31 @@ void Builtins::Generate_ResumeGeneratorTrampoline(MacroAssembler* masm) {
 
   // Store padding (which might be replaced by the last argument).
   __ Sub(x11, x11, 1);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  // TODO(gcjenkinson) Replace arbitrary computation of address
+  // with setting the computed value into a valid capability.
+  {
+    UseScratchRegisterScope temps(masm);
+    Register temp = temps.AcquireC();
+    __ LoadTaggedPointerField(
+        temp, FieldMemOperand(c4, JSFunction::kSharedFunctionInfoOffset));
+    __ Lsl(x11, x11, kSystemPointerSizeLog2);
+    __ Scvalue(temp, temp, x11);
+    __ Poke(padregc, Operand(temp));
+  }
+#else
   __ Poke(padreg, Operand(x11, LSL, kSystemPointerAddrSizeLog2));
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Poke receiver into highest claimed slot.
   __ LoadTaggedPointerField(
+#if defined(__CHERI_PURE_CAPABILITY__)
+      c5, FieldMemOperand(c1, JSGeneratorObject::kReceiverOffset));
+  __ Poke(c5, __ ReceiverOperand(x10));
+#else
       x5, FieldMemOperand(x1, JSGeneratorObject::kReceiverOffset));
   __ Poke(x5, __ ReceiverOperand(x10));
+#endif // __CHERI_PURE_CAPABILITY__
 
   // ----------- S t a t e -------------
   //  -- x1                       : the JSGeneratorObject to resume
@@ -535,18 +730,40 @@ void Builtins::Generate_ResumeGeneratorTrampoline(MacroAssembler* masm) {
 
   // Copy the function arguments from the generator object's register file.
   __ LoadTaggedPointerField(
+#if defined(__CHERI_PURE_CAPABILITY__)
+      c5,
+      FieldMemOperand(c1, JSGeneratorObject::kParametersAndRegistersOffset));
+#else
       x5,
       FieldMemOperand(x1, JSGeneratorObject::kParametersAndRegistersOffset));
+#endif // __CHERI_PURE_CAPABILITY__
   {
     Label loop, done;
     __ Cbz(x10, &done);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ SlotAddress(c12, x10);
+#else
     __ SlotAddress(x12, x10);
+#endif // __CHERI_PURE_CAPABILITY__
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Add(c5, c5, Operand(x10, LSL, kTaggedSizeLog2));
+    __ Add(c5, c5, Operand(FixedArray::kHeaderSize - kHeapObjectTag));
+#else
     __ Add(x5, x5, Operand(x10, LSL, kTaggedSizeLog2));
     __ Add(x5, x5, Operand(FixedArray::kHeaderSize - kHeapObjectTag));
+#endif // __CHERI_PURE_CAPABILITY__
     __ Bind(&loop);
     __ Sub(x10, x10, 1);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ LoadAnyTaggedField(c11, MemOperand(c5, -kTaggedSize, PreIndex));
+#else
     __ LoadAnyTaggedField(x11, MemOperand(x5, -kTaggedSize, PreIndex));
+#endif // __CHERI_PURE_CAPABILITY__
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Str(c11, MemOperand(c12, -kSystemPointerSize, PostIndex));
+#else
     __ Str(x11, MemOperand(x12, -kSystemPointerAddrSize, PostIndex));
+#endif // __CHERI_PURE_CAPABILITY__
     __ Cbnz(x10, &loop);
     __ Bind(&done);
   }
@@ -555,11 +772,25 @@ void Builtins::Generate_ResumeGeneratorTrampoline(MacroAssembler* masm) {
   if (FLAG_debug_code) {
     Label is_baseline;
     __ LoadTaggedPointerField(
+#if defined(__CHERI_PURE_CAPABILITY__)
+        c3, FieldMemOperand(c4, JSFunction::kSharedFunctionInfoOffset));
+#else
         x3, FieldMemOperand(x4, JSFunction::kSharedFunctionInfoOffset));
+#endif // __CHERI_PURE_CAPABILITY__
     __ LoadTaggedPointerField(
+#if defined(__CHERI_PURE_CAPABILITY__)
+        c3, FieldMemOperand(c3, SharedFunctionInfo::kFunctionDataOffset));
+#else
         x3, FieldMemOperand(x3, SharedFunctionInfo::kFunctionDataOffset));
+#endif // __CHERI_PURE_CAPABILITY__
+#if defined(__CHERI_PURE_CAPABILITY__)
+    // TODO(gcjenkinson): Fix use of the scratch register in GetSharedFunctionInfoBytecodeOrBaseline
+    GetSharedFunctionInfoBytecodeOrBaseline(masm, c3, c0, &is_baseline);
+    __ CompareObjectType(c3, c3, x3, BYTECODE_ARRAY_TYPE);
+#else
     GetSharedFunctionInfoBytecodeOrBaseline(masm, x3, x0, &is_baseline);
     __ CompareObjectType(x3, x3, x3, BYTECODE_ARRAY_TYPE);
+#endif // __CHERI_PURE_CAPABILITY__
     __ Assert(eq, AbortReason::kMissingBytecodeArray);
     __ bind(&is_baseline);
   }
@@ -567,40 +798,84 @@ void Builtins::Generate_ResumeGeneratorTrampoline(MacroAssembler* masm) {
   // Resume (Ignition/TurboFan) generator object.
   {
     __ LoadTaggedPointerField(
+#if defined(__CHERI_PURE_CAPABILITY__)
+        c0, FieldMemOperand(c4, JSFunction::kSharedFunctionInfoOffset));
+#else
         x0, FieldMemOperand(x4, JSFunction::kSharedFunctionInfoOffset));
+#endif // __CHERI_PURE_CAPABILITY__
     __ Ldrh(w0, FieldMemOperand(
+#if defined(__CHERI_PURE_CAPABILITY__)
+                    c0, SharedFunctionInfo::kFormalParameterCountOffset));
+#else
                     x0, SharedFunctionInfo::kFormalParameterCountOffset));
+#endif // __CHERI_PURE_CAPABILITY__
     // We abuse new.target both to indicate that this is a resume call and to
     // pass in the generator object.  In ordinary calls, new.target is always
     // undefined because generator functions are non-constructable.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Mov(c3, c1);
+    __ Mov(c1, c4);
+    static_assert(kJavaScriptCallCodeStartRegister == c2, "ABI mismatch");
+#else
     __ Mov(x3, x1);
     __ Mov(x1, x4);
     static_assert(kJavaScriptCallCodeStartRegister == x2, "ABI mismatch");
+#endif // __CHERI_PURE_CAPABILITY__
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ LoadTaggedPointerField(c2, FieldMemOperand(c1, JSFunction::kCodeOffset));
+    __ JumpCodeTObject(c2);
+#else
     __ LoadTaggedPointerField(x2, FieldMemOperand(x1, JSFunction::kCodeOffset));
     __ JumpCodeTObject(x2);
+#endif // __CHERI_PURE_CAPABILITY__
   }
 
   __ Bind(&prepare_step_in_if_stepping);
   {
     FrameScope scope(masm, StackFrame::INTERNAL);
     // Push hole as receiver since we do not use it for stepping.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ LoadRoot(c5, RootIndex::kTheHoleValue);
+    __ Push(c1, c4, c5);
+#else
     __ LoadRoot(x5, RootIndex::kTheHoleValue);
     __ Push(x1, padreg, x4, x5);
+#endif // __CHERI_PURE_CAPABILITY__
     __ CallRuntime(Runtime::kDebugOnFunctionCall);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Pop(c1);
+#else
     __ Pop(padreg, x1);
+#endif // __CHERI_PURE_CAPABILITY__
     __ LoadTaggedPointerField(
+#if defined(__CHERI_PURE_CAPABILITY__)
+        c4, FieldMemOperand(c1, JSGeneratorObject::kFunctionOffset));
+#else
         x4, FieldMemOperand(x1, JSGeneratorObject::kFunctionOffset));
+#endif // __CHERI_PURE_CAPABILITY__
   }
   __ B(&stepping_prepared);
 
   __ Bind(&prepare_step_in_suspended_generator);
   {
     FrameScope scope(masm, StackFrame::INTERNAL);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Push(c1);
+#else
     __ Push(x1, padreg);
+#endif // __CHERI_PURE_CAPABILITY__
     __ CallRuntime(Runtime::kDebugPrepareStepInSuspendedGenerator);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Pop(c1);
+#else
     __ Pop(padreg, x1);
+#endif // __CHERI_PURE_CAPABILITY__
     __ LoadTaggedPointerField(
+#if defined(__CHERI_PURE_CAPABILITY__)
+        c4, FieldMemOperand(c1, JSGeneratorObject::kFunctionOffset));
+#else
         x4, FieldMemOperand(x1, JSGeneratorObject::kFunctionOffset));
+#endif // __CHERI_PURE_CAPABILITY__
   }
   __ B(&stepping_prepared);
 
@@ -664,7 +939,11 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
 
     // Initialize the root register.
     // C calling convention. The first argument is passed in x0.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Mov(kRootRegister, c0);
+#else
     __ Mov(kRootRegister, x0);
+#endif // _CHERI_PURE_CAPABILITY__
 
 #ifdef V8_COMPRESS_POINTERS_IN_SHARED_CAGE
     // Initialize the pointer cage base register.
@@ -678,7 +957,11 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
   static_assert(
       EntryFrameConstants::kCalleeSavedRegisterBytesPushedAfterFpLrPair == 0);
   static_assert(EntryFrameConstants::kOffsetToCalleeSavedRegisters == 0);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Mov(fp, csp);
+#else
   __ Mov(fp, sp);
+#endif // _CHERI_PURE_CAPABILITY__
 
   // Build an entry frame (see layout below).
 
@@ -686,21 +969,36 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
   __ Mov(x12, StackFrame::TypeToMarker(type));
   __ Push(x12, xzr);
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Mov(c11, ExternalReference::Create(IsolateAddressId::kCEntryFPAddress,
+                                        masm->isolate()));
+  __ Ldr(c10, MemOperand(c11));  // c10 = C entry FP.
+#else
   __ Mov(x11, ExternalReference::Create(IsolateAddressId::kCEntryFPAddress,
                                         masm->isolate()));
   __ Ldr(x10, MemOperand(x11));  // x10 = C entry FP.
+#endif // _CHERI_PURE_CAPABILITY__
 
   // Clear c_entry_fp, now we've loaded its value to be pushed on the stack.
   // If the c_entry_fp is not already zero and we don't clear it, the
   // SafeStackFrameIterator will assume we are executing C++ and miss the JS
   // frames on top.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Str(czr, MemOperand(c11));
+#else
   __ Str(xzr, MemOperand(x11));
+#endif // _CHERI_PURE_CAPABILITY__
+
 
   // Set js_entry_sp if this is the outermost JS call.
   Label done;
   ExternalReference js_entry_sp = ExternalReference::Create(
       IsolateAddressId::kJSEntrySPAddress, masm->isolate());
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Mov(c12, js_entry_sp);
+#else
   __ Mov(x12, js_entry_sp);
+#endif // _CHERI_PURE_CAPABILITY__
   __ Ldr(x11, MemOperand(x12));  // x11 = previous JS entry SP.
 
   // Select between the inner and outermost frame marker, based on the JS entry
@@ -711,11 +1009,19 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
   // x11 = JS entry frame marker.
   __ Csel(x11, xzr, StackFrame::OUTERMOST_JSENTRY_FRAME, ne);
   __ B(ne, &done);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Str(fp, MemOperand(c12));
+#else
   __ Str(fp, MemOperand(x12));
+#endif // _CHERI_PURE_CAPABILITY__
 
   __ Bind(&done);
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Push(c10, c11);
+#else
   __ Push(x10, x11);
+#endif // _CHERI_PURE_CAPABILITY__
 
   // The frame set up looks like this:
   // sp[0] : JS entry frame marker.
@@ -747,35 +1053,65 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
     // field in the JSEnv and return a failure sentinel. Coming in here the
     // fp will be invalid because UnwindAndFindHandler sets it to 0 to
     // signal the existence of the JSEntry frame.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Mov(c10,
+#else
     __ Mov(x10,
+#endif // _CHERI_PURE_CAPABILITY__
            ExternalReference::Create(IsolateAddressId::kPendingExceptionAddress,
                                      masm->isolate()));
   }
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Str(c0, MemOperand(x10));
+  __ LoadRoot(c0, RootIndex::kException);
+#else
   __ Str(x0, MemOperand(x10));
   __ LoadRoot(x0, RootIndex::kException);
+#endif // _CHERI_PURE_CAPABILITY__
   __ B(&exit);
 
   // Invoke: Link this frame into the handler chain.
   __ Bind(&invoke);
 
   // Push new stack handler.
+#if defined(__CHERI_PURE_CAPABILITY__)
   static_assert(StackHandlerConstants::kSize == 2 * kSystemPointerSize,
+#else
+  static_assert(StackHandlerConstants::kSize == 2 * kSystemPointerAddrSize,
+#endif // _CHERI_PURE_CAPABILITY__
                 "Unexpected offset for StackHandlerConstants::kSize");
+#if defined(__CHERI_PURE_CAPABILITY__)
   static_assert(StackHandlerConstants::kNextOffset == 0 * kSystemPointerSize,
+#else
+  static_assert(StackHandlerConstants::kNextOffset == 0 * kSystemPointerAddrSize,
+#endif // _CHERI_PURE_CAPABILITY__
                 "Unexpected offset for StackHandlerConstants::kNextOffset");
 
   // Link the current handler as the next handler.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Mov(c11, ExternalReference::Create(IsolateAddressId::kHandlerAddress,
+                                        masm->isolate()));
+  __ Ldr(c10, MemOperand(x11));
+  __ Push(c10);
+#else
   __ Mov(x11, ExternalReference::Create(IsolateAddressId::kHandlerAddress,
                                         masm->isolate()));
   __ Ldr(x10, MemOperand(x11));
   __ Push(padreg, x10);
+#endif // _CHERI_PURE_CAPABILITY__
 
   // Set this new handler as the current one.
   {
     UseScratchRegisterScope temps(masm);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Register scratch = temps.AcquireC();
+    __ Mov(scratch, csp);
+    __ Str(scratch, MemOperand(c11));
+#else
     Register scratch = temps.AcquireX();
     __ Mov(scratch, sp);
     __ Str(scratch, MemOperand(x11));
+#endif // _CHERI_PURE_CAPABILITY__
   }
 
   // If an exception not caught by another handler occurs, this handler
@@ -790,13 +1126,26 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
   __ Call(trampoline_code, RelocInfo::CODE_TARGET);
 
   // Pop the stack handler and unlink this frame from the handler chain.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  static_assert(StackHandlerConstants::kNextOffset == 0 * kSystemPointerSize,
+                "Unexpected offset for StackHandlerConstants::kNextOffset");
+  __ Pop(c10);
+  __ Mov(c11, ExternalReference::Create(IsolateAddressId::kHandlerAddress,
+                                        masm->isolate()));
+  __ Drop(StackHandlerConstants::kSlotCount - 2);
+#else
   static_assert(StackHandlerConstants::kNextOffset == 0 * kSystemPointerAddrSize,
                 "Unexpected offset for StackHandlerConstants::kNextOffset");
   __ Pop(x10, padreg);
   __ Mov(x11, ExternalReference::Create(IsolateAddressId::kHandlerAddress,
                                         masm->isolate()));
   __ Drop(StackHandlerConstants::kSlotCount - 2);
+#endif // _CHERI_PURE_CAPABILITY__
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Str(c10, MemOperand(c11));
+#else
   __ Str(x10, MemOperand(x11));
+#endif // _CHERI_PURE_CAPABILITY__
 
   __ Bind(&exit);
   // x0 holds the result.
@@ -813,25 +1162,55 @@ void Generate_JSEntryVariant(MacroAssembler* masm, StackFrame::Type type,
   // Check if the current stack frame is marked as the outermost JS frame.
   Label non_outermost_js_2;
   {
+#if defined(__CHERI_PURE_CAPABILITY__)
+   Register c_entry_fp = c11;
+    __ PeekPair(c10, c_entry_fp, 0);
+    {
+       UseScratchRegisterScope temps(masm);
+       Register temp = temps.AcquireX();
+       __ Gcvalue(c10, temp);
+       __ Cmp(temp, StackFrame::OUTERMOST_JSENTRY_FRAME);
+    }
+    __ B(ne, &non_outermost_js_2);
+    __ Mov(c12, js_entry_sp);
+    __ Str(czr, MemOperand(c12));
+#else
     Register c_entry_fp = x11;
     __ PeekPair(x10, c_entry_fp, 0);
     __ Cmp(x10, StackFrame::OUTERMOST_JSENTRY_FRAME);
     __ B(ne, &non_outermost_js_2);
     __ Mov(x12, js_entry_sp);
     __ Str(xzr, MemOperand(x12));
+#endif // _CHERI_PURE_CAPABILITY__
     __ Bind(&non_outermost_js_2);
 
     // Restore the top frame descriptors from the stack.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Mov(c12, ExternalReference::Create(IsolateAddressId::kCEntryFPAddress,
+#else
     __ Mov(x12, ExternalReference::Create(IsolateAddressId::kCEntryFPAddress,
+#endif // _CHERI_PURE_CAPABILITY__
                                           masm->isolate()));
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Str(c_entry_fp, MemOperand(c12));
+#else
     __ Str(c_entry_fp, MemOperand(x12));
+#endif // _CHERI_PURE_CAPABILITY__
   }
 
   // Reset the stack to the callee saved registers.
   static_assert(
+#if defined(__CHERI_PURE_CAPABILITY__)
+      EntryFrameConstants::kFixedFrameSize % (2 * kSystemPointerSize) == 0,
+#else
       EntryFrameConstants::kFixedFrameSize % (2 * kSystemPointerAddrSize) == 0,
+#endif // _CHERI_PURE_CAPABILITY__
       "Size of entry frame is not a multiple of 16 bytes");
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Drop(EntryFrameConstants::kFixedFrameSize / kSystemPointerSize);
+#else
   __ Drop(EntryFrameConstants::kFixedFrameSize / kSystemPointerAddrSize);
+#endif // _CHERI_PURE_CAPABILITY__
   // Restore the callee-saved registers and return.
   __ PopCalleeSavedRegisters();
   __ Ret();
@@ -863,12 +1242,23 @@ void Builtins::Generate_JSRunMicrotasksEntry(MacroAssembler* masm) {
 //   x0: result.
 static void Generate_JSEntryTrampolineHelper(MacroAssembler* masm,
                                              bool is_construct) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register new_target = c1;
+  Register function = c2;
+  Register receiver = c3;
+#else
   Register new_target = x1;
   Register function = x2;
   Register receiver = x3;
+#endif // __CHERI_PURE_CAPABILITY__
   Register argc = x4;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register argv = c5;
+  Register scratch = c10;
+#else
   Register argv = x5;
   Register scratch = x10;
+#endif // __CHERI_PURE_CAPABILITY__
   Register slots_to_claim = x11;
 
   {
@@ -900,7 +1290,11 @@ static void Generate_JSEntryTrampolineHelper(MacroAssembler* masm,
 
     // Store padding (which might be overwritten).
     __ SlotAddress(scratch, slots_to_claim);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Str(padregc, MemOperand(scratch, -kSystemPointerSize));
+#else
     __ Str(padreg, MemOperand(scratch, -kSystemPointerAddrSize));
+#endif // __CHERI_PURE_CAPABILITY__
 
     // Store receiver on the stack.
     __ Poke(receiver, 0);
@@ -919,23 +1313,48 @@ static void Generate_JSEntryTrampolineHelper(MacroAssembler* masm,
 
     // scratch has been set to point to the location of the function, which
     // marks the end of the argument copy.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ SlotAddress(c0, 1);  // Skips receiver.
+#else
     __ SlotAddress(x0, 1);  // Skips receiver.
+#endif // _CHERI_PURE_CAPABILITY__
     __ Bind(&loop);
     // Load the handle.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Ldr(c11, MemOperand(argv, kSystemPointerSize, PostIndex));
+#else
     __ Ldr(x11, MemOperand(argv, kSystemPointerAddrSize, PostIndex));
+#endif // _CHERI_PURE_CAPABILITY__
     // Dereference the handle.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Ldr(x11, MemOperand(c11));
+#else
     __ Ldr(x11, MemOperand(x11));
+#endif // _CHERI_PURE_CAPABILITY__
     // Poke the result into the stack.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Str(c11, MemOperand(c0, kSystemPointerSize, PostIndex));
+#else
     __ Str(x11, MemOperand(x0, kSystemPointerAddrSize, PostIndex));
+#endif // _CHERI_PURE_CAPABILITY__
     // Loop if we've not reached the end of copy marker.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Cmp(c0, scratch);
+#else
     __ Cmp(x0, scratch);
+#endif // _CHERI_PURE_CAPABILITY__
     __ B(lt, &loop);
 
     __ Bind(&done);
 
     __ Mov(x0, argc);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Mov(c3, new_target);
+    __ Mov(c1, function);
+#else
     __ Mov(x3, new_target);
     __ Mov(x1, function);
+#endif // _CHERI_PURE_CAPABILITY__
     // x0: argc.
     // x1: function.
     // x3: new.target.
@@ -943,6 +1362,15 @@ static void Generate_JSEntryTrampolineHelper(MacroAssembler* masm,
     // Initialize all JavaScript callee-saved registers, since they will be seen
     // by the garbage collector as part of handlers.
     // The original values have been saved in JSEntry.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ LoadRoot(c19, RootIndex::kUndefinedValue);
+    __ Mov(c20, c19);
+    __ Mov(c21, c19);
+    __ Mov(c22, c19);
+    __ Mov(c23, c19);
+    __ Mov(c24, c19);
+    __ Mov(c25, c19);
+#else
     __ LoadRoot(x19, RootIndex::kUndefinedValue);
     __ Mov(x20, x19);
     __ Mov(x21, x19);
@@ -950,8 +1378,13 @@ static void Generate_JSEntryTrampolineHelper(MacroAssembler* masm,
     __ Mov(x23, x19);
     __ Mov(x24, x19);
     __ Mov(x25, x19);
+#endif // _CHERI_PURE_CAPABILITY__
 #ifndef V8_COMPRESS_POINTERS_IN_SHARED_CAGE
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Mov(c28, c19);
+#else
     __ Mov(x28, x19);
+#endif // _CHERI_PURE_CAPABILITY__
 #endif
     // Don't initialize the reserved registers.
     // x26 : root register (kRootRegister).
@@ -986,8 +1419,11 @@ void Builtins::Generate_RunMicrotasksTrampoline(MacroAssembler* masm) {
   //   x0: root_register_value
   //   x1: microtask_queue
 
-  __ Mov(RunMicrotasksDescriptor::MicrotaskQueueRegister(), x1);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Mov(RunMicrotasksDescriptor::MicrotaskQueueRegister(), c1);
+#else
   __ Jump(BUILTIN_CODE(masm->isolate(), RunMicrotasks), RelocInfo::CODE_TARGET);
+#endif // _CHERI_PURE_CAPABILITY__
 }
 
 static void ReplaceClosureCodeWithOptimizedCode(MacroAssembler* masm,
@@ -1006,7 +1442,6 @@ static void ReplaceClosureCodeWithOptimizedCode(MacroAssembler* masm,
 
 static void LeaveInterpreterFrame(MacroAssembler* masm, Register scratch1,
                                   Register scratch2) {
-  ASM_CODE_COMMENT(masm);
   Register params_size = scratch1;
   // Get the size of the formal parameters + receiver (in bytes).
   __ Ldr(params_size,
@@ -1018,7 +1453,11 @@ static void LeaveInterpreterFrame(MacroAssembler* masm, Register scratch1,
   // Compute the size of the actual parameters + receiver (in bytes).
   __ Ldr(actual_params_size,
          MemOperand(fp, StandardFrameConstants::kArgCOffset));
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ lsl(actual_params_size, actual_params_size, kSystemPointerSizeLog2);
+#else
   __ lsl(actual_params_size, actual_params_size, kSystemPointerAddrSizeLog2);
+#endif // __CHERI_PURE_CAPABILITY__
 
   // If actual is bigger than formal, then we should use it to free up the stack
   // arguments.
@@ -1062,9 +1501,17 @@ static void TailCallOptimizedCodeSlot(MacroAssembler* masm,
   //  -- x1 : target function (preserved for callee if needed, and caller)
   // -----------------------------------
   ASM_CODE_COMMENT(masm);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  DCHECK(!AreAliased(c1, c3, optimized_code_entry, scratch));
+#else
   DCHECK(!AreAliased(x1, x3, optimized_code_entry, scratch));
+#endif // _CHERI_PURE_CAPABILITY__
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register closure = c1;
+#else
   Register closure = x1;
+#endif // _CHERI_PURE_CAPABILITY__
   Label heal_optimized_code_slot;
 
   // If the optimized code is cleared, go to runtime to update the optimization
@@ -1081,9 +1528,15 @@ static void TailCallOptimizedCodeSlot(MacroAssembler* masm,
   // Optimized code is good, get it into the closure and link the closure into
   // the optimized functions list, then tail call the optimized code.
   ReplaceClosureCodeWithOptimizedCode(masm, optimized_code_entry, closure);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  static_assert(kJavaScriptCallCodeStartRegister == c2, "ABI mismatch");
+  __ Move(c2, optimized_code_entry);
+  __ JumpCodeTObject(c2);
+#else
   static_assert(kJavaScriptCallCodeStartRegister == x2, "ABI mismatch");
   __ Move(x2, optimized_code_entry);
   __ JumpCodeTObject(x2);
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Optimized code slot contains deoptimized code or code is cleared and
   // optimized code marker isn't updated. Evict the code, update the marker
@@ -1102,7 +1555,11 @@ static void MaybeOptimizeCode(MacroAssembler* masm, Register feedback_vector,
   //  -- tiering_state : int32 containing non-zero tiering state.
   // -----------------------------------
   ASM_CODE_COMMENT(masm);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  DCHECK(!AreAliased(feedback_vector, c1, c3, tiering_state));
+#else
   DCHECK(!AreAliased(feedback_vector, x1, x3, tiering_state));
+#endif // _CHERI_PURE_CAPABILITY__
 
   TailCallRuntimeIfStateEquals(masm, tiering_state,
                                TieringState::kRequestTurbofan_Synchronous,
@@ -1222,7 +1679,11 @@ static void MaybeOptimizeCodeOrTailCallOptimizedCodeSlot(
   MaybeOptimizeCode(masm, feedback_vector, tiering_state);
 
   __ bind(&maybe_has_optimized_code);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register optimized_code_entry = c7;
+#else
   Register optimized_code_entry = x7;
+#endif // __CHERI_PURE_CAPABILITY__
   __ LoadAnyTaggedField(
       optimized_code_entry,
       FieldMemOperand(feedback_vector,
@@ -1255,21 +1716,33 @@ void ResetFeedbackVectorOsrUrgency(MacroAssembler* masm,
 void Builtins::Generate_BaselineOutOfLinePrologue(MacroAssembler* masm) {
   UseScratchRegisterScope temps(masm);
   // Need a few extra registers
+#if defined(__CHERI_PURE_CAPABILITY__)
+  temps.Include(c14, c15);
+#else
   temps.Include(x14, x15);
+#endif // __CHERI_PURE_CAPABILITY__
 
   auto descriptor =
       Builtins::CallInterfaceDescriptorFor(Builtin::kBaselineOutOfLinePrologue);
   Register closure = descriptor.GetRegisterParameter(
       BaselineOutOfLinePrologueDescriptor::kClosure);
   // Load the feedback vector from the closure.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register feedback_vector = temps.AcquireC();
+#else
   Register feedback_vector = temps.AcquireX();
+#endif // __CHERI_PURE_CAPABILITY__
   __ LoadTaggedPointerField(
       feedback_vector,
       FieldMemOperand(closure, JSFunction::kFeedbackCellOffset));
   __ LoadTaggedPointerField(
       feedback_vector, FieldMemOperand(feedback_vector, Cell::kValueOffset));
   if (FLAG_debug_code) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ CompareObjectType(feedback_vector, c4, x4, FEEDBACK_VECTOR_TYPE);
+#else
     __ CompareObjectType(feedback_vector, x4, x4, FEEDBACK_VECTOR_TYPE);
+#endif // __CHERI_PURE_CAPABILITY__
     __ Assert(eq, AbortReason::kExpectedFeedbackVector);
   }
 
@@ -1319,12 +1792,21 @@ void Builtins::Generate_BaselineOutOfLinePrologue(MacroAssembler* masm) {
     Register bytecode_array = descriptor.GetRegisterParameter(
         BaselineOutOfLinePrologueDescriptor::kInterpreterBytecodeArray);
     ResetBytecodeAge(masm, bytecode_array);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Push(argc, padreg);
+    __ Push(bytecode_array);
+#else
     __ Push(argc, bytecode_array);
+#endif // __CHERI_PURE_CAPABILITY__
 
     // Baseline code frames store the feedback vector where interpreter would
     // store the bytecode offset.
     if (FLAG_debug_code) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+      __ CompareObjectType(feedback_vector, c4, x4, FEEDBACK_VECTOR_TYPE);
+#else
       __ CompareObjectType(feedback_vector, x4, x4, FEEDBACK_VECTOR_TYPE);
+#endif // __CHERI_PURE_CAPABILITY__
       __ Assert(eq, AbortReason::kExpectedFeedbackVector);
     }
     // Our stack is currently aligned. We have have to push something along with
@@ -1347,8 +1829,18 @@ void Builtins::Generate_BaselineOutOfLinePrologue(MacroAssembler* masm) {
     UseScratchRegisterScope temps(masm);
 
     Register sp_minus_frame_size = temps.AcquireX();
+#if defined(__CHERI_PURE_CAPABILITY__)
+    {
+      UseScratchRegisterScope temps(masm);
+      Register temp = temps.AcquireX();
+      __ Gcvalue(csp, temp);
+      __ Sub(sp_minus_frame_size, temp, frame_size);
+    }
+    Register interrupt_limit = temps.AcquireC();
+#else
     __ Sub(sp_minus_frame_size, sp, frame_size);
     Register interrupt_limit = temps.AcquireX();
+#endif // __CHERI_PURE_CAPABILITY__
     __ LoadStackLimit(interrupt_limit, StackLimitKind::kInterruptStackLimit);
     __ Cmp(sp_minus_frame_size, interrupt_limit);
     __ B(lo, &call_stack_guard);
@@ -1380,11 +1872,19 @@ void Builtins::Generate_BaselineOutOfLinePrologue(MacroAssembler* masm) {
 
     FrameScope frame_scope(masm, StackFrame::INTERNAL);
     // Save incoming new target or generator
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Push(new_target);
+#else
     __ Push(padreg, new_target);
+#endif // __CHERI_PURE_CAPABILITY__
     __ SmiTag(frame_size);
     __ PushArgument(frame_size);
     __ CallRuntime(Runtime::kStackGuardWithGap);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Pop(new_target);
+#else
     __ Pop(new_target, padreg);
+#endif // __CHERI_PURE_CAPABILITY__
   }
   __ LoadRoot(kInterpreterAccumulatorRegister, RootIndex::kUndefinedValue);
   __ Ret();
@@ -1405,25 +1905,46 @@ void Builtins::Generate_BaselineOutOfLinePrologue(MacroAssembler* masm) {
 // The function builds an interpreter frame. See InterpreterFrameConstants in
 // frame-constants.h for its layout.
 void Builtins::Generate_InterpreterEntryTrampoline(MacroAssembler* masm) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register closure = c1;
+  Register feedback_vector = c2;
+#else
   Register closure = x1;
   Register feedback_vector = x2;
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Get the bytecode array from the function object and load it into
   // kInterpreterBytecodeArrayRegister.
   __ LoadTaggedPointerField(
+#if defined(__CHERI_PURE_CAPABILITY__)
+      c4, FieldMemOperand(closure, JSFunction::kSharedFunctionInfoOffset));
+#else
       x4, FieldMemOperand(closure, JSFunction::kSharedFunctionInfoOffset));
+#endif // __CHERI_PURE_CAPABILITY__
   __ LoadTaggedPointerField(
       kInterpreterBytecodeArrayRegister,
+#if defined(__CHERI_PURE_CAPABILITY__)
+      FieldMemOperand(c4, SharedFunctionInfo::kFunctionDataOffset));
+#else
       FieldMemOperand(x4, SharedFunctionInfo::kFunctionDataOffset));
+#endif // __CHERI_PURE_CAPABILITY__
 
   Label is_baseline;
   GetSharedFunctionInfoBytecodeOrBaseline(
+#if defined(__CHERI_PURE_CAPABILITY__)
+      masm, kInterpreterBytecodeArrayRegister, c11, &is_baseline);
+#else
       masm, kInterpreterBytecodeArrayRegister, x11, &is_baseline);
+#endif // __CHERI_PURE_CAPABILITY__
 
   // The bytecode array could have been flushed from the shared function info,
   // if so, call into CompileLazy.
   Label compile_lazy;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ CompareObjectType(kInterpreterBytecodeArrayRegister, c4, x4,
+#else
   __ CompareObjectType(kInterpreterBytecodeArrayRegister, x4, x4,
+#endif // __CHERI_PURE_CAPABILITY__
                        BYTECODE_ARRAY_TYPE);
   __ B(ne, &compile_lazy);
 
@@ -1438,8 +1959,13 @@ void Builtins::Generate_InterpreterEntryTrampoline(MacroAssembler* masm) {
   // Check if feedback vector is valid. If valid, check for optimized code
   // and update invocation count. Otherwise, setup the stack frame.
   __ LoadTaggedPointerField(
+#if defined(__CHERI_PURE_CAPABILITY__)
+      c7, FieldMemOperand(feedback_vector, HeapObject::kMapOffset));
+  __ Ldrh(x7, FieldMemOperand(c7, Map::kInstanceTypeOffset));
+#else
       x7, FieldMemOperand(feedback_vector, HeapObject::kMapOffset));
   __ Ldrh(x7, FieldMemOperand(x7, Map::kInstanceTypeOffset));
+#endif // __CHERI_PURE_CAPABILITY__
   __ Cmp(x7, FEEDBACK_VECTOR_TYPE);
   __ B(ne, &push_stack_frame);
 
@@ -1470,7 +1996,11 @@ void Builtins::Generate_InterpreterEntryTrampoline(MacroAssembler* masm) {
   __ Bind(&push_stack_frame);
   FrameScope frame_scope(masm, StackFrame::MANUAL);
   __ Push<TurboAssembler::kSignLR>(lr, fp);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Mov(fp, csp);
+#else
   __ mov(fp, sp);
+#endif // __CHERI_PURE_CAPABILITY__
   __ Push(cp, closure);
 
   ResetBytecodeAge(masm, kInterpreterBytecodeArrayRegister);
@@ -1483,9 +2013,19 @@ void Builtins::Generate_InterpreterEntryTrampoline(MacroAssembler* masm) {
   // offset and an undefined (to properly align the stack pointer).
   static_assert(TurboAssembler::kExtraSlotClaimedByPrologue == 1);
   __ SmiTag(x6, kInterpreterBytecodeOffsetRegister);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Push(kJavaScriptCallArgCountRegister, padreg);
+  __ Push(kInterpreterBytecodeArrayRegister);
+#else
   __ Push(kJavaScriptCallArgCountRegister, kInterpreterBytecodeArrayRegister);
+#endif // __CHERI_PURE_CAPABILITY__
   __ LoadRoot(kInterpreterAccumulatorRegister, RootIndex::kUndefinedValue);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Push(x6, padreg);
+  __ Push(kInterpreterAccumulatorRegister);
+#else
   __ Push(x6, kInterpreterAccumulatorRegister);
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Allocate the local and temporary register file on the stack.
   Label stack_overflow;
@@ -1495,12 +2035,24 @@ void Builtins::Generate_InterpreterEntryTrampoline(MacroAssembler* masm) {
                                 BytecodeArray::kFrameSizeOffset));
 
     // Do a stack check to ensure we don't go over the limit.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Sub(c10, csp, Operand(x11));
+#else
     __ Sub(x10, sp, Operand(x11));
+#endif // __CHERI_PURE_CAPABILITY__
     {
       UseScratchRegisterScope temps(masm);
+#if defined(__CHERI_PURE_CAPABILITY__)
+      Register scratch = temps.AcquireC();
+#else
       Register scratch = temps.AcquireX();
+#endif // __CHERI_PURE_CAPABILITY__
       __ LoadStackLimit(scratch, StackLimitKind::kRealStackLimit);
+#if defined(__CHERI_PURE_CAPABILITY__)
+      __ Cmp(c10, scratch);
+#else
       __ Cmp(x10, scratch);
+#endif // __CHERI_PURE_CAPABILITY__
     }
     __ B(lo, &stack_overflow);
 
@@ -1508,7 +2060,11 @@ void Builtins::Generate_InterpreterEntryTrampoline(MacroAssembler* masm) {
     // Note: there should always be at least one stack slot for the return
     // register in the register file.
     Label loop_header;
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Lsr(x11, x11, kSystemPointerSizeLog2);
+#else
     __ Lsr(x11, x11, kSystemPointerAddrSizeLog2);
+#endif // __CHERI_PURE_CAPABILITY__
     // Round down (since we already have an undefined in the stack) the number
     // of registers to a multiple of 2, to align the stack to 16 bytes.
     __ Bic(x11, x11, 1);
@@ -1524,14 +2080,23 @@ void Builtins::Generate_InterpreterEntryTrampoline(MacroAssembler* masm) {
                kInterpreterBytecodeArrayRegister,
                BytecodeArray::kIncomingNewTargetOrGeneratorRegisterOffset));
   __ Cbz(x10, &no_incoming_new_target_or_generator_register);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Str(c3, MemOperand(fp, x10, LSL, kSystemPointerSizeLog2));
+#else
   __ Str(x3, MemOperand(fp, x10, LSL, kSystemPointerAddrSizeLog2));
+#endif // __CHERI_PURE_CAPABILITY__
   __ Bind(&no_incoming_new_target_or_generator_register);
 
   // Perform interrupt stack check.
   // TODO(solanes): Merge with the real stack limit check above.
   Label stack_check_interrupt, after_stack_check_interrupt;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ LoadStackLimit(c10, StackLimitKind::kInterruptStackLimit);
+  __ Cmp(csp, c10);
+#else
   __ LoadStackLimit(x10, StackLimitKind::kInterruptStackLimit);
   __ Cmp(sp, x10);
+#endif // __CHERI_PURE_CAPABILITY__
   __ B(lo, &stack_check_interrupt);
   __ Bind(&after_stack_check_interrupt);
 
@@ -1546,7 +2111,11 @@ void Builtins::Generate_InterpreterEntryTrampoline(MacroAssembler* masm) {
       ExternalReference::interpreter_dispatch_table_address(masm->isolate()));
   __ Ldrb(x23, MemOperand(kInterpreterBytecodeArrayRegister,
                           kInterpreterBytecodeOffsetRegister));
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Mov(x1, Operand(x23, LSL, kSystemPointerSizeLog2));
+#else
   __ Mov(x1, Operand(x23, LSL, kSystemPointerAddrSizeLog2));
+#endif // __CHERI_PURE_CAPABILITY__
   __ Ldr(kJavaScriptCallCodeStartRegister,
          MemOperand(kInterpreterDispatchTableRegister, x1));
   __ Call(kJavaScriptCallCodeStartRegister);
@@ -1617,8 +2186,13 @@ void Builtins::Generate_InterpreterEntryTrampoline(MacroAssembler* masm) {
     // Check if feedback vector is valid. If not, call prepare for baseline to
     // allocate it.
     __ LoadTaggedPointerField(
+#if defined(__CHERI_PURE_CAPABILITY__)
+        c7, FieldMemOperand(feedback_vector, HeapObject::kMapOffset));
+    __ Ldrh(x7, FieldMemOperand(c7, Map::kInstanceTypeOffset));
+#else
         x7, FieldMemOperand(feedback_vector, HeapObject::kMapOffset));
     __ Ldrh(x7, FieldMemOperand(x7, Map::kInstanceTypeOffset));
+#endif // __CHERI_PURE_CAPABILITY__
     __ Cmp(x7, FEEDBACK_VECTOR_TYPE);
     __ B(ne, &install_baseline_code);
 
@@ -1628,10 +2202,17 @@ void Builtins::Generate_InterpreterEntryTrampoline(MacroAssembler* masm) {
                                              &has_optimized_code_or_state);
 
     // Load the baseline code into the closure.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Move(c2, kInterpreterBytecodeArrayRegister);
+    static_assert(kJavaScriptCallCodeStartRegister == c2, "ABI mismatch");
+    ReplaceClosureCodeWithOptimizedCode(masm, c2, closure);
+    __ JumpCodeTObject(c2);
+#else
     __ Move(x2, kInterpreterBytecodeArrayRegister);
     static_assert(kJavaScriptCallCodeStartRegister == x2, "ABI mismatch");
     ReplaceClosureCodeWithOptimizedCode(masm, x2, closure);
     __ JumpCodeTObject(x2);
+#endif // __CHERI_PURE_CAPABILITY__
 
     __ bind(&install_baseline_code);
     GenerateTailCallToReturnedCode(masm, Runtime::kInstallBaselineCode);
@@ -1652,8 +2233,13 @@ static void GenerateInterpreterPushArgs(MacroAssembler* masm, Register num_args,
                                         ConvertReceiverMode receiver_mode,
                                         InterpreterPushArgsMode mode) {
   ASM_CODE_COMMENT(masm);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register last_arg_addr = c10;
+  Register stack_addr = c11;
+#else
   Register last_arg_addr = x10;
   Register stack_addr = x11;
+#endif // _CHERI_PURE_CAPABILITY__
   Register slots_to_claim = x12;
   Register slots_to_copy = x13;
 
@@ -1688,7 +2274,11 @@ static void GenerateInterpreterPushArgs(MacroAssembler* masm, Register num_args,
     UseScratchRegisterScope temps(masm);
     Register scratch = temps.AcquireX();
     __ Sub(scratch, slots_to_claim, 1);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Poke(padregc, Operand(scratch, LSL, kSystemPointerSizeLog2));
+#else
     __ Poke(padreg, Operand(scratch, LSL, kSystemPointerAddrSizeLog2));
+#endif // __CHERI_PURE_CAPABILITY__
   }
 
   const bool skip_receiver =
@@ -1699,18 +2289,34 @@ static void GenerateInterpreterPushArgs(MacroAssembler* masm, Register num_args,
     __ Mov(slots_to_copy, num_args);
   }
   __ SlotAddress(stack_addr, skip_receiver ? 1 : 0);
-
   __ Sub(last_arg_addr, first_arg_index,
+#if defined(__CHERI_PURE_CAPABILITY__)
+         Operand(slots_to_copy, LSL, kSystemPointerSizeLog2));
+#else
          Operand(slots_to_copy, LSL, kSystemPointerAddrSizeLog2));
+#endif // _CHERI_PURE_CAPABILITY__
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Add(last_arg_addr, last_arg_addr, kSystemPointerSize);
+#else
   __ Add(last_arg_addr, last_arg_addr, kSystemPointerAddrSize);
+#endif // _CHERI_PURE_CAPABILITY__
 
   // Load the final spread argument into spread_arg_out, if necessary.
   if (mode == InterpreterPushArgsMode::kWithFinalSpread) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Ldr(spread_arg_out, MemOperand(last_arg_addr, -kSystemPointerSize));
+#else
     __ Ldr(spread_arg_out, MemOperand(last_arg_addr, -kSystemPointerAddrSize));
+#endif // _CHERI_PURE_CAPABILITY__
   }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ CopyCapabilities(stack_addr, last_arg_addr, slots_to_copy,
+                     TurboAssembler::kCapDstLessThanSrcAndReverse);
+#else
   __ CopyDoubleWords(stack_addr, last_arg_addr, slots_to_copy,
                      TurboAssembler::kDstLessThanSrcAndReverse);
+#endif // _CHERI_PURE_CAPABILITY__
 
   if (receiver_mode == ConvertReceiverMode::kNullOrUndefined) {
     // Store "undefined" as the receiver arg if we need to.
@@ -1737,7 +2343,11 @@ void Builtins::Generate_InterpreterPushArgsThenCallImpl(
   // spread_arg_out will be updated to contain the last spread argument, when
   // mode == InterpreterPushArgsMode::kWithFinalSpread.
   Register num_args = x0;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register first_arg_index = c2;
+#else
   Register first_arg_index = x2;
+#endif // __CHERI_PURE_CAPABILITY__
   Register spread_arg_out =
       (mode == InterpreterPushArgsMode::kWithFinalSpread) ? x2 : no_reg;
   GenerateInterpreterPushArgs(masm, num_args, first_arg_index, spread_arg_out,
@@ -1763,20 +2373,32 @@ void Builtins::Generate_InterpreterPushArgsThenConstructImpl(
   // -- x2 : allocation site feedback if available, undefined otherwise
   // -- x4 : address of the first argument
   // -----------------------------------
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ AssertUndefinedOrAllocationSite(c2);
+#else
   __ AssertUndefinedOrAllocationSite(x2);
+#endif // _CHERI_PURE_CAPABILITY__
 
   // Push the arguments. num_args may be updated according to mode.
   // spread_arg_out will be updated to contain the last spread argument, when
   // mode == InterpreterPushArgsMode::kWithFinalSpread.
   Register num_args = x0;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register first_arg_index = c4;
+#else
   Register first_arg_index = x4;
+#endif // _CHERI_PURE_CAPABILITY__
   Register spread_arg_out =
       (mode == InterpreterPushArgsMode::kWithFinalSpread) ? x2 : no_reg;
   GenerateInterpreterPushArgs(masm, num_args, first_arg_index, spread_arg_out,
                               ConvertReceiverMode::kNullOrUndefined, mode);
 
   if (mode == InterpreterPushArgsMode::kArrayFunction) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ AssertFunction(c1);
+#else
     __ AssertFunction(x1);
+#endif // __CHERI_PURE_CAPABILITY__
 
     // Tail call to the array construct stub (still in the caller
     // context at this point).
@@ -1808,7 +2430,11 @@ static void Generate_InterpreterEnterBytecode(MacroAssembler* masm) {
     __ AssertNotSmi(
         kInterpreterBytecodeArrayRegister,
         AbortReason::kFunctionDataShouldBeBytecodeArrayOnInterpreterEntry);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ CompareObjectType(kInterpreterBytecodeArrayRegister, c1, x1,
+#else
     __ CompareObjectType(kInterpreterBytecodeArrayRegister, x1, x1,
+#endif // __CHERI_PURE_CAPABILITY__
                          BYTECODE_ARRAY_TYPE);
     __ Assert(
         eq, AbortReason::kFunctionDataShouldBeBytecodeArrayOnInterpreterEntry);
@@ -1835,15 +2461,24 @@ static void Generate_InterpreterEnterBytecode(MacroAssembler* masm) {
   // Dispatch to the target bytecode.
   __ Ldrb(x23, MemOperand(kInterpreterBytecodeArrayRegister,
                           kInterpreterBytecodeOffsetRegister));
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Mov(x1, Operand(x23, LSL, kSystemPointerSizeLog2));
+#else
   __ Mov(x1, Operand(x23, LSL, kSystemPointerAddrSizeLog2));
+#endif // __CHERI_PURE_CAPABILITY__
   __ Ldr(kJavaScriptCallCodeStartRegister,
          MemOperand(kInterpreterDispatchTableRegister, x1));
 
   {
     UseScratchRegisterScope temps(masm);
     temps.Exclude(x17);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Mov(c17, kJavaScriptCallCodeStartRegister);
+    __ Jump(c17);
+#else
     __ Mov(x17, kJavaScriptCallCodeStartRegister);
     __ Jump(x17);
+#endif // __CHERI_PURE_CAPABILITY__
   }
 
   __ Bind(&return_from_bytecode_dispatch);
@@ -1859,34 +2494,63 @@ static void Generate_InterpreterEnterBytecode(MacroAssembler* masm) {
   // custom copy of the interpreter entry trampoline for profiling. If so,
   // get the custom trampoline, otherwise grab the entry address of the global
   // trampoline.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Ldr(c1, MemOperand(fp, StandardFrameConstants::kFunctionOffset));
+  __ LoadTaggedPointerField(
+      c1, FieldMemOperand(c1, JSFunction::kSharedFunctionInfoOffset));
+  __ LoadTaggedPointerField(
+      c1, FieldMemOperand(c1, SharedFunctionInfo::kFunctionDataOffset));
+  __ CompareObjectType(c1, kInterpreterDispatchTableRegister,
+                       kInterpreterDispatchTableRegister.X(),
+#else
   __ Ldr(x1, MemOperand(fp, StandardFrameConstants::kFunctionOffset));
   __ LoadTaggedPointerField(
-      x1, FieldMemOperand(x1, JSFunction::kSharedFunctionInfoOffset));
+      x1, FieldMemOperand(c1, JSFunction::kSharedFunctionInfoOffset));
   __ LoadTaggedPointerField(
-      x1, FieldMemOperand(x1, SharedFunctionInfo::kFunctionDataOffset));
+      x1, FieldMemOperand(c1, SharedFunctionInfo::kFunctionDataOffset));
   __ CompareObjectType(x1, kInterpreterDispatchTableRegister,
                        kInterpreterDispatchTableRegister,
+#endif // __CHERI_PURE_CAPABILITY__
                        INTERPRETER_DATA_TYPE);
   __ B(ne, &builtin_trampoline);
 
   __ LoadTaggedPointerField(
+#if defined(__CHERI_PURE_CAPABILITY__)
+      c1, FieldMemOperand(c1, InterpreterData::kInterpreterTrampolineOffset));
+  __ LoadCodeTEntry(c1, c1);
+#else
       x1, FieldMemOperand(x1, InterpreterData::kInterpreterTrampolineOffset));
   __ LoadCodeTEntry(x1, x1);
+#endif // __CHERI_PURE_CAPABILITY__
   __ B(&trampoline_loaded);
 
   __ Bind(&builtin_trampoline);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Mov(c1, ExternalReference::
+#else
   __ Mov(x1, ExternalReference::
+#endif // __CHERI_PURE_CAPABILITY__
                  address_of_interpreter_entry_trampoline_instruction_start(
                      masm->isolate()));
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Ldr(c1, MemOperand(x1));
+#else
   __ Ldr(x1, MemOperand(x1));
+#endif // __CHERI_PURE_CAPABILITY__
 
   __ Bind(&trampoline_loaded);
 
   {
     UseScratchRegisterScope temps(masm);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    temps.Exclude(c17);
+    __ Add(c17, c1, Operand(interpreter_entry_return_pc_offset.value()));
+    __ Br(c17);
+#else
     temps.Exclude(x17);
     __ Add(x17, x1, Operand(interpreter_entry_return_pc_offset.value()));
     __ Br(x17);
+#endif // __CHERI_PURE_CAPABILITY__
   }
 }
 
@@ -1912,7 +2576,6 @@ void Builtins::Generate_InterpreterEnterAtNextBytecode(MacroAssembler* masm) {
   AdvanceBytecodeOffsetOrReturn(masm, kInterpreterBytecodeArrayRegister,
                                 kInterpreterBytecodeOffsetRegister, x1, x2, x3,
                                 &if_return);
-
   __ bind(&enter_bytecode);
   // Convert new bytecode offset to a Smi and save in the stackframe.
   __ SmiTag(x2, kInterpreterBytecodeOffsetRegister);
@@ -1948,17 +2611,33 @@ void Generate_ContinueToBuiltinHelper(MacroAssembler* masm,
                    (allocatable_register_count +
                     BuiltinContinuationFrameConstants::PaddingSlotCount(
                         allocatable_register_count)) *
+#if defined(__CHERI_PURE_CAPABILITY__)
+                       kSystemPointerSize;
+#else
                        kSystemPointerAddrSize;
+#endif // __CHERI_PURE_CAPABILITY__
 
   UseScratchRegisterScope temps(masm);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register scratch = temps.AcquireC();  // Temp register is not allocatable.
+#else
   Register scratch = temps.AcquireX();  // Temp register is not allocatable.
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Set up frame pointer.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Add(fp, csp, frame_size);
+#else
   __ Add(fp, sp, frame_size);
+#endif // __CHERI_PURE_CAPABILITY__
 
   if (with_result) {
     if (java_script_builtin) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+      __ Mov(scratch, c0);
+#else
       __ mov(scratch, x0);
+#endif // __CHERI_PURE_CAPABILITY__
     } else {
       // Overwrite the hole inserted by the deoptimizer with the return value
       // from the LAZY deopt point.
@@ -1969,14 +2648,22 @@ void Generate_ContinueToBuiltinHelper(MacroAssembler* masm,
 
   // Restore registers in pairs.
   int offset = -BuiltinContinuationFrameConstants::kFixedFrameSizeFromFp -
+#if defined(__CHERI_PURE_CAPABILITY__)
+               allocatable_register_count * kSystemPointerSize;
+#else
                allocatable_register_count * kSystemPointerAddrSize;
+#endif // __CHERI_PURE_CAPABILITY__
   for (int i = allocatable_register_count - 1; i > 0; i -= 2) {
     int code1 = config->GetAllocatableGeneralCode(i);
     int code2 = config->GetAllocatableGeneralCode(i - 1);
     Register reg1 = Register::from_code(code1);
     Register reg2 = Register::from_code(code2);
     __ Ldp(reg1, reg2, MemOperand(fp, offset));
+#if defined(__CHERI_PURE_CAPABILITY__)
+    offset += 2 * kSystemPointerSize;
+#else
     offset += 2 * kSystemPointerAddrSize;
+#endif // __CHERI_PURE_CAPABILITY__
   }
 
   // Restore first register separately, if number of registers is odd.
@@ -1993,10 +2680,18 @@ void Generate_ContinueToBuiltinHelper(MacroAssembler* masm,
     // from LAZY is always the last argument.
     constexpr int return_offset =
         BuiltinContinuationFrameConstants::kCallerSPOffset /
+#if defined(__CHERI_PURE_CAPABILITY__)
+            kSystemPointerSize -
+#else
             kSystemPointerAddrSize -
+#endif // __CHERI_PURE_CAPABILITY__
         kJSArgcReceiverSlots;
     __ add(x0, x0, return_offset);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Str(scratch, MemOperand(fp, x0, LSL, kSystemPointerSizeLog2));
+#else
     __ Str(scratch, MemOperand(fp, x0, LSL, kSystemPointerAddrSizeLog2));
+#endif // __CHERI_PURE_CAPABILITY__
     // Recover argument count.
     __ sub(x0, x0, return_offset);
   }
@@ -2009,7 +2704,11 @@ void Generate_ContinueToBuiltinHelper(MacroAssembler* masm,
       MemOperand(fp, BuiltinContinuationFrameConstants::kBuiltinIndexOffset));
 
   // Restore fp, lr.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Mov(csp, fp);
+#else
   __ Mov(sp, fp);
+#endif // __CHERI_PURE_CAPABILITY__
   __ Pop<TurboAssembler::kAuthLR>(fp, lr);
 
   __ LoadEntryFromBuiltinIndex(builtin);
@@ -2042,8 +2741,13 @@ void Builtins::Generate_NotifyDeoptimized(MacroAssembler* masm) {
   }
 
   // Pop TOS register and padding.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  DCHECK_EQ(kInterpreterAccumulatorRegister.code(), c0.code());
+  __ Pop(c0);
+#else
   DCHECK_EQ(kInterpreterAccumulatorRegister.code(), x0.code());
   __ Pop(x0, padreg);
+#endif // __CHERI_PURE_CAPABILITY__
   __ Ret();
 }
 
@@ -2062,11 +2766,19 @@ void Generate_OSREntry(MacroAssembler* masm, Register entry_address,
   UseScratchRegisterScope temps(masm);
   temps.Exclude(x17);
   if (offset.IsZero()) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Mov(c17, entry_address);
+  } else {
+    __ Add(c17, entry_address, offset);
+  }
+  __ Br(c17);
+#else
     __ Mov(x17, entry_address);
   } else {
     __ Add(x17, entry_address, offset);
   }
   __ Br(x17);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 enum class OsrSourceTier {
@@ -2095,21 +2807,38 @@ void OnStackReplacement(MacroAssembler* masm, OsrSourceTier source,
   __ Ret();
 
   __ Bind(&jump_to_optimized_code);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  DCHECK_EQ(maybe_target_code, c0);  // Already in the right spot.
+#else
   DCHECK_EQ(maybe_target_code, x0);  // Already in the right spot.
+#endif // __CHERI_PURE_CAPABILITY__
 
   // OSR entry tracing.
   {
     Label next;
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Mov(c1, ExternalReference::address_of_FLAG_trace_osr());
+    __ Ldrsb(x1, MemOperand(c1));
+#else
     __ Mov(x1, ExternalReference::address_of_FLAG_trace_osr());
     __ Ldrsb(x1, MemOperand(x1));
+#endif // __CHERI_PURE_CAPABILITY__
     __ Tst(x1, 0xFF);  // Mask to the LSB.
     __ B(eq, &next);
 
     {
       FrameScope scope(masm, StackFrame::INTERNAL);
+#if defined(__CHERI_PURE_CAPABILITY__)
+      __ Push(c0);  // Preserve the code object.
+#else
       __ Push(x0, padreg);  // Preserve the code object.
+#endif // __CHERI_PURE_CAPABILITY__
       __ CallRuntime(Runtime::kTraceOptimizedOSREntry, 0);
+#if defined(__CHERI_PURE_CAPABILITY__)
+      __ Pop(c0);
+#else
       __ Pop(padreg, x0);
+#endif // __CHERI_PURE_CAPABILITY__
     }
 
     __ Bind(&next);
@@ -2122,25 +2851,49 @@ void OnStackReplacement(MacroAssembler* masm, OsrSourceTier source,
   }
 
   if (V8_EXTERNAL_CODE_SPACE_BOOL) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ LoadCodeDataContainerCodeNonBuiltin(c0, c0);
+#else
     __ LoadCodeDataContainerCodeNonBuiltin(x0, x0);
+#endif // __CHERI_PURE_CAPABILITY__
   }
 
   // Load deoptimization data from the code object.
   // <deopt_data> = <code>[#deoptimization_data_offset]
   __ LoadTaggedPointerField(
+#if defined(__CHERI_PURE_CAPABILITY__)
+      c1,
+      FieldMemOperand(c0, Code::kDeoptimizationDataOrInterpreterDataOffset));
+#else
       x1,
       FieldMemOperand(x0, Code::kDeoptimizationDataOrInterpreterDataOffset));
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Load the OSR entrypoint offset from the deoptimization data.
   // <osr_offset> = <deopt_data>[#header_size + #osr_pc_offset]
   __ SmiUntagField(
-      x1, FieldMemOperand(x1, FixedArray::OffsetOfElementAt(
+#if defined(__CHERI_PURE_CAPABILITY__)
+      c1, FieldMemOperand(x1, FixedArray::OffsetOfElementAt(
+#else
+      c1, FieldMemOperand(x1, FixedArray::OffsetOfElementAt(
+#endif // __CHERI_PURE_CAPABILITY__
                                   DeoptimizationData::kOsrPcOffsetIndex)));
 
   // Compute the target address = code_obj + header_size + osr_offset
   // <entry_addr> = <code_obj> + #header_size + <osr_offset>
+#if defined(__CHERI_PURE_CAPABILITY__)
+  {
+    UseScratchRegisterScope temps(masm);
+    Register temp = temps.AcquireX();
+    __ Gcvalue(c0, temp);
+    __ Add(temp, temp, x1);
+    __ Scvalue(c0, c0, temp);
+    Generate_OSREntry(masm, c0, Code::kHeaderSize - kHeapObjectTag);
+  }
+#else
   __ Add(x0, x0, x1);
   Generate_OSREntry(masm, x0, Code::kHeaderSize - kHeapObjectTag);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 }  // namespace
@@ -2174,11 +2927,19 @@ void Builtins::Generate_FunctionPrototypeApply(MacroAssembler* masm) {
   ASM_LOCATION("Builtins::Generate_FunctionPrototypeApply");
 
   Register argc = x0;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register receiver = c1;
+  Register arg_array = c2;
+  Register this_arg = c3;
+  Register undefined_value = c4;
+  Register null_value = c5;
+#else
   Register receiver = x1;
   Register arg_array = x2;
   Register this_arg = x3;
   Register undefined_value = x4;
   Register null_value = x5;
+#endif // __CHERI_PURE_CAPABILITY__
 
   __ LoadRoot(undefined_value, RootIndex::kUndefinedValue);
   __ LoadRoot(null_value, RootIndex::kNullValue);
@@ -2188,14 +2949,27 @@ void Builtins::Generate_FunctionPrototypeApply(MacroAssembler* masm) {
   // present) instead.
   {
     Label done;
+#if defined(__CHERI_PURE_CAPABILITY__)
     __ Mov(this_arg, undefined_value);
     __ Mov(arg_array, undefined_value);
+#else
+    __ Mov(this_arg, undefined_value);
+    __ Mov(arg_array, undefined_value);
+#endif // __CHERI_PURE_CAPABILITY__
     __ Peek(receiver, 0);
     __ Cmp(argc, Immediate(JSParameterCount(1)));
     __ B(lt, &done);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Peek(this_arg, kSystemPointerSize);
+#else
     __ Peek(this_arg, kSystemPointerAddrSize);
+#endif // __CHERI_PURE_CAPABILITY__
     __ B(eq, &done);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Peek(arg_array, 2 * kSystemPointerSize);
+#else
     __ Peek(arg_array, 2 * kSystemPointerAddrSize);
+#endif // __CHERI_PURE_CAPABILITY__
     __ bind(&done);
   }
   __ DropArguments(argc, TurboAssembler::kCountIncludesReceiver);
@@ -2226,7 +3000,11 @@ void Builtins::Generate_FunctionPrototypeApply(MacroAssembler* masm) {
   __ Bind(&no_arguments);
   {
     __ Mov(x0, JSParameterCount(0));
+#if defined(__CHERI_PURE_CAPABILITY__)
+    DCHECK_EQ(receiver, c1);
+#else
     DCHECK_EQ(receiver, x1);
+#endif // __CHERI_PURE_CAPABILITY__
     __ Jump(masm->isolate()->builtins()->Call(), RelocInfo::CODE_TARGET);
   }
 }
@@ -2234,7 +3012,11 @@ void Builtins::Generate_FunctionPrototypeApply(MacroAssembler* masm) {
 // static
 void Builtins::Generate_FunctionPrototypeCall(MacroAssembler* masm) {
   Register argc = x0;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register function = c1;
+#else
   Register function = x1;
+#endif // __CHERI_PURE_CAPABILITY__
 
   ASM_LOCATION("Builtins::Generate_FunctionPrototypeCall");
 
@@ -2244,7 +3026,11 @@ void Builtins::Generate_FunctionPrototypeCall(MacroAssembler* masm) {
   // 2. Handle case with no arguments.
   {
     Label non_zero;
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Register scratch = c10;
+#else
     Register scratch = x10;
+#endif // __CHERI_PURE_CAPABILITY__
     __ Cmp(argc, JSParameterCount(0));
     __ B(gt, &non_zero);
     __ LoadRoot(scratch, RootIndex::kUndefinedValue);
@@ -2261,10 +3047,18 @@ void Builtins::Generate_FunctionPrototypeCall(MacroAssembler* masm) {
   // That is if padding exists or not.
   {
     Label even;
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Register copy_from = c10;
+    Register copy_to = c11;
+#else
     Register copy_from = x10;
     Register copy_to = x11;
+#endif // __CHERI_PURE_CAPABILITY__
     Register count = x12;
     UseScratchRegisterScope temps(masm);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    temps.Include(c14, c15);
+#endif // __CHERI_PURE_CAPABILITY__
     Register argc_without_receiver = temps.AcquireX();
     __ Sub(argc_without_receiver, argc, kJSArgcReceiverSlots);
 
@@ -2275,19 +3069,34 @@ void Builtins::Generate_FunctionPrototypeCall(MacroAssembler* masm) {
     // Shift arguments one slot down on the stack (overwriting the original
     // receiver).
     __ SlotAddress(copy_from, 1);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Sub(copy_to, copy_from, kSystemPointerSize);
+    __ CopyCapabilities(copy_to, copy_from, count);
+#else
     __ Sub(copy_to, copy_from, kSystemPointerAddrSize);
     __ CopyDoubleWords(copy_to, copy_from, count);
+#endif // __CHERI_PURE_CAPABILITY__
     // Overwrite the duplicated remaining last argument.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Poke(padregc, Operand(argc_without_receiver, LSL, kCRegSizeLog2));
+#else
     __ Poke(padreg, Operand(argc_without_receiver, LSL, kXRegSizeLog2));
+#endif // __CHERI_PURE_CAPABILITY__
     __ B(&arguments_ready);
 
     // Copy arguments one slot higher in memory, overwriting the original
     // receiver and padding.
     __ Bind(&even);
     __ SlotAddress(copy_from, count);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Add(copy_to, copy_from, kSystemPointerSize);
+    __ CopyCapabilities(copy_to, copy_from, count,
+                       TurboAssembler::kCapSrcLessThanDst);
+#else
     __ Add(copy_to, copy_from, kSystemPointerAddrSize);
     __ CopyDoubleWords(copy_to, copy_from, count,
                        TurboAssembler::kSrcLessThanDst);
+#endif // __CHERI_PURE_CAPABILITY__
     __ Drop(2);
   }
 
@@ -2310,10 +3119,17 @@ void Builtins::Generate_ReflectApply(MacroAssembler* masm) {
   ASM_LOCATION("Builtins::Generate_ReflectApply");
 
   Register argc = x0;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register arguments_list = c2;
+  Register target = c1;
+  Register this_argument = c4;
+  Register undefined_value = c3;
+#else
   Register arguments_list = x2;
   Register target = x1;
   Register this_argument = x4;
   Register undefined_value = x3;
+#endif // __CHERI_PURE_CAPABILITY__
 
   __ LoadRoot(undefined_value, RootIndex::kUndefinedValue);
 
@@ -2327,12 +3143,24 @@ void Builtins::Generate_ReflectApply(MacroAssembler* masm) {
     __ Mov(arguments_list, undefined_value);
     __ Cmp(argc, Immediate(JSParameterCount(1)));
     __ B(lt, &done);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Peek(target, kSystemPointerSize);
+#else
     __ Peek(target, kSystemPointerAddrSize);
+#endif // __CHERI_PURE_CAPABILITY__
     __ B(eq, &done);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Peek(this_argument, 2 * kSystemPointerSize);
+#else
     __ Peek(this_argument, 2 * kSystemPointerAddrSize);
+#endif // __CHERI_PURE_CAPABILITY__
     __ Cmp(argc, Immediate(JSParameterCount(3)));
     __ B(lt, &done);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Peek(arguments_list, 3 * kSystemPointerSize);
+#else
     __ Peek(arguments_list, 3 * kSystemPointerAddrSize);
+#endif // __CHERI_PURE_CAPABILITY__
     __ bind(&done);
   }
   __ DropArguments(argc, TurboAssembler::kCountIncludesReceiver);
@@ -2365,10 +3193,17 @@ void Builtins::Generate_ReflectConstruct(MacroAssembler* masm) {
   ASM_LOCATION("Builtins::Generate_ReflectConstruct");
 
   Register argc = x0;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register arguments_list = c2;
+  Register target = c1;
+  Register new_target = c3;
+  Register undefined_value = c4;
+#else
   Register arguments_list = x2;
   Register target = x1;
   Register new_target = x3;
   Register undefined_value = x4;
+#endif // __CHERI_PURE_CAPABILITY__
 
   __ LoadRoot(undefined_value, RootIndex::kUndefinedValue);
 
@@ -2383,13 +3218,25 @@ void Builtins::Generate_ReflectConstruct(MacroAssembler* masm) {
     __ Mov(new_target, undefined_value);
     __ Cmp(argc, Immediate(JSParameterCount(1)));
     __ B(lt, &done);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Peek(target, kSystemPointerSize);
+#else
     __ Peek(target, kSystemPointerAddrSize);
+#endif // __CHERI_PURE_CAPABILITY__
     __ B(eq, &done);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Peek(arguments_list, 2 * kSystemPointerSize);
+#else
     __ Peek(arguments_list, 2 * kSystemPointerAddrSize);
+#endif // __CHERI_PURE_CAPABILITY__
     __ Mov(new_target, target);  // new.target defaults to target
     __ Cmp(argc, Immediate(JSParameterCount(3)));
     __ B(lt, &done);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Peek(new_target, 3 * kSystemPointerSize);
+#else
     __ Peek(new_target, 3 * kSystemPointerAddrSize);
+#endif // __CHERI_PURE_CAPABILITY__
     __ bind(&done);
   }
 
@@ -2450,11 +3297,20 @@ void Generate_PrepareForCopyingVarargs(MacroAssembler* masm, Register argc,
 
   // Move the arguments already in the stack including the receiver.
   {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Register src = c11;
+    Register dst = c12;
+#else
     Register src = x11;
     Register dst = x12;
+#endif // _CHERI_PURE_CAPABILITY__
     __ SlotAddress(src, slots_to_claim);
     __ SlotAddress(dst, 0);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ CopyCapabilities(dst, src, slots_to_copy);
+#else
     __ CopyDoubleWords(dst, src, slots_to_copy);
+#endif // _CHERI_PURE_CAPABILITY__
   }
   __ Bind(&exit);
 }
@@ -2475,9 +3331,15 @@ void Builtins::Generate_CallOrConstructVarargs(MacroAssembler* masm,
   if (FLAG_debug_code) {
     // Allow x2 to be a FixedArray, or a FixedDoubleArray if x4 == 0.
     Label ok, fail;
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ AssertNotSmi(c2, AbortReason::kOperandIsNotAFixedArray);
+    __ LoadTaggedPointerField(c10, FieldMemOperand(c2, HeapObject::kMapOffset));
+    __ Ldrh(x13, FieldMemOperand(c10, Map::kInstanceTypeOffset));
+#else
     __ AssertNotSmi(x2, AbortReason::kOperandIsNotAFixedArray);
     __ LoadTaggedPointerField(x10, FieldMemOperand(x2, HeapObject::kMapOffset));
     __ Ldrh(x13, FieldMemOperand(x10, Map::kInstanceTypeOffset));
+#endif // _CHERI_PURE_CAPABILITY__
     __ Cmp(x13, FIXED_ARRAY_TYPE);
     __ B(eq, &ok);
     __ Cmp(x13, FIXED_DOUBLE_ARRAY_TYPE);
@@ -2491,7 +3353,11 @@ void Builtins::Generate_CallOrConstructVarargs(MacroAssembler* masm,
     __ bind(&ok);
   }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register arguments_list = c2;
+#else
   Register arguments_list = x2;
+#endif // _CHERI_PURE_CAPABILITY__
   Register argc = x0;
   Register len = x4;
 
@@ -2507,17 +3373,28 @@ void Builtins::Generate_CallOrConstructVarargs(MacroAssembler* masm,
   // Push varargs.
   {
     Label loop;
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Register src = c10;
+    Register the_hole_value = c11;
+    Register undefined_value = c12;
+    Register scratch = c13;
+#else
     Register src = x10;
     Register the_hole_value = x11;
     Register undefined_value = x12;
     Register scratch = x13;
+#endif // _CHERI_PURE_CAPABILITY__
     __ Add(src, arguments_list, FixedArray::kHeaderSize - kHeapObjectTag);
     __ LoadRoot(the_hole_value, RootIndex::kTheHoleValue);
     __ LoadRoot(undefined_value, RootIndex::kUndefinedValue);
     // We do not use the CompareRoot macro as it would do a LoadRoot behind the
     // scenes and we want to avoid that in a loop.
     // TODO(all): Consider using Ldp and Stp.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Register dst = c16;
+#else
     Register dst = x16;
+#endif // _CHERI_PURE_CAPABILITY__
     __ SlotAddress(dst, argc);
     __ Add(argc, argc, len);  // Update new argc.
     __ Bind(&loop);
@@ -2553,16 +3430,26 @@ void Builtins::Generate_CallOrConstructForwardVarargs(MacroAssembler* masm,
   // Check if new.target has a [[Construct]] internal method.
   if (mode == CallOrConstructMode::kConstruct) {
     Label new_target_constructor, new_target_not_constructor;
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ JumpIfSmi(c3, &new_target_not_constructor);
+    __ LoadTaggedPointerField(c5, FieldMemOperand(c3, HeapObject::kMapOffset));
+    __ Ldrb(x5, FieldMemOperand(c5, Map::kBitFieldOffset));
+#else
     __ JumpIfSmi(x3, &new_target_not_constructor);
     __ LoadTaggedPointerField(x5, FieldMemOperand(x3, HeapObject::kMapOffset));
     __ Ldrb(x5, FieldMemOperand(x5, Map::kBitFieldOffset));
+#endif // __CHERI_PURE_CAPABILITY__
     __ TestAndBranchIfAnySet(x5, Map::Bits1::IsConstructorBit::kMask,
                              &new_target_constructor);
     __ Bind(&new_target_not_constructor);
     {
       FrameScope scope(masm, StackFrame::MANUAL);
       __ EnterFrame(StackFrame::INTERNAL);
+#if defined(__CHERI_PURE_CAPABILITY__)
+      __ PushArgument(c3);
+#else
       __ PushArgument(x3);
+#endif // __CHERI_PURE_CAPABILITY__
       __ CallRuntime(Runtime::kThrowNotConstructor);
       __ Unreachable();
     }
@@ -2582,18 +3469,32 @@ void Builtins::Generate_CallOrConstructForwardVarargs(MacroAssembler* masm,
 
   // Push varargs.
   {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Register args_fp = c5;
+    Register dst = c13;
+#else
     Register args_fp = x5;
     Register dst = x13;
+#endif // __CHERI_PURE_CAPABILITY__
     // Point to the fist argument to copy from (skipping receiver).
     __ Add(args_fp, fp,
+#if defined(__CHERI_PURE_CAPABILITY__)
+           CommonFrameConstants::kFixedFrameSizeAboveFp + kSystemPointerSize);
+    __ lsl(start_index, start_index, kSystemPointerSizeLog2);
+#else
            CommonFrameConstants::kFixedFrameSizeAboveFp + kSystemPointerAddrSize);
     __ lsl(start_index, start_index, kSystemPointerAddrSizeLog2);
+#endif // __CHERI_PURE_CAPABILITY__
     __ Add(args_fp, args_fp, start_index);
     // Point to the position to copy to.
     __ SlotAddress(dst, argc);
     // Update total number of arguments.
     __ Add(argc, argc, len);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ CopyCapabilities(dst, args_fp, len);
+#else
     __ CopyDoubleWords(dst, args_fp, len);
+#endif // __CHERI_PURE_CAPABILITY__
   }
   __ B(&stack_done);
 
@@ -2612,19 +3513,27 @@ void Builtins::Generate_CallFunction(MacroAssembler* masm,
   //  -- x0 : the number of arguments
   //  -- x1 : the function to call (checked to be a JSFunction)
   // -----------------------------------
-  __ AssertCallableFunction(x1);
+  Register arg_count = x0;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register js_func = c1;
+  Register shared_func_info = c2;
+#else
+  Register js_func = x1;
+  Register shared_func_info = x2;
+#endif // _CHERI_PURE_CAPABILITY__
 
+  __ AssertCallableFunction(js_func);
   __ LoadTaggedPointerField(
-      x2, FieldMemOperand(x1, JSFunction::kSharedFunctionInfoOffset));
+      shared_func_info, FieldMemOperand(js_func, JSFunction::kSharedFunctionInfoOffset));
 
   // Enter the context of the function; ToObject has to run in the function
   // context, and we also need to take the global proxy from the function
   // context in case of conversion.
   __ LoadTaggedPointerField(cp,
-                            FieldMemOperand(x1, JSFunction::kContextOffset));
+                            FieldMemOperand(js_func, JSFunction::kContextOffset));
   // We need to convert the receiver for non-native sloppy mode functions.
   Label done_convert;
-  __ Ldr(w3, FieldMemOperand(x2, SharedFunctionInfo::kFlagsOffset));
+  __ Ldr(w3, FieldMemOperand(shared_func_info, SharedFunctionInfo::kFlagsOffset));
   __ TestAndBranchIfAnySet(w3,
                            SharedFunctionInfo::IsNativeBit::kMask |
                                SharedFunctionInfo::IsStrictBit::kMask,
@@ -2639,22 +3548,42 @@ void Builtins::Generate_CallFunction(MacroAssembler* masm,
 
     if (mode == ConvertReceiverMode::kNullOrUndefined) {
       // Patch receiver to global proxy.
+#if defined(__CHERI_PURE_CAPABILITY__)
+      __ LoadGlobalProxy(c3);
+#else
       __ LoadGlobalProxy(x3);
+#endif // __CHERI_PURE_CAPABILITY__
     } else {
       Label convert_to_object, convert_receiver;
-      __ Peek(x3, __ ReceiverOperand(x0));
+#if defined(__CHERI_PURE_CAPABILITY__)
+      __ Peek(c3, __ ReceiverOperand(arg_count));
+      __ JumpIfSmi(c3, &convert_to_object);
+      static_assert(LAST_JS_RECEIVER_TYPE == LAST_TYPE);
+      __ CompareObjectType(c3, c4, x4, FIRST_JS_RECEIVER_TYPE);
+#else
+      __ Peek(x3, __ ReceiverOperand(arg_count));
       __ JumpIfSmi(x3, &convert_to_object);
       static_assert(LAST_JS_RECEIVER_TYPE == LAST_TYPE);
       __ CompareObjectType(x3, x4, x4, FIRST_JS_RECEIVER_TYPE);
+#endif // __CHERI_PURE_CAPABILITY__
       __ B(hs, &done_convert);
       if (mode != ConvertReceiverMode::kNotNullOrUndefined) {
         Label convert_global_proxy;
+#if defined(__CHERI_PURE_CAPABILITY__)
+        __ JumpIfRoot(c3, RootIndex::kUndefinedValue, &convert_global_proxy);
+        __ JumpIfNotRoot(c3, RootIndex::kNullValue, &convert_to_object);
+#else
         __ JumpIfRoot(x3, RootIndex::kUndefinedValue, &convert_global_proxy);
         __ JumpIfNotRoot(x3, RootIndex::kNullValue, &convert_to_object);
+#endif // __CHERI_PURE_CAPABILITY__
         __ Bind(&convert_global_proxy);
         {
           // Patch receiver to global proxy.
+#if defined(__CHERI_PURE_CAPABILITY__)
+          __ LoadGlobalProxy(c3);
+#else
           __ LoadGlobalProxy(x3);
+#endif // __CHERI_PURE_CAPABILITY__
         }
         __ B(&convert_receiver);
       }
@@ -2664,20 +3593,30 @@ void Builtins::Generate_CallFunction(MacroAssembler* masm,
         // TODO(bmeurer): Inline the allocation here to avoid building the frame
         // in the fast case? (fall back to AllocateInNewSpace?)
         FrameScope scope(masm, StackFrame::INTERNAL);
-        __ SmiTag(x0);
-        __ Push(padreg, x0, x1, cp);
-        __ Mov(x0, x3);
+        __ SmiTag(arg_count);
+#if defined(__CHERI_PURE_CAPABILITY__)
+        __ Push(padreg, arg_count);
+        __ Push(js_func, cp);
+#else
+        __ Push(padreg, arg_count, js_func, cp);
+#endif // __CHERI_PURE_CAPABILITY__
+        __ Mov(arg_count, x3);
         __ Call(BUILTIN_CODE(masm->isolate(), ToObject),
                 RelocInfo::CODE_TARGET);
-        __ Mov(x3, x0);
-        __ Pop(cp, x1, x0, padreg);
-        __ SmiUntag(x0);
+        __ Mov(x3, arg_count);
+#if defined(__CHERI_PURE_CAPABILITY__)
+        __ Pop(cp, js_func);
+        __ Pop(arg_count, xzr);
+#else
+        __ Pop(cp, js_func, arg_count, padreg);
+#endif // __CHERI_PURE_CAPABILITY__
+        __ SmiUntag(arg_count);
       }
       __ LoadTaggedPointerField(
-          x2, FieldMemOperand(x1, JSFunction::kSharedFunctionInfoOffset));
+          shared_func_info, FieldMemOperand(js_func, JSFunction::kSharedFunctionInfoOffset));
       __ Bind(&convert_receiver);
     }
-    __ Poke(x3, __ ReceiverOperand(x0));
+    __ Poke(x3, __ ReceiverOperand(arg_count));
   }
   __ Bind(&done_convert);
 
@@ -2688,9 +3627,16 @@ void Builtins::Generate_CallFunction(MacroAssembler* masm,
   //  -- cp : the function context.
   // -----------------------------------
 
-  __ Ldrh(x2,
-          FieldMemOperand(x2, SharedFunctionInfo::kFormalParameterCountOffset));
-  __ InvokeFunctionCode(x1, no_reg, x2, x0, InvokeType::kJump);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register shared_func_info_value = shared_func_info.X();
+  __ Ldrh(shared_func_info_value,
+          FieldMemOperand(shared_func_info, SharedFunctionInfo::kFormalParameterCountOffset));
+  __ InvokeFunctionCode(js_func, no_reg, shared_func_info_value, arg_count, InvokeType::kJump);
+#else
+  __ Ldrh(shared_func_info,
+          FieldMemOperand(shared_func_info, SharedFunctionInfo::kFormalParameterCountOffset));
+  __ InvokeFunctionCode(js_func, no_reg, shared_func_info, arg_count, InvokeType::kJump);
+#endif // _CHERI_PURE_CAPABILITY__
 }
 
 namespace {
@@ -2703,12 +3649,20 @@ void Generate_PushBoundArguments(MacroAssembler* masm) {
   // -----------------------------------
 
   Register bound_argc = x4;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register bound_argv = c2;
+#else
   Register bound_argv = x2;
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Load [[BoundArguments]] into x2 and length of that into x4.
   Label no_bound_arguments;
   __ LoadTaggedPointerField(
+#if defined(__CHERI_PURE_CAPABILITY__)
+      bound_argv, FieldMemOperand(c1, JSBoundFunction::kBoundArgumentsOffset));
+#else
       bound_argv, FieldMemOperand(x1, JSBoundFunction::kBoundArgumentsOffset));
+#endif // __CHERI_PURE_CAPABILITY__
   __ SmiUntagField(bound_argc,
                    FieldMemOperand(bound_argv, FixedArray::kLengthOffset));
   __ Cbz(bound_argc, &no_bound_arguments);
@@ -2732,9 +3686,20 @@ void Generate_PushBoundArguments(MacroAssembler* masm) {
       __ LoadStackLimit(x10, StackLimitKind::kRealStackLimit);
       // Make x10 the space we have left. The stack might already be overflowed
       // here which will cause x10 to become negative.
+#if defined(__CHERI_PURE_CAPABILITY__)
+      UseScratchRegisterScope temps(masm);
+      Register temp = temps.AcquireX();
+      __ Gcvalue(csp, temp);
+      __ Sub(x10, temp, x10);
+#else
       __ Sub(x10, sp, x10);
+#endif // __CHERI_PURE_CAPABILITY__
       // Check if the arguments will overflow the stack.
+#if defined(__CHERI_PURE_CAPABILITY__)
+      __ Cmp(x10, Operand(bound_argc, LSL, kSystemPointerSizeLog2));
+#else
       __ Cmp(x10, Operand(bound_argc, LSL, kSystemPointerAddrSizeLog2));
+#endif // __CHERI_PURE_CAPABILITY__
       __ B(gt, &done);
       __ TailCallRuntime(Runtime::kThrowStackOverflow);
       __ Bind(&done);
@@ -2743,7 +3708,11 @@ void Generate_PushBoundArguments(MacroAssembler* masm) {
     Label copy_bound_args;
     Register total_argc = x15;
     Register slots_to_claim = x12;
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Register scratch = c10;
+#else
     Register scratch = x10;
+#endif // __CHERI_PURE_CAPABILITY__
     Register receiver = x14;
 
     __ Sub(argc, argc, kJSArgcReceiverSlots);
@@ -2753,7 +3722,11 @@ void Generate_PushBoundArguments(MacroAssembler* masm) {
     // Round up slots_to_claim to an even number if it is odd.
     __ Add(slots_to_claim, bound_argc, 1);
     __ Bic(slots_to_claim, slots_to_claim, 1);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Claim(slots_to_claim, kSystemPointerSize);
+#else
     __ Claim(slots_to_claim, kSystemPointerAddrSize);
+#endif // __CHERI_PURE_CAPABILITY__
 
     __ Tbz(bound_argc, 0, &copy_bound_args);
     {
@@ -2765,15 +3738,33 @@ void Generate_PushBoundArguments(MacroAssembler* masm) {
       // is for stack alignment padding.
       // 1. Shift args one slot down.
       {
+#if defined(__CHERI_PURE_CAPABILITY__)
+        Register copy_from = c11;
+        Register copy_to = c12;
+#else
         Register copy_from = x11;
         Register copy_to = x12;
+#endif // __CHERI_PURE_CAPABILITY__
         __ SlotAddress(copy_to, slots_to_claim);
+#if defined(__CHERI_PURE_CAPABILITY__)
+        __ Add(copy_from, copy_to, kSystemPointerSize);
+#else
         __ Add(copy_from, copy_to, kSystemPointerAddrSize);
+#endif // __CHERI_PURE_CAPABILITY__
+#if defined(__CHERI_PURE_CAPABILITY__)
+        __ CopyCapabilities(copy_to, copy_from, argc);
+#else
         __ CopyDoubleWords(copy_to, copy_from, argc);
+#endif // __CHERI_PURE_CAPABILITY__
       }
       // 2. Write a padding in the last slot.
+#if defined(__CHERI_PURE_CAPABILITY__)
+      __ Add(scratch.X(), total_argc, 1);
+      __ Str(padregc, MemOperand(csp, scratch.X(), LSL, kSystemPointerSizeLog2));
+#else
       __ Add(scratch, total_argc, 1);
       __ Str(padreg, MemOperand(sp, scratch, LSL, kSystemPointerAddrSizeLog2));
+#endif // __CHERI_PURE_CAPABILITY__
       __ B(&copy_bound_args);
 
       __ Bind(&argc_even);
@@ -2785,12 +3776,23 @@ void Generate_PushBoundArguments(MacroAssembler* masm) {
       __ Drop(2);
       // 2. Shift args one slot up.
       {
+#if defined(__CHERI_PURE_CAPABILITY__)
+        Register copy_from = c11;
+        Register copy_to = c12;
+#else
         Register copy_from = x11;
         Register copy_to = x12;
+#endif // __CHERI_PURE_CAPABILITY__
         __ SlotAddress(copy_to, total_argc);
+#if defined(__CHERI_PURE_CAPABILITY__)
+        __ Sub(copy_from, copy_to, kSystemPointerSize);
+        __ CopyCapabilities(copy_to, copy_from, argc,
+                           TurboAssembler::kCapSrcLessThanDst);
+#else
         __ Sub(copy_from, copy_to, kSystemPointerAddrSize);
         __ CopyDoubleWords(copy_to, copy_from, argc,
                            TurboAssembler::kSrcLessThanDst);
+#endif // __CHERI_PURE_CAPABILITY__
       }
     }
 
@@ -2804,14 +3806,22 @@ void Generate_PushBoundArguments(MacroAssembler* masm) {
     {
       Label loop;
       Register counter = bound_argc;
+#if defined(__CHERI_PURE_CAPABILITY__)
+      Register copy_to = c12;
+#else
       Register copy_to = x12;
+#endif // __CHERI_PURE_CAPABILITY__
       __ Add(bound_argv, bound_argv, FixedArray::kHeaderSize - kHeapObjectTag);
       __ SlotAddress(copy_to, 1);
       __ Bind(&loop);
       __ Sub(counter, counter, 1);
       __ LoadAnyTaggedField(scratch,
                             MemOperand(bound_argv, kTaggedSize, PostIndex));
+#if defined(__CHERI_PURE_CAPABILITY__)
+      __ Str(scratch, MemOperand(copy_to, kSystemPointerSize, PostIndex));
+#else
       __ Str(scratch, MemOperand(copy_to, kSystemPointerAddrSize, PostIndex));
+#endif // __CHERI_PURE_CAPABILITY__
       __ Cbnz(counter, &loop);
     }
     // Update argc.
@@ -2828,19 +3838,33 @@ void Builtins::Generate_CallBoundFunctionImpl(MacroAssembler* masm) {
   //  -- x0 : the number of arguments
   //  -- x1 : the function to call (checked to be a JSBoundFunction)
   // -----------------------------------
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ AssertBoundFunction(c1);
+#else
   __ AssertBoundFunction(x1);
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Patch the receiver to [[BoundThis]].
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ LoadAnyTaggedField(c10,
+                        FieldMemOperand(c1, JSBoundFunction::kBoundThisOffset));
+  __ Poke(c10, __ ReceiverOperand(x0));
+#else
   __ LoadAnyTaggedField(x10,
                         FieldMemOperand(x1, JSBoundFunction::kBoundThisOffset));
   __ Poke(x10, __ ReceiverOperand(x0));
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Push the [[BoundArguments]] onto the stack.
   Generate_PushBoundArguments(masm);
 
   // Call the [[BoundTargetFunction]] via the Call builtin.
   __ LoadTaggedPointerField(
+#if defined(__CHERI_PURE_CAPABILITY__)
+      c1, FieldMemOperand(c1, JSBoundFunction::kBoundTargetFunctionOffset));
+#else
       x1, FieldMemOperand(x1, JSBoundFunction::kBoundTargetFunctionOffset));
+#endif // __CHERI_PURE_CAPABILITY__
   __ Jump(BUILTIN_CODE(masm->isolate(), Call_ReceiverIsAny),
           RelocInfo::CODE_TARGET);
 }
@@ -2852,8 +3876,13 @@ void Builtins::Generate_Call(MacroAssembler* masm, ConvertReceiverMode mode) {
   //  -- x1 : the target to call (can be any Object).
   // -----------------------------------
   Register argc = x0;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register target = c1;
+  Register map = c4;
+#else
   Register target = x1;
   Register map = x4;
+#endif // _CHERI_PURE_CAPABILITY__
   Register instance_type = x5;
   DCHECK(!AreAliased(argc, target, map, instance_type));
 
@@ -2930,19 +3959,34 @@ void Builtins::Generate_ConstructFunction(MacroAssembler* masm) {
   //  -- x1 : the constructor to call (checked to be a JSFunction)
   //  -- x3 : the new target (checked to be a constructor)
   // -----------------------------------
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ AssertConstructor(c1);
+  __ AssertFunction(c1);
+#else
   __ AssertConstructor(x1);
   __ AssertFunction(x1);
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Calling convention for function specific ConstructStubs require
   // x2 to contain either an AllocationSite or undefined.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ LoadRoot(c2, RootIndex::kUndefinedValue);
+#else
   __ LoadRoot(x2, RootIndex::kUndefinedValue);
+#endif // __CHERI_PURE_CAPABILITY__
 
   Label call_generic_stub;
 
   // Jump to JSBuiltinsConstructStub or JSConstructStubGeneric.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ LoadTaggedPointerField(
+      c4, FieldMemOperand(c1, JSFunction::kSharedFunctionInfoOffset));
+  __ Ldr(w4, FieldMemOperand(c4, SharedFunctionInfo::kFlagsOffset));
+#else
   __ LoadTaggedPointerField(
       x4, FieldMemOperand(x1, JSFunction::kSharedFunctionInfoOffset));
   __ Ldr(w4, FieldMemOperand(x4, SharedFunctionInfo::kFlagsOffset));
+#endif // __CHERI_PURE_CAPABILITY__
   __ TestAndBranchIfAllClear(
       w4, SharedFunctionInfo::ConstructAsBuiltinBit::kMask, &call_generic_stub);
 
@@ -2961,8 +4005,13 @@ void Builtins::Generate_ConstructBoundFunction(MacroAssembler* masm) {
   //  -- x1 : the function to call (checked to be a JSBoundFunction)
   //  -- x3 : the new target (checked to be a constructor)
   // -----------------------------------
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ AssertConstructor(c1);
+  __ AssertBoundFunction(c1);
+#else
   __ AssertConstructor(x1);
   __ AssertBoundFunction(x1);
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Push the [[BoundArguments]] onto the stack.
   Generate_PushBoundArguments(masm);
@@ -2970,16 +4019,29 @@ void Builtins::Generate_ConstructBoundFunction(MacroAssembler* masm) {
   // Patch new.target to [[BoundTargetFunction]] if new.target equals target.
   {
     Label done;
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ CmpTagged(c1, c3);
+#else
     __ CmpTagged(x1, x3);
+#endif // __CHERI_PURE_CAPABILITY__
     __ B(ne, &done);
     __ LoadTaggedPointerField(
+#if defined(__CHERI_PURE_CAPABILITY__)
+        c3, FieldMemOperand(c1, JSBoundFunction::kBoundTargetFunctionOffset));
+#else
         x3, FieldMemOperand(x1, JSBoundFunction::kBoundTargetFunctionOffset));
+#endif // __CHERI_PURE_CAPABILITY__
     __ Bind(&done);
   }
 
   // Construct the [[BoundTargetFunction]] via the Construct builtin.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ LoadTaggedPointerField(
+      c1, FieldMemOperand(c1, JSBoundFunction::kBoundTargetFunctionOffset));
+#else
   __ LoadTaggedPointerField(
       x1, FieldMemOperand(x1, JSBoundFunction::kBoundTargetFunctionOffset));
+#endif // __CHERI_PURE_CAPABILITY__
   __ Jump(BUILTIN_CODE(masm->isolate(), Construct), RelocInfo::CODE_TARGET);
 }
 
@@ -2992,8 +4054,13 @@ void Builtins::Generate_Construct(MacroAssembler* masm) {
   //          the JSFunction on which new was invoked initially)
   // -----------------------------------
   Register argc = x0;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register target = c1;
+  Register map = c4;
+#else
   Register target = x1;
   Register map = x4;
+#endif // __CHERI_PURE_CAPABILITY__
   Register instance_type = x5;
   DCHECK(!AreAliased(argc, target, map, instance_type));
 
@@ -3069,7 +4136,11 @@ void Builtins::Generate_WasmCompileLazy(MacroAssembler* masm) {
     }
     // Also push x1, because we must push multiples of 16 bytes (see
     // {TurboAssembler::PushCPURegList}.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    saved_gp_regs.set(c1);
+#else
     saved_gp_regs.set(x1);
+#endif // __CHERI_PURE_CAPABILITY__
     // All set registers were unique.
     CHECK_EQ(saved_gp_regs.Count(), arraysize(wasm::kGpParamRegisters) + 1);
     // We push a multiple of 16 bytes.
@@ -3098,7 +4169,11 @@ void Builtins::Generate_WasmCompileLazy(MacroAssembler* masm) {
     FrameScope scope(masm, StackFrame::WASM_COMPILE_LAZY);
 
     // Save registers that we need to keep alive across the runtime call.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ PushCRegList(kSavedGpRegs);
+#else
     __ PushXRegList(kSavedGpRegs);
+#endif // __CHERI_PURE_CAPABILITY__
     __ PushQRegList(kSavedFpRegs);
 
     // Pass instance and function index as explicit arguments to the runtime
@@ -3115,18 +4190,34 @@ void Builtins::Generate_WasmCompileLazy(MacroAssembler* masm) {
 
     // Restore registers.
     __ PopQRegList(kSavedFpRegs);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ PopCRegList(kSavedGpRegs);
+#else
     __ PopXRegList(kSavedGpRegs);
+#endif // __CHERI_PURE_CAPABILITY__
   }
 
   // The runtime function returned the jump table slot offset as a Smi (now in
   // x17). Use that to compute the jump target.
   static_assert(!kSavedGpRegs.has(x18));
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ ldr(c18, MemOperand(
+#else
   __ ldr(x18, MemOperand(
+#endif // __CHERI_PURE_CAPABILITY__
                   kWasmInstanceRegister,
                   WasmInstanceObject::kJumpTableStartOffset - kHeapObjectTag));
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ add(c17, c18, Operand(c17));
+#else
   __ add(x17, x18, Operand(x17));
+#endif // __CHERI_PURE_CAPABILITY__
   // Finally, jump to the jump table slot for the function.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Jump(c17);
+#else
   __ Jump(x17);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 void Builtins::Generate_WasmDebugBreak(MacroAssembler* masm) {
@@ -3136,7 +4227,11 @@ void Builtins::Generate_WasmDebugBreak(MacroAssembler* masm) {
 
     // Save all parameter registers. They might hold live values, we restore
     // them after the runtime call.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ PushCRegList(WasmDebugBreakFrameConstants::kPushedGpRegs);
+#else
     __ PushXRegList(WasmDebugBreakFrameConstants::kPushedGpRegs);
+#endif // __CHERI_PURE_CAPABILITY__
     __ PushQRegList(WasmDebugBreakFrameConstants::kPushedFpRegs);
 
     // Initialize the JavaScript context with 0. CEntry will use it to
@@ -3146,7 +4241,11 @@ void Builtins::Generate_WasmDebugBreak(MacroAssembler* masm) {
 
     // Restore registers.
     __ PopQRegList(WasmDebugBreakFrameConstants::kPushedFpRegs);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ PopCRegList(WasmDebugBreakFrameConstants::kPushedGpRegs);
+#else
     __ PopXRegList(WasmDebugBreakFrameConstants::kPushedGpRegs);
+#endif // __CHERI_PURE_CAPABILITY__
   }
   __ Ret();
 }
@@ -3207,7 +4306,11 @@ void Builtins::Generate_CEntry(MacroAssembler* masm, int result_size,
   // The arguments are in reverse order, so that arg[argc-2] is actually the
   // first argument to the target function and arg[0] is the last.
   const Register& argc_input = x0;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  const Register& target_input = c1;
+#else
   const Register& target_input = x1;
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Calculate argv, argc and the target address, and store them in
   // callee-saved registers so we can retry the call without having to reload
@@ -3216,18 +4319,34 @@ void Builtins::Generate_CEntry(MacroAssembler* masm, int result_size,
   // it should), then we might be better off putting these parameters directly
   // into their argument registers, rather than using callee-saved registers and
   // preserving them on the stack.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  const Register& argv = c21;
+#else
   const Register& argv = x21;
+#endif // __CHERI_PURE_CAPABILITY__
   const Register& argc = x22;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  const Register& target = c23;
+#else
   const Register& target = x23;
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Derive argv from the stack pointer so that it points to the first argument
   // (arg[argc-2]), or just below the receiver in case there are no arguments.
   //  - Adjust for the arg[] array.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register temp_argv = c11;
+#else
   Register temp_argv = x11;
+#endif // __CHERI_PURE_CAPABILITY__
   if (argv_mode == ArgvMode::kStack) {
     __ SlotAddress(temp_argv, x0);
     //  - Adjust for the receiver.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Sub(temp_argv, temp_argv, 1 * kSystemPointerSize);
+#else
     __ Sub(temp_argv, temp_argv, 1 * kSystemPointerAddrSize);
+#endif // __CHERI_PURE_CAPABILITY__
   }
 
   // Reserve three slots to preserve x21-x23 callee-saved registers.
@@ -3239,9 +4358,15 @@ void Builtins::Generate_CEntry(MacroAssembler* masm, int result_size,
       builtin_exit_frame ? StackFrame::BUILTIN_EXIT : StackFrame::EXIT);
 
   // Poke callee-saved registers into reserved space.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Poke(argv, 1 * kSystemPointerSize);
+  __ Poke(argc, 2 * kSystemPointerSize);
+  __ Poke(target, 3 * kSystemPointerSize);
+#else
   __ Poke(argv, 1 * kSystemPointerAddrSize);
   __ Poke(argc, 2 * kSystemPointerAddrSize);
   __ Poke(target, 3 * kSystemPointerAddrSize);
+#endif // __CHERI_PURE_CAPABILITY__
 
   // We normally only keep tagged values in callee-saved registers, as they
   // could be pushed onto the stack by called stubs and functions, and on the
@@ -3288,8 +4413,13 @@ void Builtins::Generate_CEntry(MacroAssembler* masm, int result_size,
 
   // Prepare AAPCS64 arguments to pass to the builtin.
   __ Mov(x0, argc);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Mov(c1, argv);
+  __ Mov(c2, ExternalReference::isolate_address(masm->isolate()));
+#else
   __ Mov(x1, argv);
   __ Mov(x2, ExternalReference::isolate_address(masm->isolate()));
+#endif // __CHERI_PURE_CAPABILITY__
 
   __ StoreReturnAddressAndCall(target);
 
@@ -3300,7 +4430,11 @@ void Builtins::Generate_CEntry(MacroAssembler* masm, int result_size,
   //  x21   argv
   //  x22   argc
   //  x23   target
+#if defined(__CHERI_PURE_CAPABILITY__)
+  const Register& result = c0;
+#else
   const Register& result = x0;
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Check result for exception sentinel.
   Label exception_returned;
@@ -3312,9 +4446,15 @@ void Builtins::Generate_CEntry(MacroAssembler* masm, int result_size,
   // Restore callee-saved registers x21-x23.
   __ Mov(x11, argc);
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Peek(argv, 1 * kSystemPointerSize);
+  __ Peek(argc, 2 * kSystemPointerSize);
+  __ Peek(target, 3 * kSystemPointerSize);
+#else
   __ Peek(argv, 1 * kSystemPointerAddrSize);
   __ Peek(argc, 2 * kSystemPointerAddrSize);
   __ Peek(target, 3 * kSystemPointerAddrSize);
+#endif // __CHERI_PURE_CAPABILITY__
 
   __ LeaveExitFrame(save_doubles == SaveFPRegsMode::kSave, x10, x9);
   if (argv_mode == ArgvMode::kStack) {
@@ -3345,7 +4485,11 @@ void Builtins::Generate_CEntry(MacroAssembler* masm, int result_size,
     FrameScope scope(masm, StackFrame::MANUAL);
     __ Mov(x0, 0);  // argc.
     __ Mov(x1, 0);  // argv.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Mov(c2, ExternalReference::isolate_address(masm->isolate()));
+#else
     __ Mov(x2, ExternalReference::isolate_address(masm->isolate()));
+#endif // __CHERI_PURE_CAPABILITY__
     __ CallCFunction(find_handler, 3);
   }
 
@@ -3354,10 +4498,18 @@ void Builtins::Generate_CEntry(MacroAssembler* masm, int result_size,
   __ Ldr(cp, MemOperand(cp));
   {
     UseScratchRegisterScope temps(masm);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Register scratch = temps.AcquireC();
+#else
     Register scratch = temps.AcquireX();
+#endif // __CHERI_PURE_CAPABILITY__
     __ Mov(scratch, pending_handler_sp_address);
     __ Ldr(scratch, MemOperand(scratch));
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Mov(csp, scratch);
+#else
     __ Mov(sp, scratch);
+#endif // __CHERI_PURE_CAPABILITY__
   }
   __ Mov(fp, pending_handler_fp_address);
   __ Ldr(fp, MemOperand(fp));
@@ -3372,10 +4524,18 @@ void Builtins::Generate_CEntry(MacroAssembler* masm, int result_size,
   {
     // Clear c_entry_fp, like we do in `LeaveExitFrame`.
     UseScratchRegisterScope temps(masm);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Register scratch = temps.AcquireC();
+#else
     Register scratch = temps.AcquireX();
+#endif // __CHERI_PURE_CAPABILITY__
     __ Mov(scratch, ExternalReference::Create(
                         IsolateAddressId::kCEntryFPAddress, masm->isolate()));
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Str(czr, MemOperand(scratch));
+#else
     __ Str(xzr, MemOperand(scratch));
+#endif // __CHERI_PURE_CAPABILITY__
   }
 
   // Compute the handler entry address and jump to it. We use x17 here for the
@@ -3383,10 +4543,17 @@ void Builtins::Generate_CEntry(MacroAssembler* masm, int result_size,
   // InterpreterEnterAtBytecode, which when CFI is enabled starts with
   // a "BTI c".
   UseScratchRegisterScope temps(masm);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  temps.Exclude(c17);
+  __ Mov(c17, pending_handler_entrypoint_address);
+  __ Ldr(c17, MemOperand(c17));
+  __ Br(c17);
+#else
   temps.Exclude(x17);
   __ Mov(x17, pending_handler_entrypoint_address);
   __ Ldr(x17, MemOperand(x17));
   __ Br(x17);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 void Builtins::Generate_DoubleToI(MacroAssembler* masm) {
@@ -3402,7 +4569,11 @@ void Builtins::Generate_DoubleToI(MacroAssembler* masm) {
   DoubleRegister double_scratch = temps.AcquireD();
 
   // Account for saved regs.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  const int kArgumentOffset = 2 * kSystemPointerSize;
+#else
   const int kArgumentOffset = 2 * kSystemPointerAddrSize;
+#endif // __CHERI_PURE_CAPABILITY__
 
   __ Push(result, scratch1);  // scratch1 is also pushed to preserve alignment.
   __ Peek(double_scratch, kArgumentOffset);
@@ -3488,39 +4659,72 @@ void CallApiFunctionAndReturn(MacroAssembler* masm, Register function_address,
   const int kLevelOffset = AddressOffset(
       ExternalReference::handle_scope_level_address(isolate), next_address);
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  DCHECK(function_address == c1 || function_address == c2);
+#else
   DCHECK(function_address == x1 || function_address == x2);
+#endif // __CHERI_PURE_CAPABILITY__
 
   Label profiler_enabled, end_profiler_check;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Mov(c10, ExternalReference::is_profiling_address(isolate));
+  __ Ldrb(w10, MemOperand(c10));
+#else
   __ Mov(x10, ExternalReference::is_profiling_address(isolate));
   __ Ldrb(w10, MemOperand(x10));
+#endif // __CHERI_PURE_CAPABILITY__
   __ Cbnz(w10, &profiler_enabled);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Mov(c10, ExternalReference::address_of_runtime_stats_flag());
+  __ Ldrsw(w10, MemOperand(c10));
+#else
   __ Mov(x10, ExternalReference::address_of_runtime_stats_flag());
   __ Ldrsw(w10, MemOperand(x10));
+#endif // __CHERI_PURE_CAPABILITY__
   __ Cbnz(w10, &profiler_enabled);
   {
     // Call the api function directly.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Mov(c3, function_address);
+#else
     __ Mov(x3, function_address);
+#endif // __CHERI_PURE_CAPABILITY__
     __ B(&end_profiler_check);
   }
   __ Bind(&profiler_enabled);
   {
     // Additional parameter is the address of the actual callback.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Mov(c3, thunk_ref);
+#else
     __ Mov(x3, thunk_ref);
+#endif // __CHERI_PURE_CAPABILITY__
   }
   __ Bind(&end_profiler_check);
 
   // Save the callee-save registers we are going to use.
   // TODO(all): Is this necessary? ARM doesn't do it.
   static_assert(kCallApiFunctionSpillSpace == 4);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Poke(c19, (spill_offset + 0) * kCRegSize);
+  __ Poke(c20, (spill_offset + 1) * kCRegSize);
+  __ Poke(c21, (spill_offset + 2) * kCRegSize);
+  __ Poke(c22, (spill_offset + 3) * kCRegSize);
+#else
   __ Poke(x19, (spill_offset + 0) * kXRegSize);
   __ Poke(x20, (spill_offset + 1) * kXRegSize);
   __ Poke(x21, (spill_offset + 2) * kXRegSize);
   __ Poke(x22, (spill_offset + 3) * kXRegSize);
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Allocate HandleScope in callee-save registers.
   // We will need to restore the HandleScope after the call to the API function,
   // by allocating it in callee-save registers they will be preserved by C code.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register handle_scope_base = c22;
+#else
   Register handle_scope_base = x22;
+#endif // __CHERI_PURE_CAPABILITY__
   Register next_address_reg = x19;
   Register limit_reg = x20;
   Register level_reg = w21;
@@ -3532,8 +4736,13 @@ void CallApiFunctionAndReturn(MacroAssembler* masm, Register function_address,
   __ Add(level_reg, level_reg, 1);
   __ Str(level_reg, MemOperand(handle_scope_base, kLevelOffset));
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Mov(c10, c3);  // TODO(arm64): Load target into c10 directly.
+  __ StoreReturnAddressAndCall(c10);
+#else
   __ Mov(x10, x3);  // TODO(arm64): Load target into x10 directly.
   __ StoreReturnAddressAndCall(x10);
+#endif // __CHERI_PURE_CAPABILITY__
 
   Label promote_scheduled_exception;
   Label delete_allocated_handles;
@@ -3541,7 +4750,11 @@ void CallApiFunctionAndReturn(MacroAssembler* masm, Register function_address,
   Label return_value_loaded;
 
   // Load value from ReturnValue.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Ldr(c0, return_value_operand);
+#else
   __ Ldr(x0, return_value_operand);
+#endif // __CHERI_PURE_CAPABILITY__
   __ Bind(&return_value_loaded);
   // No more valid handles (the result handle was the last one). Restore
   // previous handle scope.
@@ -3560,10 +4773,17 @@ void CallApiFunctionAndReturn(MacroAssembler* masm, Register function_address,
   // Leave the API exit frame.
   __ Bind(&leave_exit_frame);
   // Restore callee-saved registers.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Peek(c19, (spill_offset + 0) * kCRegSize);
+  __ Peek(c20, (spill_offset + 1) * kCRegSize);
+  __ Peek(c21, (spill_offset + 2) * kCRegSize);
+  __ Peek(c22, (spill_offset + 3) * kCRegSize);
+#else
   __ Peek(x19, (spill_offset + 0) * kXRegSize);
   __ Peek(x20, (spill_offset + 1) * kXRegSize);
   __ Peek(x21, (spill_offset + 2) * kXRegSize);
   __ Peek(x22, (spill_offset + 3) * kXRegSize);
+#endif // __CHERI_PURE_CAPABILITY__
 
   if (stack_space_operand != nullptr) {
     DCHECK_EQ(stack_space, 0);
@@ -3571,12 +4791,22 @@ void CallApiFunctionAndReturn(MacroAssembler* masm, Register function_address,
     __ Ldr(x19, *stack_space_operand);
   }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ LeaveExitFrame(false, c1, x5);
+#else
   __ LeaveExitFrame(false, x1, x5);
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Check if the function scheduled an exception.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Mov(c5, ExternalReference::scheduled_exception_address(isolate));
+  __ Ldr(c5, MemOperand(c5));
+  __ JumpIfNotRoot(c5, RootIndex::kTheHoleValue, &promote_scheduled_exception);
+#else
   __ Mov(x5, ExternalReference::scheduled_exception_address(isolate));
   __ Ldr(x5, MemOperand(x5));
   __ JumpIfNotRoot(x5, RootIndex::kTheHoleValue, &promote_scheduled_exception);
+#endif // __CHERI_PURE_CAPABILITY__
 
   if (stack_space_operand == nullptr) {
     DCHECK_NE(stack_space, 0);
@@ -3596,11 +4826,21 @@ void CallApiFunctionAndReturn(MacroAssembler* masm, Register function_address,
   __ Bind(&delete_allocated_handles);
   __ Str(limit_reg, MemOperand(handle_scope_base, kLimitOffset));
   // Save the return value in a callee-save register.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register saved_result = c19;
+  __ Mov(saved_result, c0);
+  __ Mov(c0, ExternalReference::isolate_address(isolate));
+#else
   Register saved_result = x19;
   __ Mov(saved_result, x0);
   __ Mov(x0, ExternalReference::isolate_address(isolate));
+#endif // __CHERI_PURE_CAPABILITY__
   __ CallCFunction(ExternalReference::delete_handle_scope_extensions(), 1);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Mov(c0, saved_result);
+#else
   __ Mov(x0, saved_result);
+#endif // __CHERI_PURE_CAPABILITY__
   __ B(&leave_exit_frame);
 }
 
@@ -3619,11 +4859,19 @@ void Builtins::Generate_CallApiCallback(MacroAssembler* masm) {
   //  -- sp[(argc) * 8]      : last argument
   // -----------------------------------
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register api_function_address = c1;
+#else
   Register api_function_address = x1;
+#endif // __CHERI_PURE_CAPABILITY__
   Register argc = x2;
   Register call_data = x3;
   Register holder = x0;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register scratch = c4;
+#else
   Register scratch = x4;
+#endif // __CHERI_PURE_CAPABILITY__
 
   DCHECK(!AreAliased(api_function_address, argc, call_data, holder, scratch));
 
@@ -3640,37 +4888,66 @@ void Builtins::Generate_CallApiCallback(MacroAssembler* masm) {
   // Set up FunctionCallbackInfo's implicit_args on the stack as follows:
   //
   // Target state:
-  //   sp[0 * kSystemPointerAddrSize]: kHolder
-  //   sp[1 * kSystemPointerAddrSize]: kIsolate
-  //   sp[2 * kSystemPointerAddrSize]: undefined (kReturnValueDefaultValue)
-  //   sp[3 * kSystemPointerAddrSize]: undefined (kReturnValue)
-  //   sp[4 * kSystemPointerAddrSize]: kData
-  //   sp[5 * kSystemPointerAddrSize]: undefined (kNewTarget)
+  //   sp[0 * kSystemPointerSize]: kHolder
+  //   sp[1 * kSystemPointerSize]: kIsolate
+  //   sp[2 * kSystemPointerSize]: undefined (kReturnValueDefaultValue)
+  //   sp[3 * kSystemPointerSize]: undefined (kReturnValue)
+  //   sp[4 * kSystemPointerSize]: kData
+  //   sp[5 * kSystemPointerSize]: undefined (kNewTarget)
 
   // Reserve space on the stack.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Claim(FCA::kArgsLength, kSystemPointerSize);
+#else
   __ Claim(FCA::kArgsLength, kSystemPointerAddrSize);
+#endif // __CHERI_PURE_CAPABILITY__
 
   // kHolder.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Str(holder, MemOperand(csp, 0 * kSystemPointerSize));
+#else
   __ Str(holder, MemOperand(sp, 0 * kSystemPointerAddrSize));
+#endif // __CHERI_PURE_CAPABILITY__
 
   // kIsolate.
   __ Mov(scratch, ExternalReference::isolate_address(masm->isolate()));
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Str(scratch, MemOperand(csp, 1 * kSystemPointerSize));
+#else
   __ Str(scratch, MemOperand(sp, 1 * kSystemPointerAddrSize));
+#endif // __CHERI_PURE_CAPABILITY__
 
   // kReturnValueDefaultValue and kReturnValue.
   __ LoadRoot(scratch, RootIndex::kUndefinedValue);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Str(scratch, MemOperand(csp, 2 * kSystemPointerSize));
+  __ Str(scratch, MemOperand(csp, 3 * kSystemPointerSize));
+#else
   __ Str(scratch, MemOperand(sp, 2 * kSystemPointerAddrSize));
   __ Str(scratch, MemOperand(sp, 3 * kSystemPointerAddrSize));
+#endif // __CHERI_PURE_CAPABILITY__
 
   // kData.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Str(call_data, MemOperand(csp, 4 * kSystemPointerAddrSize));
+#else
   __ Str(call_data, MemOperand(sp, 4 * kSystemPointerAddrSize));
+#endif // __CHERI_PURE_CAPABILITY__
 
   // kNewTarget.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Str(scratch, MemOperand(csp, 5 * kSystemPointerSize));
+#else
   __ Str(scratch, MemOperand(sp, 5 * kSystemPointerAddrSize));
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Keep a pointer to kHolder (= implicit_args) in a scratch register.
   // We use it below to set up the FunctionCallbackInfo object.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Mov(scratch, csp);
+#else
   __ Mov(scratch, sp);
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Allocate the v8::Arguments structure in the arguments' space, since it's
   // not controlled by GC.
@@ -3683,16 +4960,29 @@ void Builtins::Generate_CallApiCallback(MacroAssembler* masm) {
 
   // FunctionCallbackInfo::implicit_args_ (points at kHolder as set up above).
   // Arguments are after the return address (pushed by EnterExitFrame()).
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Str(scratch, MemOperand(sp, 1 * kSystemPointerSize));
+#else
   __ Str(scratch, MemOperand(sp, 1 * kSystemPointerAddrSize));
+#endif // _CHERI_PURE_CAPABILITY__
 
   // FunctionCallbackInfo::values_ (points at the first varargs argument passed
   // on the stack).
   __ Add(scratch, scratch,
+#if defined(__CHERI_PURE_CAPABILITY__)
+         Operand((FCA::kArgsLength + 1) * kSystemPointerSize));
+  __ Str(scratch, MemOperand(csp, 2 * kSystemPointerSize));
+#else
          Operand((FCA::kArgsLength + 1) * kSystemPointerAddrSize));
   __ Str(scratch, MemOperand(sp, 2 * kSystemPointerAddrSize));
+#endif // _CHERI_PURE_CAPABILITY__
 
   // FunctionCallbackInfo::length_.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Str(argc, MemOperand(csp, 3 * kSystemPointerSize));
+#else
   __ Str(argc, MemOperand(sp, 3 * kSystemPointerAddrSize));
+#endif // _CHERI_PURE_CAPABILITY__
 
   // We also store the number of slots to drop from the stack after returning
   // from the API function here.
@@ -3700,12 +4990,22 @@ void Builtins::Generate_CallApiCallback(MacroAssembler* masm) {
   // drop, not the number of bytes. arm64 must always drop a slot count that is
   // a multiple of two, and related helper functions (DropArguments) expect a
   // register containing the slot count.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Add(scratch.X(), argc, Operand(FCA::kArgsLength + 1 /*receiver*/));
+  __ Str(scratch, MemOperand(csp, 4 * kSystemPointerSize));
+#else
   __ Add(scratch, argc, Operand(FCA::kArgsLength + 1 /*receiver*/));
   __ Str(scratch, MemOperand(sp, 4 * kSystemPointerAddrSize));
+#endif // _CHERI_PURE_CAPABILITY__
 
   // v8::InvocationCallback's argument.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  DCHECK(!AreAliased(c0, api_function_address));
+  __ add(c0, csp, Operand(1 * kSystemPointerSize));
+#else
   DCHECK(!AreAliased(x0, api_function_address));
   __ add(x0, sp, Operand(1 * kSystemPointerAddrSize));
+#endif // _CHERI_PURE_CAPABILITY__
 
   ExternalReference thunk_ref = ExternalReference::invoke_function_callback();
 
@@ -3716,11 +5016,19 @@ void Builtins::Generate_CallApiCallback(MacroAssembler* masm) {
   // TODO(jgruber): Document what these arguments are.
   static constexpr int kStackSlotsAboveFCA = 2;
   MemOperand return_value_operand(
+#if defined(__CHERI_PURE_CAPABILITY__)
+      fp, (kStackSlotsAboveFCA + FCA::kReturnValueOffset) * kSystemPointerSize);
+#else
       fp, (kStackSlotsAboveFCA + FCA::kReturnValueOffset) * kSystemPointerAddrSize);
+#endif // _CHERI_PURE_CAPABILITY__
 
   static constexpr int kSpillOffset = 1 + kApiStackSpace;
   static constexpr int kUseStackSpaceOperand = 0;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  MemOperand stack_space_operand(csp, 4 * kSystemPointerSize);
+#else
   MemOperand stack_space_operand(sp, 4 * kSystemPointerAddrSize);
+#endif // _CHERI_PURE_CAPABILITY__
 
   AllowExternalCallThatCantCauseGC scope(masm);
   CallApiFunctionAndReturn(masm, api_function_address, thunk_ref,
@@ -3741,10 +5049,17 @@ void Builtins::Generate_CallApiGetter(MacroAssembler* masm) {
   Register receiver = ApiGetterDescriptor::ReceiverRegister();
   Register holder = ApiGetterDescriptor::HolderRegister();
   Register callback = ApiGetterDescriptor::CallbackRegister();
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register data = c4;
+  Register undef = c5;
+  Register isolate_address = c6;
+  Register name = c7;
+#else
   Register data = x4;
   Register undef = x5;
   Register isolate_address = x6;
   Register name = x7;
+#endif // __CHERI_PURE_CAPABILITY__
   DCHECK(!AreAliased(receiver, holder, callback, data, undef, isolate_address,
                      name));
 
@@ -3760,7 +5075,11 @@ void Builtins::Generate_CallApiGetter(MacroAssembler* masm) {
   //   should_throw_on_error
   // These are followed by the property name, which is also pushed below the
   // exit frame to make the GC aware of it.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Push(receiver, data, undef, undef, isolate_address, holder, czr, name);
+#else
   __ Push(receiver, data, undef, undef, isolate_address, holder, xzr, name);
+#endif // __CHERI_PURE_CAPABILITY__
 
   // v8::PropertyCallbackInfo::args_ array and name handle.
   static const int kStackUnwindSpace =
@@ -3769,8 +5088,13 @@ void Builtins::Generate_CallApiGetter(MacroAssembler* masm) {
                 "slots must be a multiple of 2 for stack pointer alignment");
 
   // Load address of v8::PropertyAccessorInfo::args_ array and name handle.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Mov(c0, csp);                          // x0 = Handle<Name>
+  __ Add(c1, c0, 1 * kSystemPointerSize);  // x1 = v8::PCI::args_
+#else
   __ Mov(x0, sp);                          // x0 = Handle<Name>
   __ Add(x1, x0, 1 * kSystemPointerAddrSize);  // x1 = v8::PCI::args_
+#endif // __CHERI_PURE_CAPABILITY__
 
   const int kApiStackSpace = 1;
 
@@ -3779,15 +5103,25 @@ void Builtins::Generate_CallApiGetter(MacroAssembler* masm) {
 
   // Create v8::PropertyCallbackInfo object on the stack and initialize
   // it's args_ field.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Poke(c1, 1 * kSystemPointerSize);
+  __ SlotAddress(c1, 1);
+#else
   __ Poke(x1, 1 * kSystemPointerAddrSize);
   __ SlotAddress(x1, 1);
+#endif // __CHERI_PURE_CAPABILITY__
   // x1 = v8::PropertyCallbackInfo&
 
   ExternalReference thunk_ref =
       ExternalReference::invoke_accessor_getter_callback();
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register api_function_address = c2;
+  Register js_getter = c4;
+#else
   Register api_function_address = x2;
   Register js_getter = x4;
+#endif // __CHERI_PURE_CAPABILITY__
   __ LoadTaggedPointerField(
       js_getter, FieldMemOperand(callback, AccessorInfo::kJsGetterOffset));
 
@@ -3800,7 +5134,11 @@ void Builtins::Generate_CallApiGetter(MacroAssembler* masm) {
   // +3 is to skip prolog, return address and name handle.
   MemOperand return_value_operand(
       fp,
+#if defined(__CHERI_PURE_CAPABILITY__)
+      (PropertyCallbackArguments::kReturnValueOffset + 3) * kSystemPointerSize);
+#else
       (PropertyCallbackArguments::kReturnValueOffset + 3) * kSystemPointerAddrSize);
+#endif // __CHERI_PURE_CAPABILITY__
   MemOperand* const kUseStackSpaceConstant = nullptr;
   CallApiFunctionAndReturn(masm, api_function_address, thunk_ref,
                            kStackUnwindSpace, kUseStackSpaceConstant,
@@ -3816,7 +5154,11 @@ void Builtins::Generate_DirectCEntry(MacroAssembler* masm) {
   // making the call GC safe. The irregexp backend relies on this.
 
   __ Poke<TurboAssembler::kSignLR>(lr, 0);  // Store the return address.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Blr(c10);                              // Call the C++ function.
+#else
   __ Blr(x10);                              // Call the C++ function.
+#endif // _CHERI_PURE_CAPABILITY__
   __ Peek<TurboAssembler::kAuthLR>(lr, 0);  // Return to calling code.
   __ AssertFPCRState();
   __ Ret();
@@ -3829,7 +5171,11 @@ void CopyRegListToFrame(MacroAssembler* masm, const Register& dst,
                         const Register& temp0, const Register& temp1,
                         int src_offset = 0) {
   ASM_CODE_COMMENT(masm);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  DCHECK_EQ(reg_list.Count() * reg_list.RegisterSizeInBits() % 16, 0);
+#else
   DCHECK_EQ(reg_list.Count() % 2, 0);
+#endif // __CHERI_PURE_CAPABILITY__
   UseScratchRegisterScope temps(masm);
   CPURegList copy_to_input = reg_list;
   int reg_size = reg_list.RegisterSizeInBytes();
@@ -3839,8 +5185,13 @@ void CopyRegListToFrame(MacroAssembler* masm, const Register& dst,
   // Compute some temporary addresses to avoid having the macro assembler set
   // up a temp with an offset for accesses out of the range of the addressing
   // mode.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register src = temps.AcquireC();
+  masm->Add(src, csp, src_offset);
+#else
   Register src = temps.AcquireX();
   masm->Add(src, sp, src_offset);
+#endif // _CHERI_PURE_CAPABILITY__
   masm->Add(dst, dst, dst_offset);
 
   // Write reg_list into the frame pointed to by dst.
@@ -3866,7 +5217,9 @@ void CopyRegListToFrame(MacroAssembler* masm, const Register& dst,
 void RestoreRegList(MacroAssembler* masm, const CPURegList& reg_list,
                     const Register& src_base, int src_offset) {
   ASM_CODE_COMMENT(masm);
+#if !defined(__CHERI_PURE_CAPABILITY__)
   DCHECK_EQ(reg_list.Count() % 2, 0);
+#endif // __CHERI_PURE_CAPABILITY__
   UseScratchRegisterScope temps(masm);
   CPURegList restore_list = reg_list;
   int reg_size = restore_list.RegisterSizeInBytes();
@@ -3874,7 +5227,11 @@ void RestoreRegList(MacroAssembler* masm, const CPURegList& reg_list,
   // Compute a temporary addresses to avoid having the macro assembler set
   // up a temp with an offset for accesses out of the range of the addressing
   // mode.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register src = temps.AcquireC();
+#else
   Register src = temps.AcquireX();
+#endif // __CHERI_PURE_CAPABILITY__
   masm->Add(src, src_base, src_offset);
 
   // No need to restore padreg.
@@ -3921,51 +5278,103 @@ void Generate_DeoptimizationEntry(MacroAssembler* masm,
 
   // We save all the registers except sp, lr, platform register (x18) and the
   // masm scratches.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  CPURegList saved_registers(CPURegister::kRegister, kCRegSizeInBits, 0, 28);
+#else
   CPURegList saved_registers(CPURegister::kRegister, kXRegSizeInBits, 0, 28);
+#endif // __CHERI_PURE_CAPABILITY__
   saved_registers.Remove(ip0);
   saved_registers.Remove(ip1);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  saved_registers.Remove(c18);
+#else
   saved_registers.Remove(x18);
+#endif // __CHERI_PURE_CAPABILITY__
   saved_registers.Combine(fp);
   saved_registers.Align();
   DCHECK_EQ(saved_registers.Count() % 2, 0);
   __ PushCPURegList(saved_registers);
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Mov(c3, Operand(ExternalReference::Create(
+                 IsolateAddressId::kCEntryFPAddress, isolate)));
+  __ Str(fp, MemOperand(c3));
+#else
   __ Mov(x3, Operand(ExternalReference::Create(
                  IsolateAddressId::kCEntryFPAddress, isolate)));
   __ Str(fp, MemOperand(x3));
+#endif // __CHERI_PURE_CAPABILITY__
 
   const int kSavedRegistersAreaSize =
+#if defined(__CHERI_PURE_CAPABILITY__)
+      (saved_registers.Count() * kCRegSize) +
+#else
       (saved_registers.Count() * kXRegSize) +
+#endif // __CHERI_PURE_CAPABILITY__
       (saved_double_registers.Count() * kDRegSize);
 
   // Floating point registers are saved on the stack above core registers.
   const int kDoubleRegistersOffset = saved_registers.Count() * kXRegSize;
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register code_object = c2;
+#else
   Register code_object = x2;
   Register fp_to_sp = x3;
+#endif // __CHERI_PURE_CAPABILITY__
   // Get the address of the location in the code object. This is the return
   // address for lazy deoptimization.
   __ Mov(code_object, lr);
   // Compute the fp-to-sp delta.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  {
+    UseScratchRegisterScope temps(masm);
+    Register temp = temps.AcquireX();
+    __ Gcvalue(csp, temp);
+    __ Add(temp, temp, kSavedRegistersAreaSize);
+    Register temp_fp = temps.AcquireX();
+    __ Gcvalue(fp, temp_fp);
+    __ Sub(temp, temp_fp, temp);
+    __ Scvalue(csp, csp, temp);
+  }
+#else
   __ Add(fp_to_sp, sp, kSavedRegistersAreaSize);
   __ Sub(fp_to_sp, fp, fp_to_sp);
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Allocate a new deoptimizer object.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Ldr(c1, MemOperand(fp, CommonFrameConstants::kContextOrFrameTypeOffset));
+#else
   __ Ldr(x1, MemOperand(fp, CommonFrameConstants::kContextOrFrameTypeOffset));
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Ensure we can safely load from below fp.
   DCHECK_GT(kSavedRegistersAreaSize, -StandardFrameConstants::kFunctionOffset);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Ldr(c0, MemOperand(fp, StandardFrameConstants::kFunctionOffset));
+#else
   __ Ldr(x0, MemOperand(fp, StandardFrameConstants::kFunctionOffset));
+#endif // __CHERI_PURE_CAPABILITY__
 
   // If x1 is a smi, zero x0.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Tst(c1, kSmiTagMask);
+  __ CzeroC(c0, eq);
+#else
   __ Tst(x1, kSmiTagMask);
   __ CzeroX(x0, eq);
+#endif // __CHERI_PURE_CAPABILITY__
 
   __ Mov(x1, static_cast<int>(deopt_kind));
   // Following arguments are already loaded:
   //  - x2: code object address
   //  - x3: fp-to-sp delta
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Mov(c4, ExternalReference::isolate_address(isolate));
+#else
   __ Mov(x4, ExternalReference::isolate_address(isolate));
+#endif // __CHERI_PURE_CAPABILITY__
 
   {
     // Call Deoptimizer::New().
@@ -3974,14 +5383,27 @@ void Generate_DeoptimizationEntry(MacroAssembler* masm,
   }
 
   // Preserve "deoptimizer" object in register x0.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register deoptimizer = c0;
+#else
   Register deoptimizer = x0;
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Get the input frame descriptor pointer.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Ldr(c1, MemOperand(deoptimizer, Deoptimizer::input_offset()));
+#else
   __ Ldr(x1, MemOperand(deoptimizer, Deoptimizer::input_offset()));
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Copy core registers into the input frame.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  CopyRegListToFrame(masm, c1, FrameDescription::registers_offset(),
+                     saved_registers, c2, c3);
+#else
   CopyRegListToFrame(masm, x1, FrameDescription::registers_offset(),
                      saved_registers, x2, x3);
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Copy double registers to the input frame.
   CopyRegListToFrame(masm, x1, FrameDescription::double_registers_offset(),
@@ -3991,28 +5413,50 @@ void Generate_DeoptimizationEntry(MacroAssembler* masm,
   // walk the stack without the return address.
   {
     UseScratchRegisterScope temps(masm);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Register is_iterable = temps.AcquireC();
+#else
     Register is_iterable = temps.AcquireX();
+#endif // __CHERI_PURE_CAPABILITY__
     __ Mov(is_iterable, ExternalReference::stack_is_iterable_address(isolate));
     __ strb(xzr, MemOperand(is_iterable));
   }
 
   // Remove the saved registers from the stack.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  DCHECK_EQ(kSavedRegistersAreaSize % kCRegSize, 0);
+  __ Drop(kSavedRegistersAreaSize / kCRegSize);
+#else
   DCHECK_EQ(kSavedRegistersAreaSize % kXRegSize, 0);
   __ Drop(kSavedRegistersAreaSize / kXRegSize);
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Compute a pointer to the unwinding limit in register x2; that is
   // the first stack slot not part of the input frame.
   Register unwind_limit = x2;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Ldr(unwind_limit, MemOperand(c1, FrameDescription::frame_size_offset()));
+#else
   __ Ldr(unwind_limit, MemOperand(x1, FrameDescription::frame_size_offset()));
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Unwind the stack down to - but not including - the unwinding
   // limit and copy the contents of the activation frame to the input
   // frame description.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Add(c3, c1, FrameDescription::frame_content_offset());
+  __ SlotAddress(c1, 0);
+#else
   __ Add(x3, x1, FrameDescription::frame_content_offset());
   __ SlotAddress(x1, 0);
+#endif // __CHERI_PURE_CAPABILITY__
   __ Lsr(unwind_limit, unwind_limit, kSystemPointerAddrSizeLog2);
   __ Mov(x5, unwind_limit);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ CopyCapabilities(c3, c1, x5);
+#else
   __ CopyDoubleWords(x3, x1, x5);
+#endif // __CHERI_PURE_CAPABILITY__
   // Since {unwind_limit} is the frame size up to the parameter count, we might
   // end up with a unaligned stack pointer. This is later recovered when
   // setting the stack pointer to {caller_frame_top_offset}.
@@ -4020,53 +5464,96 @@ void Generate_DeoptimizationEntry(MacroAssembler* masm,
   __ Drop(unwind_limit);
 
   // Compute the output frame in the deoptimizer.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Push(c0);  // Preserve deoptimizer object across call.
+#else
   __ Push(padreg, x0);  // Preserve deoptimizer object across call.
+#endif // __CHERI_PURE_CAPABILITY__
   {
     // Call Deoptimizer::ComputeOutputFrames().
     AllowExternalCallThatCantCauseGC scope(masm);
     __ CallCFunction(ExternalReference::compute_output_frames_function(), 1);
   }
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Pop(c4);  // Restore deoptimizer object (class Deoptimizer).
+#else
   __ Pop(x4, padreg);  // Restore deoptimizer object (class Deoptimizer).
+#endif // __CHERI_PURE_CAPABILITY__
 
   {
     UseScratchRegisterScope temps(masm);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Register scratch = temps.AcquireC();
+    __ Ldr(scratch, MemOperand(c4, Deoptimizer::caller_frame_top_offset()));
+    __ Mov(csp, scratch);
+#else
     Register scratch = temps.AcquireX();
     __ Ldr(scratch, MemOperand(x4, Deoptimizer::caller_frame_top_offset()));
     __ Mov(sp, scratch);
+#endif // __CHERI_PURE_CAPABILITY__
   }
 
   // Replace the current (input) frame with the output frames.
   Label outer_push_loop, outer_loop_header;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Ldrsw(x1, MemOperand(c4, Deoptimizer::output_count_offset()));
+  __ Ldr(x0, MemOperand(c4, Deoptimizer::output_offset()));
+#else
   __ Ldrsw(x1, MemOperand(x4, Deoptimizer::output_count_offset()));
   __ Ldr(x0, MemOperand(x4, Deoptimizer::output_offset()));
+#endif // __CHERI_PURE_CAPABILITY__
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Add(x1, x0, Operand(x1, LSL, kSystemPointerSizeLog2));
+#else
   __ Add(x1, x0, Operand(x1, LSL, kSystemPointerAddrSizeLog2));
+#endif // __CHERI_PURE_CAPABILITY__
   __ B(&outer_loop_header);
 
   __ Bind(&outer_push_loop);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register current_frame = c2;
+#else
   Register current_frame = x2;
+#endif // __CHERI_PURE_CAPABILITY__
   Register frame_size = x3;
   __ Ldr(current_frame, MemOperand(x0, kSystemPointerAddrSize, PostIndex));
   __ Ldr(x3, MemOperand(current_frame, FrameDescription::frame_size_offset()));
   __ Lsr(frame_size, x3, kSystemPointerAddrSizeLog2);
   __ Claim(frame_size);
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Add(c7, current_frame, FrameDescription::frame_content_offset());
+  __ SlotAddress(c6, 0);
+  __ CopyCapabilities(c6, c7, frame_size);
+#else
   __ Add(x7, current_frame, FrameDescription::frame_content_offset());
   __ SlotAddress(x6, 0);
   __ CopyDoubleWords(x6, x7, frame_size);
+#endif // __CHERI_PURE_CAPABILITY__
 
   __ Bind(&outer_loop_header);
   __ Cmp(x0, x1);
   __ B(lt, &outer_push_loop);
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Ldr(c1, MemOperand(c4, Deoptimizer::input_offset()));
+  RestoreRegList(masm, saved_double_registers, c1,
+                 FrameDescription::double_registers_offset());
+#else
   __ Ldr(x1, MemOperand(x4, Deoptimizer::input_offset()));
   RestoreRegList(masm, saved_double_registers, x1,
                  FrameDescription::double_registers_offset());
+#endif // __CHERI_PURE_CAPABILITY__
 
   {
     UseScratchRegisterScope temps(masm);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Register is_iterable = temps.AcquireC();
+#else
     Register is_iterable = temps.AcquireX();
-    Register one = x4;
+#endif // __CHERI_PURE_CAPABILITY__
     __ Mov(is_iterable, ExternalReference::stack_is_iterable_address(isolate));
+    Register one = x4;
     __ Mov(one, Operand(1));
     __ strb(one, MemOperand(is_iterable));
   }
@@ -4088,11 +5575,19 @@ void Generate_DeoptimizationEntry(MacroAssembler* masm,
                  FrameDescription::registers_offset());
 
   UseScratchRegisterScope temps(masm);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  temps.Exclude(c17);
+  Register continuation = c17;
+  __ Ldr(continuation, MemOperand(last_output_frame,
+                                   FrameDescription::continuation_offset()));
+  __ Ldr(lr, MemOperand(last_output_frame, FrameDescription::pc_offset()));
+#else
   temps.Exclude(x17);
   Register continuation = x17;
   __ Ldr(continuation, MemOperand(last_output_frame,
                                   FrameDescription::continuation_offset()));
   __ Ldr(lr, MemOperand(last_output_frame, FrameDescription::pc_offset()));
+#endif // __CHERI_PURE_CAPABILITY__
 #ifdef V8_ENABLE_CONTROL_FLOW_INTEGRITY
   __ Autibsp();
 #endif
@@ -4122,11 +5617,19 @@ void Generate_BaselineOrInterpreterEntry(MacroAssembler* masm,
   __ bind(&start);
 
   // Get function from the frame.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register closure = c1;
+#else
   Register closure = x1;
+#endif // __CHERI_PURE_CAPABILITY__
   __ Ldr(closure, MemOperand(fp, StandardFrameConstants::kFunctionOffset));
 
   // Get the Code object from the shared function info.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register code_obj = c22;
+#else
   Register code_obj = x22;
+#endif // __CHERI_PURE_CAPABILITY__
   __ LoadTaggedPointerField(
       code_obj,
       FieldMemOperand(closure, JSFunction::kSharedFunctionInfoOffset));
@@ -4138,7 +5641,11 @@ void Generate_BaselineOrInterpreterEntry(MacroAssembler* masm,
   // always have baseline code.
   if (!is_osr) {
     Label start_with_baseline;
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ CompareObjectType(code_obj, c3, x3, CODET_TYPE);
+#else
     __ CompareObjectType(code_obj, x3, x3, CODET_TYPE);
+#endif // __CHERI_PURE_CAPABILITY__
     __ B(eq, &start_with_baseline);
 
     // Start with bytecode as there is no baseline code.
@@ -4151,7 +5658,11 @@ void Generate_BaselineOrInterpreterEntry(MacroAssembler* masm,
     // Start with baseline code.
     __ bind(&start_with_baseline);
   } else if (FLAG_debug_code) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ CompareObjectType(code_obj, c3, x3, CODET_TYPE);
+#else
     __ CompareObjectType(code_obj, x3, x3, CODET_TYPE);
+#endif // __CHERI_PURE_CAPABILITY__
     __ Assert(eq, AbortReason::kExpectedBaselineData);
   }
 
@@ -4163,7 +5674,11 @@ void Generate_BaselineOrInterpreterEntry(MacroAssembler* masm,
   }
 
   // Load the feedback vector.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register feedback_vector = c2;
+#else
   Register feedback_vector = x2;
+#endif // __CHERI_PURE_CAPABILITY__
   __ LoadTaggedPointerField(
       feedback_vector,
       FieldMemOperand(closure, JSFunction::kFeedbackCellOffset));
@@ -4173,7 +5688,11 @@ void Generate_BaselineOrInterpreterEntry(MacroAssembler* masm,
   Label install_baseline_code;
   // Check if feedback vector is valid. If not, call prepare for baseline to
   // allocate it.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ CompareObjectType(feedback_vector, c3, x3, FEEDBACK_VECTOR_TYPE);
+#else
   __ CompareObjectType(feedback_vector, x3, x3, FEEDBACK_VECTOR_TYPE);
+#endif // __CHERI_PURE_CAPABILITY__
   __ B(ne, &install_baseline_code);
 
   // Save BytecodeOffset from the stack frame.
@@ -4193,7 +5712,11 @@ void Generate_BaselineOrInterpreterEntry(MacroAssembler* masm,
     get_baseline_pc_extref =
         ExternalReference::baseline_pc_for_bytecode_offset();
   }
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register get_baseline_pc = c3;
+#else
   Register get_baseline_pc = x3;
+#endif // __CHERI_PURE_CAPABILITY__
   __ Mov(get_baseline_pc, get_baseline_pc_extref);
 
   // If the code deoptimizes during the implicit function entry stack interrupt
@@ -4217,11 +5740,22 @@ void Generate_BaselineOrInterpreterEntry(MacroAssembler* masm,
   __ ldr(kInterpreterBytecodeArrayRegister,
          MemOperand(fp, InterpreterFrameConstants::kBytecodeArrayFromFp));
   // Save the accumulator register, since it's clobbered by the below call.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Push(kInterpreterAccumulatorRegister);
+#else
   __ Push(padreg, kInterpreterAccumulatorRegister);
+#endif // __CHERI_PURE_CAPABILITY__
   {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    // TODO(gcjenkinson): Which of these need to be capability registers
+    Register arg_reg_1 = c0;
+    Register arg_reg_2 = x1;
+    Register arg_reg_3 = c2;
+#else
     Register arg_reg_1 = x0;
     Register arg_reg_2 = x1;
     Register arg_reg_3 = x2;
+#endif // __CHERI_PURE_CAPABILITY__
     __ Mov(arg_reg_1, code_obj);
     __ Mov(arg_reg_2, kInterpreterBytecodeOffsetRegister);
     __ Mov(arg_reg_3, kInterpreterBytecodeArrayRegister);
@@ -4229,7 +5763,11 @@ void Generate_BaselineOrInterpreterEntry(MacroAssembler* masm,
     __ CallCFunction(get_baseline_pc, 3, 0);
   }
   __ Add(code_obj, code_obj, kReturnRegister0);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Pop(kInterpreterAccumulatorRegister);
+#else
   __ Pop(kInterpreterAccumulatorRegister, padreg);
+#endif // __CHERI_PURE_CAPABILITY__
 
   if (is_osr) {
     ResetBytecodeAge(masm, kInterpreterBytecodeArrayRegister);
@@ -4255,10 +5793,18 @@ void Generate_BaselineOrInterpreterEntry(MacroAssembler* masm,
   __ bind(&install_baseline_code);
   {
     FrameScope scope(masm, StackFrame::INTERNAL);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Push(kInterpreterAccumulatorRegister);
+#else
     __ Push(padreg, kInterpreterAccumulatorRegister);
+#endif // __CHERI_PURE_CAPABILITY__
     __ PushArgument(closure);
     __ CallRuntime(Runtime::kInstallBaselineCode, 1);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ Pop(kInterpreterAccumulatorRegister);
+#else
     __ Pop(kInterpreterAccumulatorRegister, padreg);
+#endif // __CHERI_PURE_CAPABILITY__
   }
   // Retry from the start after installing baseline code.
   __ B(&start);
@@ -4287,15 +5833,24 @@ void Builtins::Generate_RestartFrameTrampoline(MacroAssembler* masm) {
   // - Leave the frame.
   // - Restart the frame by calling the function.
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Ldr(c1, MemOperand(fp, StandardFrameConstants::kFunctionOffset));
+  __ ldr(c0, MemOperand(fp, StandardFrameConstants::kArgCOffset));
+#else
   __ Ldr(x1, MemOperand(fp, StandardFrameConstants::kFunctionOffset));
   __ ldr(x0, MemOperand(fp, StandardFrameConstants::kArgCOffset));
+#endif // __CHERI_PURE_CAPABILITY__
 
   __ LeaveFrame(StackFrame::INTERPRETED);
 
   // The arguments are already in the stack (including any necessary padding),
   // we should not try to massage the arguments again.
   __ Mov(x2, kDontAdaptArgumentsSentinel);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ InvokeFunction(c1, x2, x0, InvokeType::kJump);
+#else
   __ InvokeFunction(x1, x2, x0, InvokeType::kJump);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 #undef __

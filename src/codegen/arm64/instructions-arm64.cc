@@ -207,7 +207,7 @@ unsigned CalcLSPairDataSize(LoadStorePairOp op) {
 
 #if defined(__CHERI_PURE_CAPABILITY__)
 unsigned CalcLSPairCapDataSize(LoadStorePairOp op) {
-  return 4;
+  return kSystemPointerSizeLog2;
 }
 #endif // __CHERI_PURE_CAPABILITY__
 

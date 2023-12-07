@@ -257,7 +257,7 @@ void TurboAssembler::Gcvalue(const Register& cd, const Register& rd) {
 }
 
 void TurboAssembler::Scvalue(const Register& cd, const Register& cn,
-		             const Register& rm) {
+                             const Register& rm) {
   DCHECK(allow_macro_instructions());
   scvalue(cd, cn, rm);
 }
@@ -1491,7 +1491,11 @@ void TurboAssembler::Claim(int64_t count, uint64_t unit_size) {
     size -= kStackPageSize;
   }
 #endif
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Sub(csp, csp, size);
+#else
   Sub(sp, sp, size);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 void TurboAssembler::Claim(const Register& count, uint64_t unit_size) {
@@ -1531,7 +1535,10 @@ void TurboAssembler::Claim(const Register& count, uint64_t unit_size) {
 
   Sub(sp, sp, bytes_scratch);
 #else
-  Sub(sp, sp, size);
+#if defined(__CHERI_PURE_CAPABILITY__)
+#else
+  Sub(csp, csp, size);
+#endif // __CHERI_PURE_CAPABILITY__
 #endif
 }
 
@@ -1543,7 +1550,11 @@ void TurboAssembler::Drop(int64_t count, uint64_t unit_size) {
     return;
   }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Add(csp, csp, size);
+#else
   Add(sp, sp, size);
+#endif // __CHERI_PURE_CAPABILITY__
 #if !defined(__CHERI_PURE_CAPABILITY__)
   DCHECK_EQ(size % 16, 0);
 #endif
@@ -1561,7 +1572,11 @@ void TurboAssembler::Drop(const Register& count, uint64_t unit_size) {
   }
 
   AssertPositiveOrZero(count);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Add(csp, csp, size);
+#else
   Add(sp, sp, size);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 void TurboAssembler::DropArguments(const Register& count,

@@ -104,11 +104,19 @@ void BaselineCompiler::PrologueFillFrame() {
 
 void BaselineCompiler::VerifyFrameSize() {
   ASM_CODE_COMMENT(&masm_);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ masm()->Add(c15, cp,
+#else // defined(__CHERI_PURE_CAPABILITY__)
   __ masm()->Add(x15, sp,
+#endif // defined(__CHERI_PURE_CAPABILITY__)
                  RoundUp(InterpreterFrameConstants::kFixedFrameSizeFromFp +
                              bytecode_->frame_size(),
                          2 * kSystemPointerSize));
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ masm()->Cmp(c15, fp);
+#else // defined(__CHERI_PURE_CAPABILITY__)
   __ masm()->Cmp(x15, fp);
+#endif // defined(__CHERI_PURE_CAPABILITY__)
   __ masm()->Assert(eq, AbortReason::kUnexpectedStackPointer);
 }
 

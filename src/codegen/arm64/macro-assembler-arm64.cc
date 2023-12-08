@@ -1531,10 +1531,11 @@ void TurboAssembler::AssertSpAligned() {
   // Arm64 requires the stack pointer to be 16-byte aligned prior to address
   // calculation.
   UseScratchRegisterScope scope(this);
-  Register temp = scope.AcquireX();
 #if defined(__CHERI_PURE_CAPABILITY__)
-  Gcvalue(csp, temp);
+  Register temp = scope.AcquireC();
+  Mov(csp, temp);
 #else
+  Register temp = scope.AcquireX();
   Mov(temp, sp);
 #endif // __CHERI_PURE_CAPABILITY__
   Tst(temp, 15);
@@ -2343,6 +2344,9 @@ void TurboAssembler::Jump(const ExternalReference& reference) {
 
 void TurboAssembler::Call(Register target) {
   BlockPoolsScope scope(this);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Orr(target, target, 0x1);
+#endif // __CHERI_PURE_CAPABILITY__
   Blr(target);
 }
 
@@ -2418,6 +2422,9 @@ void TurboAssembler::LoadEntryFromBuiltinIndex(Register builtin_index) {
 void TurboAssembler::LoadEntryFromBuiltin(Builtin builtin,
                                           Register destination) {
   Ldr(destination, EntryFromBuiltinAsOperand(builtin));
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Orr(destination, destination, 0x1);
+#endif // defined(__CHERI_PURE_CAPABILITY__)
 }
 
 MemOperand TurboAssembler::EntryFromBuiltinAsOperand(Builtin builtin) {
@@ -2713,6 +2720,9 @@ void TurboAssembler::IndirectCall(Address target, RelocInfo::Mode rmode) {
   Register temp = temps.AcquireX();
 #endif // __CHERI_PURE_CAPABILITY__
   Mov(temp, Immediate(target, rmode));
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Orr(temp, temp, 0x1);
+#endif // __CHERI_PURE_CAPABILITY__
   Blr(temp);
 }
 

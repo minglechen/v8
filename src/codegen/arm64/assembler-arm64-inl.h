@@ -662,11 +662,7 @@ int Assembler::deserialization_special_target_size(Address location) {
     return kSpecialTargetSize;
   } else {
     DCHECK_EQ(instr->InstructionBits(), 0);
-#if defined(__CHERI_PURE_CAPABILITY__)
     return kSystemPointerSize;
-#else
-    return kSystemPointerAddrSize;
-#endif // __CHERI_PURE_CAPABILITY__
   }
 }
 
@@ -742,12 +738,10 @@ int RelocInfo::target_address_size() {
     Instruction* instr = reinterpret_cast<Instruction*>(pc_);
 #if defined(__CHERI_PURE_CAPABILITY__)
     DCHECK(instr->IsLdrLiteralC() || instr->IsLdrLiteralX() || instr->IsLdrLiteralW());
-    return instr->IsLdrLiteralW() ? kTaggedSize : instr->IsLdrLiteralX() ?
-        kSystemPointerAddrSize : kSystemPointerSize;
 #else
     DCHECK(instr->IsLdrLiteralX() || instr->IsLdrLiteralW());
-    return instr->IsLdrLiteralW() ? kTaggedSize : kSystemPointerAddrSize;
 #endif // __CHERI_PURE_CAPABILITY__
+    return instr->IsLdrLiteralW() ? kTaggedSize : kSystemPointerSize;
   }
 }
 

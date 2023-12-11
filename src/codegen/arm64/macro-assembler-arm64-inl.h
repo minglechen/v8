@@ -1394,9 +1394,17 @@ void TurboAssembler::Push(const Register& src0, const VRegister& src1) {
   DCHECK_EQ(0, size % 16);
 
   // Reserve room for src0 and push src1.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  str(src1, MemOperand(csp, -size, PreIndex));
+#else
   str(src1, MemOperand(sp, -size, PreIndex));
+#endif // __CHERI_PURE_CAPABILITY__
   // Fill the gap with src0.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  str(src0, MemOperand(csp, src1.SizeInBytes()));
+#else
   str(src0, MemOperand(sp, src1.SizeInBytes()));
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 template <TurboAssembler::LoadLRMode lr_mode>
@@ -1481,9 +1489,7 @@ void TurboAssembler::Claim(int64_t count, uint64_t unit_size) {
   if (size == 0) {
     return;
   }
-#if !defined(__CHERI_PURE_CAPABILITY__)
   DCHECK_EQ(size % 16, 0);
-#endif
 #ifdef V8_TARGET_OS_WIN
   while (size > kStackPageSize) {
     Sub(sp, sp, kStackPageSize);
@@ -1536,8 +1542,9 @@ void TurboAssembler::Claim(const Register& count, uint64_t unit_size) {
   Sub(sp, sp, bytes_scratch);
 #else
 #if defined(__CHERI_PURE_CAPABILITY__)
-#else
   Sub(csp, csp, size);
+#else
+  Sub(sp, sp, size);
 #endif // __CHERI_PURE_CAPABILITY__
 #endif
 }
@@ -1555,9 +1562,7 @@ void TurboAssembler::Drop(int64_t count, uint64_t unit_size) {
 #else
   Add(sp, sp, size);
 #endif // __CHERI_PURE_CAPABILITY__
-#if !defined(__CHERI_PURE_CAPABILITY__)
   DCHECK_EQ(size % 16, 0);
-#endif
 }
 
 void TurboAssembler::Drop(const Register& count, uint64_t unit_size) {

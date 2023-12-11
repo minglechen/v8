@@ -1456,12 +1456,7 @@ void MacroAssembler::PushCalleeSavedRegisters() {
   // TODO(gcjenkinson): Fix this asssert
   static_assert(
       EntryFrameConstants::kCalleeSavedRegisterBytesPushedBeforeFpLrPair ==
-#if defined(__CHERI_PURE_CAPABILITY__)
-      // TODO(gcjenkinson): Fix theEntryFrameConstants value
-      18 * kSystemPointerAddrSize);
-#else
-      18 * kSystemPointerAddrSize);
-#endif // __CHERI_PURE_CAPABILITY__
+      18 * kSystemPointerSize);
 
 #ifdef V8_ENABLE_CONTROL_FLOW_INTEGRITY
     // Use the stack pointer's value immediately before pushing the LR as the
@@ -1533,7 +1528,7 @@ void TurboAssembler::AssertSpAligned() {
   UseScratchRegisterScope scope(this);
 #if defined(__CHERI_PURE_CAPABILITY__)
   Register temp = scope.AcquireC();
-  Mov(csp, temp);
+  Mov(temp, csp);
 #else
   Register temp = scope.AcquireX();
   Mov(temp, sp);
@@ -1631,7 +1626,7 @@ void TurboAssembler::CopyCapabilities(Register dst, Register src, Register count
 
   Bind(&done);
 }
-#endif
+#endif // defined(__CHERI_PURE_CAPABILITY__)
 
 void TurboAssembler::CopyDoubleWords(Register dst, Register src, Register count,
                                      CopyDoubleWordsMode mode) {
@@ -1664,11 +1659,7 @@ void TurboAssembler::CopyDoubleWords(Register dst, Register src, Register count,
 
   if (mode == kDstLessThanSrcAndReverse) {
     Add(src, src, Operand(count, LSL, kSystemPointerSizeLog2));
-#if defined(__CHERI_PURE_CAPABILITY__)
     Sub(src, src, kSystemPointerSize);
-#else
-    Sub(src, src, kSystemPointerAddrSize);
-#endif
   }
 
   int src_direction = (mode == kDstLessThanSrc) ? 1 : -1;
@@ -1681,58 +1672,29 @@ void TurboAssembler::CopyDoubleWords(Register dst, Register src, Register count,
   Label pairs, loop, done;
 
   Tbz(count, 0, &pairs);
-#if defined(__CHERI_PURE_CAPABILITY__)
   Ldr(temp0, MemOperand(src, src_direction * kSystemPointerSize, PostIndex));
-#else
-  Ldr(temp0, MemOperand(src, src_direction * kSystemPointerAddrSize, PostIndex));
-#endif
   Sub(count, count, 1);
-#if defined(__CHERI_PURE_CAPABILITY__)
   Str(temp0, MemOperand(dst, dst_direction * kSystemPointerSize, PostIndex));
-#else
-  Str(temp0, MemOperand(dst, dst_direction * kSystemPointerAddrSize, PostIndex));
-#endif
 
   Bind(&pairs);
   if (mode == kSrcLessThanDst) {
     // Adjust pointers for post-index ldp/stp with negative offset:
-#if defined(__CHERI_PURE_CAPABILITY__)
     Sub(dst, dst, kSystemPointerSize);
     Sub(src, src, kSystemPointerSize);
-#else
-    Sub(dst, dst, kSystemPointerAddrSize);
-    Sub(src, src, kSystemPointerAddrSize);
-#endif
   } else if (mode == kDstLessThanSrcAndReverse) {
-#if defined(__CHERI_PURE_CAPABILITY__)
     Sub(src, src, kSystemPointerSize);
-#else
-    Sub(src, src, kSystemPointerAddrSize);
-#endif
   }
   Bind(&loop);
   Cbz(count, &done);
   Ldp(temp0, temp1,
-#if defined(__CHERI_PURE_CAPABILITY__)
       MemOperand(src, 2 * src_direction * kSystemPointerSize, PostIndex));
-#else
-      MemOperand(src, 2 * src_direction * kSystemPointerAddrSize, PostIndex));
-#endif
   Sub(count, count, 2);
   if (mode == kDstLessThanSrcAndReverse) {
     Stp(temp1, temp0,
-#if defined(__CHERI_PURE_CAPABILITY__)
         MemOperand(dst, 2 * dst_direction * kSystemPointerSize, PostIndex));
-#else
-        MemOperand(dst, 2 * dst_direction * kSystemPointerAddrSize, PostIndex));
-#endif
   } else {
     Stp(temp0, temp1,
-#if defined(__CHERI_PURE_CAPABILITY__)
         MemOperand(dst, 2 * dst_direction * kSystemPointerSize, PostIndex));
-#else
-        MemOperand(dst, 2 * dst_direction * kSystemPointerAddrSize, PostIndex));
-#endif
   }
   B(&loop);
 
@@ -1746,7 +1708,7 @@ void TurboAssembler::SlotAddress(Register dst, int slot_offset) {
 #if defined(__CHERI_PURE_CAPABILITY__)
   Add(dst, csp, slot_offset << kSystemPointerSizeLog2);
 #else
-  Add(dst, sp, slot_offset << kSystemPointerAddrSizeLog2);
+  Add(dst, sp, slot_offset << kSystemPointerSizeLog2);
 #endif // __CHERI_PURE_CAPABILITY__
 }
 
@@ -2199,11 +2161,19 @@ void TurboAssembler::CallCFunction(Register function, int num_of_reg_args,
         MemOperand(kRootRegister, IsolateData::fast_c_call_caller_fp_offset()));
   } else {
     DCHECK_NOT_NULL(isolate());
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Push(addr_scratch);
+#else
     Push(addr_scratch, xzr);
+#endif // __CHERI_PURE_CAPABILITY__
     Mov(addr_scratch,
         ExternalReference::fast_c_call_caller_fp_address(isolate()));
     Str(xzr, MemOperand(addr_scratch));
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Pop(addr_scratch);
+#else
     Pop(xzr, addr_scratch);
+#endif // __CHERI_PURE_CAPABILITY__
   }
 
   if (num_of_reg_args > kRegisterPassedArguments) {
@@ -2247,6 +2217,9 @@ void TurboAssembler::Jump(Register target, Condition cond) {
   if (cond == nv) return;
   Label done;
   if (cond != al) B(NegateCondition(cond), &done);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Orr(target, target, 0x1);
+#endif // defined(__CHERI_PURE_CAPABILITY__)
   Br(target);
   Bind(&done);
 }
@@ -2261,9 +2234,13 @@ void TurboAssembler::JumpHelper(int64_t offset, RelocInfo::Mode rmode,
     near_jump(static_cast<int>(offset), rmode);
   } else {
     UseScratchRegisterScope temps(this);
+    // TODO(gcjenkinson): What to do here?
     Register temp = temps.AcquireX();
     uint64_t imm = reinterpret_cast<uint64_t>(pc_) + offset * kInstrSize;
     Mov(temp, Immediate(imm, rmode));
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Orr(temp, temp, 0x1);
+#endif // defined(__CHERI_PURE_CAPABILITY__)
     Br(temp);
   }
   Bind(&done);
@@ -2681,7 +2658,7 @@ void TurboAssembler::StoreReturnAddressAndCall(Register target) {
 #if defined(__CHERI_PURE_CAPABILITY__)
   Add(c16, csp, kSystemPointerSize);
 #else
-  Add(x16, sp, kSystemPointerAddrSize);
+  Add(x16, sp, kSystemPointerSize);
 #endif // __CHERI_PURE_CAPABILITY__
   Pacib1716();
 #endif
@@ -2782,7 +2759,7 @@ void MacroAssembler::StackOverflowCheck(Register num_args,
 #if defined(__CHERI_PURE_CAPABILITY__)
   Cmp(scratch, Operand(num_args, LSL, kSystemPointerSizeLog2));
 #else
-  Cmp(scratch, Operand(num_args, LSL, kSystemPointerAddrSizeLog2));
+  Cmp(scratch, Operand(num_args, LSL, kSystemPointerSizeLog2));
 #endif // __CHERI_PURE_CAPABILITY__
   B(le, stack_overflow);
 }
@@ -2884,11 +2861,7 @@ void MacroAssembler::InvokePrologue(Register formal_parameter_count,
     Mov(count, extra_argument_count);
     Bind(&loop);
     Str(undefined_value,
-#if defined(__CHERI_PURE_CAPABILITY__)
         MemOperand(pointer_next_value, kSystemPointerSize, PostIndex));
-#else
-        MemOperand(pointer_next_value, kSystemPointerAddrSize, PostIndex));
-#endif // __CHERI_PURE_CAPABILITY__
     Subs(count, count, 1);
     Cbnz(count, &loop);
   }
@@ -2934,8 +2907,8 @@ void MacroAssembler::CallDebugOnFunctionCall(Register fun, Register new_target,
   SmiTag(expected_parameter_count);
   SmiTag(actual_parameter_count);
 #if defined(__CHERI_PURE_CAPABILITY__)
-  Push(expected_parameter_count.C(), actual_parameter_count.C(), new_target, fun);
-  Push(fun, c4);
+  Push(expected_parameter_count, actual_parameter_count);
+  Push(new_target, fun, fun, c4);
 #else
   Push(expected_parameter_count, actual_parameter_count, new_target, fun);
   Push(fun, x4);
@@ -2944,7 +2917,8 @@ void MacroAssembler::CallDebugOnFunctionCall(Register fun, Register new_target,
 
   // Restore values from stack.
 #if defined(__CHERI_PURE_CAPABILITY__)
-  Pop(fun, new_target, actual_parameter_count.C(), expected_parameter_count.C());
+  Pop(fun, new_target);
+  Pop(actual_parameter_count, expected_parameter_count);
 #else
   Pop(fun, new_target, actual_parameter_count, expected_parameter_count);
 #endif // _CHERI_PURE_CAPABILITY__
@@ -3150,7 +3124,12 @@ void TurboAssembler::TruncateDoubleToI(Isolate* isolate, Zone* zone,
 
   // If we fell through then inline version didn't succeed - call stub instead.
   if (lr_status == kLRHasNotBeenSaved) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Push<TurboAssembler::kSignLR>(lr);
+    Push(padreg, double_input);
+#else
     Push<TurboAssembler::kSignLR>(lr, double_input);
+#endif  // V8_ENABLE_WEBASSEMBLY
   } else {
     Push<TurboAssembler::kDontStoreLR>(xzr, double_input);
   }
@@ -3194,7 +3173,8 @@ void TurboAssembler::Prologue() {
 #endif // __CHERI_PURE_CAPABILITY__
   static_assert(kExtraSlotClaimedByPrologue == 1);
 #if defined(__CHERI_PURE_CAPABILITY__)
-  Push(cp, kJSFunctionRegister, kJavaScriptCallArgCountRegister.C(), padregc);
+  Push(cp, kJSFunctionRegister);
+  Push(kJavaScriptCallArgCountRegister, padreg);
 #else
   Push(cp, kJSFunctionRegister, kJavaScriptCallArgCountRegister, padreg);
 #endif // __CHERI_PURE_CAPABILITY__
@@ -3211,17 +3191,17 @@ void TurboAssembler::EnterFrame(StackFrame::Type type) {
     Register type_reg = temps.AcquireX();
     Mov(type_reg, StackFrame::TypeToMarker(type));
 #if defined(__CHERI_PURE_CAPABILITY__)
-    Push<TurboAssembler::kSignLR>(lr, fp, type_reg.C(), padregc);
+    Push<TurboAssembler::kSignLR>(lr, fp);
+    Push(type_reg, padreg);
 #else
     Push<TurboAssembler::kSignLR>(lr, fp, type_reg, padreg);
 #endif // __CHERI_PURE_CAPABILITY__
     const int kFrameSize =
         TypedFrameConstants::kFixedFrameSizeFromFp +
+	kSystemPointerSize;
 #if defined(__CHERI_PURE_CAPABILITY__)
-	kSystemPointerAddrSize;
     Add(fp, csp, kFrameSize);
 #else
-        kSystemPointerSize;
     Add(fp, sp, kFrameSize);
 #endif // __CHERI_PURE_CAPABILITY__
     // sp[3] : lr
@@ -3253,7 +3233,9 @@ void TurboAssembler::EnterFrame(StackFrame::Type type) {
     // Users of this frame type push a context pointer after the type field,
     // so do it here to keep the stack pointer aligned.
 #if defined(__CHERI_PURE_CAPABILITY__)
-    Push<TurboAssembler::kSignLR>(lr, fp, type_reg.C(), cp);
+    Push<TurboAssembler::kSignLR>(lr, fp);
+    Push(type_reg, padreg);
+    Push(cp);
 #else
     Push<TurboAssembler::kSignLR>(lr, fp, type_reg, cp);
 #endif // __CHERI_PURE_CAPABILITY__
@@ -3262,11 +3244,10 @@ void TurboAssembler::EnterFrame(StackFrame::Type type) {
     // to account for it.
 #if defined(__CHERI_PURE_CAPABILITY__)
     Add(fp, csp,
-        TypedFrameConstants::kFixedFrameSizeFromFp + kSystemPointerSize);
 #else
     Add(fp, sp,
-        TypedFrameConstants::kFixedFrameSizeFromFp + kSystemPointerAddrSize);
 #endif // __CHERI_PURE_CAPABILITY__
+        TypedFrameConstants::kFixedFrameSizeFromFp + kSystemPointerSize);
     // sp[3] : lr
     // sp[2] : fp
     // sp[1] : type
@@ -3331,33 +3312,28 @@ void MacroAssembler::EnterExitFrame(bool save_doubles, const Register& scratch,
   Push<TurboAssembler::kSignLR>(lr, fp);
 #if defined(__CHERI_PURE_CAPABILITY__)
   Mov(fp, csp);
+  Mov(scratch.X(), StackFrame::TypeToMarker(frame_type));
+  Push(scratch, padregc);
+  //          fp[16]: CallerPC (lr)
+  //    fp -> fp[0]: CallerFP (old fp)
+  //          fp[-16]: STUB marker
+  //    sp -> fp[-32]: Space reserved for SPOffset.
 #else
   Mov(fp, sp);
-#endif // __CHERI_PURE_CAPABILITY__
   Mov(scratch, StackFrame::TypeToMarker(frame_type));
   Push(scratch, xzr);
   //          fp[8]: CallerPC (lr)
   //    fp -> fp[0]: CallerFP (old fp)
   //          fp[-8]: STUB marker
   //    sp -> fp[-16]: Space reserved for SPOffset.
-#if defined(__CHERI_PURE_CAPABILITY__)
-  // TODO(gcjenkinson): Fix the ExitFraemConstants values
-  static_assert((2 * kSystemPointerAddrSize) ==
+#endif // __CHERI_PURE_CAPABILITY__
+  static_assert((2 * kSystemPointerSize) ==
                 ExitFrameConstants::kCallerSPOffset);
-  static_assert((1 * kSystemPointerAddrSize) ==
+  static_assert((1 * kSystemPointerSize) ==
                 ExitFrameConstants::kCallerPCOffset);
-  static_assert((0 * kSystemPointerAddrSize) ==
+  static_assert((0 * kSystemPointerSize) ==
                 ExitFrameConstants::kCallerFPOffset);
-  static_assert((-2 * kSystemPointerAddrSize) == ExitFrameConstants::kSPOffset);
-#else
-  static_assert((2 * kSystemPointerAddrSize) ==
-                ExitFrameConstants::kCallerSPOffset);
-  static_assert((1 * kSystemPointerAddrSize) ==
-                ExitFrameConstants::kCallerPCOffset);
-  static_assert((0 * kSystemPointerAddrSize) ==
-                ExitFrameConstants::kCallerFPOffset);
- static_assert((-2 * kSystemPointerAddrSize) == ExitFrameConstants::kSPOffset);
-#endif
+  static_assert((-2 * kSystemPointerSize) == ExitFrameConstants::kSPOffset);
 
   // Save the frame pointer and context pointer in the top frame.
   Mov(scratch,
@@ -3366,12 +3342,7 @@ void MacroAssembler::EnterExitFrame(bool save_doubles, const Register& scratch,
   Mov(scratch,
       ExternalReference::Create(IsolateAddressId::kContextAddress, isolate()));
   Str(cp, MemOperand(scratch));
-#if defined(__CHERI_PURE_CAPABILITY__)
-  // TODO(gcjenkinson): Fix the ExitFrameConstants values
-  static_assert((-2 * kSystemPointerAddrSize) ==
-#else
-  static_assert((-2 * kSystemPointerAddrSize) ==
-#endif
+  static_assert((-2 * kSystemPointerSize) ==
                 ExitFrameConstants::kLastExitFrameField);
   if (save_doubles) {
     ExitFramePreserveFPRegs();
@@ -3383,7 +3354,11 @@ void MacroAssembler::EnterExitFrame(bool save_doubles, const Register& scratch,
   // Reserve space for the return address and for user requested memory.
   // We do this before aligning to make sure that we end up correctly
   // aligned with the minimum of wasted space.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Claim(slots_to_claim, kCRegSize);
+#else
   Claim(slots_to_claim, kXRegSize);
+#endif  // defined(__CHERI_PURE_CAPABILITY__)
   //         fp[8]: CallerPC (lr)
   //   fp -> fp[0]: CallerFP (old fp)
   //         fp[-8]: STUB marker
@@ -3396,7 +3371,11 @@ void MacroAssembler::EnterExitFrame(bool save_doubles, const Register& scratch,
   // the memory address immediately below the pointer stored in SPOffset.
   // It is not safe to derive much else from SPOffset, because the size of the
   // padding can vary.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Add(scratch, csp, kCRegSize);
+#else // defined(__CHERI_PURE_CAPABILITY__)
   Add(scratch, sp, kXRegSize);
+#endif  // defined(__CHERI_PURE_CAPABILITY__)
   Str(scratch, MemOperand(fp, ExitFrameConstants::kSPOffset));
 }
 
@@ -3651,11 +3630,7 @@ void TurboAssembler::DecompressTaggedPointer(const Register& destination,
 void TurboAssembler::DecompressTaggedPointer(const Register& destination,
                                              const Register& source) {
   ASM_CODE_COMMENT(this);
-#if defined(__CHERI_PURE_CAPABILITY__)
   Add(destination, kPtrComprCageBaseRegister, Operand(source, UXTW));
-#else
-  Add(destination, kPtrComprCageBaseRegister, Operand(source, UXTW));
-#endif // __CHERI_PURE_CAPABILITY__
 }
 
 void TurboAssembler::DecompressAnyTagged(const Register& destination,
@@ -3833,13 +3808,8 @@ void TurboAssembler::LoadExternalPointerField(Register destination,
   Ldr(destination.W(), field_operand);
   // MemOperand doesn't support LSR currently (only LSL), so here we do the
   // offset computation separately first.
-#if defined(__CHERI_PURE_CAPABILITY__)
   static_assert(kExternalPointerIndexShift > kSystemPointerSizeLog2);
   int shift_amount = kExternalPointerIndexShift - kSystemPointerSizeLog2;
-#else
-  static_assert(kExternalPointerIndexShift > kSystemPointerAddrSizeLog2);
-  int shift_amount = kExternalPointerIndexShift - kSystemPointerAddrSizeLog2;
-#endif  // __CHERI_PURE_CAPABILITY__
 #if defined(__CHERI_PURE_CAPABILITY__)
   Mov(destination.X(), Operand(destination.X(), LSR, shift_amount));
   Ldr(destination, MemOperand(external_table, destination.X()));
@@ -4264,7 +4234,11 @@ void TurboAssembler::PrintfNoPreserve(const char* format,
   // literal pool, but since Printf is usually used for debugging, it is
   // beneficial for it to be minimally dependent on other features.
   Label format_address;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Adr(c0, &format_address);
+#else
   Adr(x0, &format_address);
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Emit the format string directly in the instruction stream.
   {
@@ -4355,8 +4329,13 @@ void TurboAssembler::Printf(const char* format, CPURegister arg0,
     if (arg0_sp || arg1_sp || arg2_sp || arg3_sp) {
       // Allocate a register to hold the original stack pointer value, to pass
       // to PrintfNoPreserve as an argument.
+#if defined(__CHERI_PURE_CAPABILITY__)
+      Register arg_sp = temps.AcquireC();
+      Add(arg_sp, csp,
+#else
       Register arg_sp = temps.AcquireX();
       Add(arg_sp, sp,
+#endif // __CHERI_PURE_CAPABILITY__
           saved_registers.TotalSizeInBytes() +
               kCallerSavedV.TotalSizeInBytes());
       if (arg0_sp) arg0 = Register::Create(arg_sp.code(), arg0.SizeInBits());
@@ -4420,12 +4399,7 @@ void TurboAssembler::ComputeCodeStartAddress(const Register& rd) {
 }
 
 void TurboAssembler::RestoreFPAndLR() {
-#if defined(__CHERI_PURE_CAPABILITY__)
-  // TODO(gcjenkinson): Fix the StandardFraemConstants values
-  static_assert(StandardFrameConstants::kCallerFPOffset + kSystemPointerAddrSize ==
-#else
-  static_assert(StandardFrameConstants::kCallerFPOffset + kSystemPointerAddrSize ==
-#endif
+  static_assert(StandardFrameConstants::kCallerFPOffset + kSystemPointerSize ==
                     StandardFrameConstants::kCallerPCOffset,
                 "Offsets must be consecutive for ldp!");
 #ifdef V8_ENABLE_CONTROL_FLOW_INTEGRITY
@@ -4451,8 +4425,8 @@ void TurboAssembler::StoreReturnAddressInWasmExitFrame(Label* return_location) {
 #if defined(__CHERI_PURE_CAPABILITY__)
   Add(x16, fp, WasmExitFrameConstants::kCallingPCOffset + kSystemPointerSize);
 #else
-  Add(x16, fp, WasmExitFrameConstants::kCallingPCOffset + kSystemPointerAddrSize);
-#endif
+  Add(x16, fp, WasmExitFrameConstants::kCallingPCOffset + kSystemPointerSize);
+#endif // __CHERI_PURE_CAPABILITY__
   Pacib1716();
 #endif
   Str(x17, MemOperand(fp, WasmExitFrameConstants::kCallingPCOffset));

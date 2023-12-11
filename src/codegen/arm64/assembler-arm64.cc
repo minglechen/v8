@@ -4918,6 +4918,7 @@ void PatchingAssembler::PatchAdrFar(int64_t target_offset) {
   int scratch_code = expected_movz->Rd();
 
   // Patch to load the correct address.
+  // TODO(gcjenkinson): rd should be a C register
   Register rd = Register::XRegFromCode(rd_code);
   Register scratch = Register::XRegFromCode(scratch_code);
   // Addresses are only 48 bits.

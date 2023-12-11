@@ -272,14 +272,12 @@ constexpr int kSystemPointerHexDigits = kSystemPointerSize == 4 ? 8 : 12;
 #ifdef __CHERI_PURE_CAPABILITY__
 constexpr int kPtrAddrSize = sizeof(ptraddr_t);
 constexpr int kSystemPointerAddrSize = sizeof(ptraddr_t);
-constexpr int kPCOnStackSize = kSystemPointerAddrSize;
-constexpr int kFPOnStackSize = kSystemPointerAddrSize;
 #else
 constexpr int kPtrAddrSize = kSystemPointerSize;
-constexpr int kSystemPOinterAddrSize = kSystemPointerSize;
+constexpr int kSystemPointerAddrSize = kSystemPointerSize;
+#endif
 constexpr int kPCOnStackSize = kSystemPointerSize;
 constexpr int kFPOnStackSize = kSystemPointerSize;
-#endif
 
 #if V8_TARGET_ARCH_X64 || V8_TARGET_ARCH_IA32
 constexpr int kElidedFrameSlots = kPCOnStackSize / kSystemPointerSize;

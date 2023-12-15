@@ -25,8 +25,9 @@ enum class MachineRepresentation : uint8_t {
   kWord32,
   kWord64,
 #if defined(__CHERI_PURE_CAPABILITY__)
+  // Double the width of the native architecture.
   kCapability,
-#endif
+#endif // defined(__CHERI_PURE_CAPABILITY__)
   // (uncompressed) MapWord
   // kMapWord is the representation of a map word, i.e. a map in the header
   // of a HeapObject.
@@ -90,6 +91,9 @@ enum class MachineSemantic : uint8_t {
   kInt64,
   kUint64,
   kNumber,
+#if defined(__CHERI_PURE_CAPABILITY__)
+  kCapability,
+#endif // __CHERI_PURE_CAPABILITY__
   kAny
 };
 
@@ -160,18 +164,32 @@ class MachineType {
                               : MachineRepresentation::kWord64;
   }
   constexpr static MachineRepresentation PointerRepresentation() {
-#if defined(__CHERI_PURE_CAPACITY__)
+#if defined(__CHERI_PURE_CAPABILITY__)
+    DCHECK(kSystemPointerSize == 2 * kSystemPointerAddrSize);
     return MachineRepresentation::kCapability;
-#else
+#else // defined(__CHERI_PURE_CAPABILITY__)
     return (kSystemPointerSize == 4) ? MachineRepresentation::kWord32
                                      : MachineRepresentation::kWord64;
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
   }
   constexpr static MachineType UintPtr() {
+#if defined(__CHERI_PURE_CAPABILITY__) && 0
+    DCHECK(kSystemPointerSize == 2 * kSystemPointerAddrSize);
+    return MachineType(MachineRepresentation::kCapability,
+		       (kSystemPointerAddrSize == 4) ?
+		       MachineSemantic::kInt32 : MachineSemantic::kInt64);
+#else // defined(__CHERI_PURE_CAPABILITY__)
     return (kSystemPointerSize == 4) ? Uint32() : Uint64();
+#endif // __CHERI_PURE_CAPABILITY__
   }
   constexpr static MachineType IntPtr() {
+#if defined(__CHERI_PURE_CAPABILITY__) && 0
+    return MachineType(MachineRepresentation::kCapability,
+		       (kSystemPointerAddrSize == 4) ?
+		       MachineSemantic::kUint32 : MachineSemantic::kUint64);
+#else // defined(__CHERI_PURE_CAPABILITY__)
     return (kSystemPointerSize == 4) ? Int32() : Int64();
+#endif // __CHERI_PURE_CAPABILITY__
   }
   constexpr static MachineType Int8() {
     return MachineType(MachineRepresentation::kWord8, MachineSemantic::kInt32);
@@ -215,7 +233,11 @@ class MachineType {
     return MachineType(MachineRepresentation::kSimd256, MachineSemantic::kNone);
   }
   constexpr static MachineType Pointer() {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    return MachineType(PointerRepresentation(), MachineSemantic::kCapability);
+#else
     return MachineType(PointerRepresentation(), MachineSemantic::kNone);
+#endif // __CHERI_PURE_CAPABILITY__
   }
   constexpr static MachineType TaggedPointer() {
     return MachineType(MachineRepresentation::kTaggedPointer,
@@ -285,6 +307,10 @@ class MachineType {
         return MachineType::CompressedPointer();
       case MachineRepresentation::kSandboxedPointer:
         return MachineType::SandboxedPointer();
+#if defined(__CHERI_PURE_CAPABILITY__)
+      case MachineRepresentation::kCapability:
+        return MachineType::Pointer();
+#endif defined(__CHERI_PURE_CAPABILITY__)
       default:
         UNREACHABLE();
     }
@@ -417,6 +443,10 @@ V8_EXPORT_PRIVATE inline constexpr int ElementSizeLog2Of(
     case MachineRepresentation::kCompressedPointer:
     case MachineRepresentation::kCompressed:
       return kTaggedSizeLog2;
+#if defined(__CHERI_PURE_CAPABILITY__)
+    case MachineRepresentation::kCapability:
+      [[fallthrough]];
+#endif // __CHERI_PURE_CAPABILITY__
     case MachineRepresentation::kSandboxedPointer:
       return kSystemPointerSizeLog2;
     default:

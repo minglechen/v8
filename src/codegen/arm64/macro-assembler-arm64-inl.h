@@ -308,8 +308,15 @@ void TurboAssembler::Cmp(const Register& rn, const Operand& operand) {
   DCHECK(allow_macro_instructions());
 #if defined(__CHERI_PURE_CAPABILITY__)
   if (rn.IsC()) {
-    DCHECK(operand.reg().IsC());
-    Cmpc(rn, operand);
+    if (operand.IsImmediate()) {
+      UseScratchRegisterScope temps(this);
+      Register temp = temps.AcquireX();
+      Gcvalue(rn, temp);
+      Cmp(temp, operand);
+    } else {
+      DCHECK(operand.reg().IsC());
+      Cmpc(rn, operand);
+    }
     return;
   }
 #endif // __CHERI_PURE_CAPABILITY__
@@ -324,18 +331,11 @@ void TurboAssembler::Cmpc(const Register& cn, const Operand& operand) {
 }
 #endif // __CHERI_PURE_CAPABILITY__
 
-
 void TurboAssembler::CmpTagged(const Register& rn, const Operand& operand) {
   if (COMPRESS_POINTERS_BOOL) {
     Cmp(rn.W(), operand.ToW());
   } else {
-#if defined(__CHERI_PURE_CAPABILITY__)
-    if (rn.IsC()) {
-      Cmpc(rn, operand);
-    }
-#else
     Cmp(rn, operand);
-#endif // __CHERI_PURE_CAPABILITY__
   }
 }
 

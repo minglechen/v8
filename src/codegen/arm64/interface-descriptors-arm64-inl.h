@@ -55,6 +55,8 @@ void StaticCallInterfaceDescriptor<DerivedDescriptor>::
 // static
 constexpr auto WriteBarrierDescriptor::registers() {
 #if defined(__CHERI_PURE_CAPABILITY__)
+  // TODO(gcjenkinson): Why doesn't this match the parameters defined
+  // in the WriteBarrierDescriptor class?
   return RegisterArray(c1, c5, c4, c2, c0, c3, kContextRegister);
 #else
   // TODO(leszeks): Remove x7 which is just there for padding.
@@ -62,23 +64,44 @@ constexpr auto WriteBarrierDescriptor::registers() {
 #endif // __CHERI_PURE_CAPABILITY__
 }
 
-// static
 #if defined(__CHERI_PURE_CAPABILITY__)
-constexpr Register LoadDescriptor::ReceiverRegister() { return c1; }
+// static
+constexpr Register LoadDescriptor::ReceiverRegister() {
+  return c1;  // kReceiver (MachineType::AnyTagged)
+}
 #else
+// static
 constexpr Register LoadDescriptor::ReceiverRegister() { return x1; }
 #endif // __CHERI_PURE_CAPABILITY__
+#if defined(__CHERI_PURE_CAPABILITY__)
+// static
+constexpr Register LoadDescriptor::NameRegister() {
+  return c2; // kName (MachineType::AnyTagged)
+}
+#else
 // static
 constexpr Register LoadDescriptor::NameRegister() { return x2; }
+#endif // __CHERI_PURE_CAPABILITY__
 // static
 constexpr Register LoadDescriptor::SlotRegister() { return x0; }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+// static
+constexpr Register LoadWithVectorDescriptor::VectorRegister() {
+  return c3; // kVector (MachineType::AnyTagged)
+}
+#else
 // static
 constexpr Register LoadWithVectorDescriptor::VectorRegister() { return x3; }
+#endif // __CHERI_PURE_CAPABILITY__
 
 // static
 constexpr Register KeyedLoadBaselineDescriptor::ReceiverRegister() {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return c1; // kReceiver (MachineType::AnyTagged)
+#else
   return x1;
+#endif // __CHERI_PURE_CAPABILITY__
 }
 // static
 constexpr Register KeyedLoadBaselineDescriptor::NameRegister() {
@@ -89,38 +112,61 @@ constexpr Register KeyedLoadBaselineDescriptor::SlotRegister() { return x2; }
 
 // static
 constexpr Register KeyedLoadWithVectorDescriptor::VectorRegister() {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return c3; // kVector (MachineType::AnyTagged)
+#else
   return x3;
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 // static
 constexpr Register KeyedHasICBaselineDescriptor::ReceiverRegister() {
   return kInterpreterAccumulatorRegister;
 }
+#if defined(__CHERI_PURE_CAPABILITY__)
+// static
+constexpr Register KeyedHasICBaselineDescriptor::NameRegister() {
+  return c1; // kName (MachineType::AnyTagged)
+}
+#else
 // static
 constexpr Register KeyedHasICBaselineDescriptor::NameRegister() { return x1; }
+#endif // __CHERI_PURE_CAPABILITY__
 // static
 constexpr Register KeyedHasICBaselineDescriptor::SlotRegister() { return x2; }
 
 // static
 constexpr Register KeyedHasICWithVectorDescriptor::VectorRegister() {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return c3; // kVector (MachineType::AnyTagged)
+#else
   return x3;
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 // static
 constexpr Register
 LoadWithReceiverAndVectorDescriptor::LookupStartObjectRegister() {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return c4; // kLookupStartObject (MachineType::AnyTagged)
+#else // __CHERI_PURE_CAPABILITY__
   return x4;
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 #if defined(__CHERI_PURE_CAPABILITY__)
 // static
-constexpr Register StoreDescriptor::ReceiverRegister() { return c1; }
+constexpr Register StoreDescriptor::ReceiverRegister() {
+  return c1; // kReceiver (MachineType::AnyTagged)
+}
 // static
-constexpr Register StoreDescriptor::NameRegister() { return c2; }
+constexpr Register StoreDescriptor::NameRegister() {
+  return c2; // kName (MachineType::AnyTagged)
+}
 // static
-constexpr Register StoreDescriptor::ValueRegister() { return c0; }
-// static
-constexpr Register StoreDescriptor::SlotRegister() { return c4; }
+constexpr Register StoreDescriptor::ValueRegister() {
+  return c0; // kValue (MachineType::AnyTagged)
+}
 #else
 // static
 constexpr Register StoreDescriptor::ReceiverRegister() { return x1; }
@@ -128,35 +174,59 @@ constexpr Register StoreDescriptor::ReceiverRegister() { return x1; }
 constexpr Register StoreDescriptor::NameRegister() { return x2; }
 // static
 constexpr Register StoreDescriptor::ValueRegister() { return x0; }
+#endif // __CHERI_PURE_CAPABILITY__
 // static
 constexpr Register StoreDescriptor::SlotRegister() { return x4; }
-#endif // __CHERI_PURE_CAPABILITY__
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+// static
+constexpr Register StoreWithVectorDescriptor::VectorRegister() {
+  return c3; // kVector (machineType::AnyTagged)
+}
+#else
 // static
 constexpr Register StoreWithVectorDescriptor::VectorRegister() { return x3; }
+#endif // __CHERI_PURE_CAPABILITY__
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+// static
+constexpr Register StoreTransitionDescriptor::MapRegister() {
+  return c5; // kMap (machineType::AnyTagged)
+}
+#else
 // static
 constexpr Register StoreTransitionDescriptor::MapRegister() { return x5; }
+#endif // __CHERI_PURE_CAPABILITY__
 
 // static
 #if defined(__CHERI_PURE_CAPABILITY__)
-constexpr Register ApiGetterDescriptor::HolderRegister() { return c0; }
-#else
-constexpr Register ApiGetterDescriptor::HolderRegister() { return x0; }
-#endif // __CHERI_PURE_CAPABILITY__
 // static
-#if defined(__CHERI_PURE_CAPABILITY__)
-constexpr Register ApiGetterDescriptor::CallbackRegister() { return c3; }
+constexpr Register ApiGetterDescriptor::HolderRegister() {
+  return c0; // kHolder(MachineType::AnyTagged)
+}
+// static
+constexpr Register ApiGetterDescriptor::CallbackRegister() {
+  return c3; // kCallback (MachineType::AnyTagged)
+}
 #else
+// static
+constexpr Register ApiGetterDescriptor::HolderRegister() { return x0; }
+// static
 constexpr Register ApiGetterDescriptor::CallbackRegister() { return x3; }
 #endif // __CHERI_PURE_CAPABILITY__
 
 // static
 #if defined(__CHERI_PURE_CAPABILITY__)
-constexpr Register GrowArrayElementsDescriptor::ObjectRegister() { return c0; }
 // static
-constexpr Register GrowArrayElementsDescriptor::KeyRegister() { return c3; }
+constexpr Register GrowArrayElementsDescriptor::ObjectRegister() {
+  return c0; // kObject (MachineType::AnyTagged)
+}
+// static
+constexpr Register GrowArrayElementsDescriptor::KeyRegister() {
+  return c3; // kKey (MachineType::AnyTagged)
+}
 #else
+// static
 constexpr Register GrowArrayElementsDescriptor::ObjectRegister() { return x0; }
 // static
 constexpr Register GrowArrayElementsDescriptor::KeyRegister() { return x3; }
@@ -169,24 +239,47 @@ constexpr Register BaselineLeaveFrameDescriptor::ParamsSizeRegister() {
 // static
 constexpr Register BaselineLeaveFrameDescriptor::WeightRegister() { return x4; }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
 // static
+constexpr Register TypeConversionDescriptor::ArgumentRegister() {
+  return c0; // kArgument (MachineType::AnyTagged)
+}
+#else
 // static
 constexpr Register TypeConversionDescriptor::ArgumentRegister() { return x0; }
+#endif // __CHERI_PURE_CAPABILITY__
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+// static
+constexpr auto TypeofDescriptor::registers() { 
+  return RegisterArray(c0); // kObject (MachineType::AnyTagged)
+}
+#else
 // static
 constexpr auto TypeofDescriptor::registers() { return RegisterArray(x0); }
+#endif // __CHERI_PURE_CAPABILITY__
 
 // static
 constexpr auto CallTrampolineDescriptor::registers() {
   // x1: target
   // x0: number of arguments
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return RegisterArray(c1,  // kFunction (MachineType::AnyTagged)
+                       x0); // kActualArgumentsCount (MachineType::Int32)
+#else
   return RegisterArray(x1, x0);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 constexpr auto CopyDataPropertiesWithExcludedPropertiesDescriptor::registers() {
   // r1 : the source
   // r0 : the excluded property count
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return RegisterArray(c1,  // kSource (MachineType::AnyTagged)
+                       c0); // kExcludedPropertyCount (MachineType::AnyTagged)
+#else
   return RegisterArray(x1, x0);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 constexpr auto
@@ -194,7 +287,13 @@ CopyDataPropertiesWithExcludedPropertiesOnStackDescriptor::registers() {
   // r1 : the source
   // r0 : the excluded property count
   // x2 : the excluded property base
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return RegisterArray(c1,  // kSource (MachineType::AnyTagged)
+                       x0,  // kExcludedPropertCount (MachineType::IntPtr)
+                       x2); // kExcludePropertyBase (MachineType::IntPtr)
+#else
   return RegisterArray(x1, x0, x2);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 // static
@@ -203,7 +302,14 @@ constexpr auto CallVarargsDescriptor::registers() {
   // x1 : the target to call
   // x4 : arguments list length (untagged)
   // x2 : arguments list (FixedArray)
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return RegisterArray(c1,  // kTarget (MachineType::AnyTaged)
+                       x0,  // kActualArgumentsCount (MachineType::Int32)
+		       x4,  // kArgumentsLength (MachineType::Int32)
+		       c2); // kArgumentsList (MachineType::AnyTagged)
+#else
   return RegisterArray(x1, x0, x4, x2);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 // static
@@ -211,14 +317,25 @@ constexpr auto CallForwardVarargsDescriptor::registers() {
   // x1: target
   // x0: number of arguments
   // x2: start index (to supported rest parameters)
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return RegisterArray(c1,  // kTarget (MachineType::AnyTagged)
+                       x0,  // kActualArgumentCount (MachineType::Int32)
+		       x2); // kStartIndex (MachineType::Int32)
+#else
   return RegisterArray(x1, x0, x2);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 // static
 constexpr auto CallFunctionTemplateDescriptor::registers() {
   // x1 : function template info
   // x2 : number of arguments (on the stack)
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return RegisterArray(c1,  // kFunctionTemplateInfo (MachineType::AnyTagged)
+                       x2); // kArgumentsCount (MachineType::IntPtr)
+#else
   return RegisterArray(x1, x2);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 // static
@@ -226,14 +343,25 @@ constexpr auto CallWithSpreadDescriptor::registers() {
   // x0 : number of arguments (on the stack)
   // x1 : the target to call
   // x2 : the object to spread
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return RegisterArray(c1,  // kTarget (MachineTYpe::AnyTagged)
+                       x0,  // kArgumentsCount (MachineType::Int32)
+		       c2); // kSpread (MachineType::AnyTagged)
+#else
   return RegisterArray(x1, x0, x2);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 // static
 constexpr auto CallWithArrayLikeDescriptor::registers() {
   // x1 : the target to call
   // x2 : the arguments list
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return RegisterArray(c1,  // kTarget (MachineType::AnyTagged)
+                       c2); // kArgumentsList (MachineType::AnyTagged)
+#else
   return RegisterArray(x1, x2);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 // static
@@ -243,7 +371,15 @@ constexpr auto ConstructVarargsDescriptor::registers() {
   // x3 : the new target
   // x4 : arguments list length (untagged)
   // x2 : arguments list (FixedArray)
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return RegisterArray(c1,   // kTarget (MachineType::AnyTagged)
+		       c3,   // kNewTarget (MachineType::AnyTagged)
+		       x0,   // kActualArgumentsCount (MachineType::Int32)
+		       x4,   // kArgumentsLength (MachineType::Int32)
+		       c2);  // kArgumentsList (MachineType::AnyTagged)
+#else
   return RegisterArray(x1, x3, x0, x4, x2);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 // static
@@ -252,7 +388,14 @@ constexpr auto ConstructForwardVarargsDescriptor::registers() {
   // x1: target
   // x0: number of arguments
   // x2: start index (to supported rest parameters)
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return RegisterArray(c1,   // kTarget (MachineType::AnyTagged)
+		       c3,   // kNewTarget (MachineType::AnyTagged)
+		       x0,   // kActualArgumentsCount (MachineType::Int32)
+		       x2);  // kStartIndex (machineType::Int32)
+#else
   return RegisterArray(x1, x3, x0, x2);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 // static
@@ -261,7 +404,14 @@ constexpr auto ConstructWithSpreadDescriptor::registers() {
   // x1 : the target to call
   // x3 : the new target
   // x2 : the object to spread
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return RegisterArray(c1,   // kTarget (MachineType::AnyTagged)
+		       c3,   // kNewTarget (MachineType::AnyTagged)
+		       x0,   // kActualArgumentsCount (MachineType::Int32)
+		       c2);  // kSpread (MachineType::AnyTagged)
+#else
   return RegisterArray(x1, x3, x0, x2);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 // static
@@ -269,7 +419,13 @@ constexpr auto ConstructWithArrayLikeDescriptor::registers() {
   // x1 : the target to call
   // x3 : the new target
   // x2 : the arguments list
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return RegisterArray(c1,  // kTarget (MachineType::AnyTagged)
+		       c3,  // kNewTarget (MachineType::AnyTagged)
+		       x2); // kActualArgumentsCount (MachineType::Int32)
+#else
   return RegisterArray(x1, x3, x2);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 // static
@@ -282,7 +438,9 @@ constexpr auto ConstructStubDescriptor::registers() {
 
 // static
 #if defined(__CHERI_PURE_CAPABILITY__)
-constexpr auto AbortDescriptor::registers() { return RegisterArray(c1); }
+constexpr auto AbortDescriptor::registers() {
+  return RegisterArray(c1); // kMessageOrMessageId (MachineType::AnyTagged)
+}
 #else
 constexpr auto AbortDescriptor::registers() { return RegisterArray(x1); }
 #endif // __CHERI_PURE_CAPABILITY__
@@ -292,6 +450,8 @@ constexpr auto CompareDescriptor::registers() {
   // x1: left operand
   // x0: right operand
 #if defined(__CHERI_PURE_CAPABILITY__)
+  // TODO(gcjenkinson):CompareDescriptor doesn't defined types
+  // for kLeft and kRight, check assumption that these should be capabilities.
   return RegisterArray(c1, c0);
 #else
   return RegisterArray(x1, x0);
@@ -304,7 +464,9 @@ constexpr auto Compare_BaselineDescriptor::registers() {
   // x0: right operand
   // x2: feedback slot
 #if defined(__CHERI_PURE_CAPABILITY__)
-  return RegisterArray(c1, c0, c2);
+  return RegisterArray(c1,  // kLeft (MachineType::AnyTagged)
+		       c0,  // kRight (MachineType::AnyTagged)
+		       c2); // kSlot (MachineType::UintPtr)
 #else
   return RegisterArray(x1, x0, x2);
 #endif // __CHERI_PURE_CAPABILITY__
@@ -315,6 +477,8 @@ constexpr auto BinaryOpDescriptor::registers() {
   // x1: left operand
   // x0: right operand
 #if defined(__CHERI_PURE_CAPABILITY__)
+  // TODO(gcjenkinson): BinaryOpDescriptor doesn't defined types
+  // for kLeft and kRight, check assumption that these should be capabilities.
   return RegisterArray(c1, c0);
 #else
   return RegisterArray(x1, x0);
@@ -327,7 +491,9 @@ constexpr auto BinaryOp_BaselineDescriptor::registers() {
   // x0: right operand
   // x2: feedback slot
 #if defined(__CHERI_PURE_CAPABILITY__)
-  return RegisterArray(c1, c0, c2);
+  return RegisterArray(c1,  // kLeft (MachineType::AnyTagged)
+		       c0,  // kRight (MachineType::AnyTagged)
+		       x2); // kSlot (MachineType::UintPtr)
 #else
   return RegisterArray(x1, x0, x2);
 #endif // __CHERI_PURE_CAPABILITY__
@@ -339,7 +505,9 @@ constexpr auto BinarySmiOp_BaselineDescriptor::registers() {
   // x1: right operand
   // x2: feedback slot
 #if defined(__CHERI_PURE_CAPABILITY__)
-  return RegisterArray(c0, c1, c2);
+  return RegisterArray(c0,  // kLeft (MachineDescription::AnyTagged)
+		       x1,  // kRight (MachineDescription::TaggedSigned)
+		       x2); // kSlot (MachineType::UintPtr)
 #else
   return RegisterArray(x0, x1, x2);
 #endif // __CHERI_PURE_CAPABILITY__
@@ -348,10 +516,10 @@ constexpr auto BinarySmiOp_BaselineDescriptor::registers() {
 // static
 constexpr auto ApiCallbackDescriptor::registers() {
 #if defined(__CHERI_PURE_CAPABILITY__)
-  return RegisterArray(c1,   // kApiFunctionAddress
-                       c2,   // kArgc
-                       c3,   // kCallData
-                       c0);  // kHolder
+  return RegisterArray(c1,   // kApiFunctionAddress (MachineType::Pointer)
+                       x2,   // kArgc (MachineType::IntPtr)
+                       c3,   // kCallData (MachineType::AnyTagged)
+                       c0);  // kHolder (MachineType::AnyTagged)
 #else
   return RegisterArray(x1,   // kApiFunctionAddress
                        x2,   // kArgc
@@ -362,11 +530,7 @@ constexpr auto ApiCallbackDescriptor::registers() {
 
 // static
 constexpr auto InterpreterDispatchDescriptor::registers() {
-#if defined(__CHERI_PURE_CAPABILITY__)
   return RegisterArray(
-#else
-  return RegisterArray(
-#endif // __CHERI_PURE_CAPABILITY__
       kInterpreterAccumulatorRegister, kInterpreterBytecodeOffsetRegister,
       kInterpreterBytecodeArrayRegister, kInterpreterDispatchTableRegister);
 }
@@ -407,7 +571,9 @@ constexpr auto InterpreterPushArgsThenConstructDescriptor::registers() {
 constexpr auto ResumeGeneratorDescriptor::registers() {
 #if defined(__CHERI_PURE_CAPABILITY__)
   return RegisterArray(c0,   // the value to pass to the generator
+			     // (Machineype::AnyTagged)
                        c1);  // the JSGeneratorObject to resume
+			     // (MachineType::AnyTagged)
 #else
   return RegisterArray(x0,   // the value to pass to the generator
                        x1);  // the JSGeneratorObject to resume
@@ -417,7 +583,8 @@ constexpr auto ResumeGeneratorDescriptor::registers() {
 // static
 constexpr auto RunMicrotasksEntryDescriptor::registers() {
 #if defined(__CHERI_PURE_CAPABILITY__)
-  return RegisterArray(c0, c1);
+  return RegisterArray(c0,   // kRootRegisterValue (MachineType::Pointer)
+                       c1);  // kMicrotaskQueue (MachineType::Pointer)
 #else
   return RegisterArray(x0, x1);
 #endif // __CHERI_PURE_CAPABILITY__

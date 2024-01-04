@@ -93,7 +93,7 @@ enum class MachineSemantic : uint8_t {
   kNumber,
 #if defined(__CHERI_PURE_CAPABILITY__)
   kCapability,
-#endif // __CHERI_PURE_CAPABILITY__
+#endif // defined(__CHERI_PURE_CAPABILITY__)
   kAny
 };
 
@@ -173,23 +173,10 @@ class MachineType {
 #endif // __CHERI_PURE_CAPABILITY__
   }
   constexpr static MachineType UintPtr() {
-#if defined(__CHERI_PURE_CAPABILITY__) && 0
-    DCHECK(kSystemPointerSize == 2 * kSystemPointerAddrSize);
-    return MachineType(MachineRepresentation::kCapability,
-		       (kSystemPointerAddrSize == 4) ?
-		       MachineSemantic::kInt32 : MachineSemantic::kInt64);
-#else // defined(__CHERI_PURE_CAPABILITY__)
     return (kSystemPointerSize == 4) ? Uint32() : Uint64();
-#endif // __CHERI_PURE_CAPABILITY__
   }
   constexpr static MachineType IntPtr() {
-#if defined(__CHERI_PURE_CAPABILITY__) && 0
-    return MachineType(MachineRepresentation::kCapability,
-		       (kSystemPointerAddrSize == 4) ?
-		       MachineSemantic::kUint32 : MachineSemantic::kUint64);
-#else // defined(__CHERI_PURE_CAPABILITY__)
     return (kSystemPointerSize == 4) ? Int32() : Int64();
-#endif // __CHERI_PURE_CAPABILITY__
   }
   constexpr static MachineType Int8() {
     return MachineType(MachineRepresentation::kWord8, MachineSemantic::kInt32);
@@ -235,9 +222,9 @@ class MachineType {
   constexpr static MachineType Pointer() {
 #if defined(__CHERI_PURE_CAPABILITY__)
     return MachineType(PointerRepresentation(), MachineSemantic::kCapability);
-#else
+#else // defined(__CHERI_PURE_CAPABILITY__)
     return MachineType(PointerRepresentation(), MachineSemantic::kNone);
-#endif // __CHERI_PURE_CAPABILITY__
+#endif // defined(__CHERI_PURE_CAPABILITY__)
   }
   constexpr static MachineType TaggedPointer() {
     return MachineType(MachineRepresentation::kTaggedPointer,
@@ -310,7 +297,7 @@ class MachineType {
 #if defined(__CHERI_PURE_CAPABILITY__)
       case MachineRepresentation::kCapability:
         return MachineType::Pointer();
-#endif defined(__CHERI_PURE_CAPABILITY__)
+#endif // defined(__CHERI_PURE_CAPABILITY__)
       default:
         UNREACHABLE();
     }

@@ -93,12 +93,18 @@ class V8_EXPORT_PRIVATE INSTRUCTION_OPERAND_ALIGN InstructionOperand {
   inline bool IsFloatRegister() const;
   inline bool IsDoubleRegister() const;
   inline bool IsSimd128Register() const;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  inline bool IsCapabilityRegister() const;
+#endif // defined(__CHERI_PURE_CAPABILITY__)
   inline bool IsAnyStackSlot() const;
   inline bool IsStackSlot() const;
   inline bool IsFPStackSlot() const;
   inline bool IsFloatStackSlot() const;
   inline bool IsDoubleStackSlot() const;
   inline bool IsSimd128StackSlot() const;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  inline bool IsCapabilityStackSlot() const;
+#endif // defined(__CHERI_PURE_CAPABILITY__)
 
   template <typename SubKindOperand>
   static SubKindOperand* New(Zone* zone, const SubKindOperand& op) {
@@ -560,6 +566,10 @@ class LocationOperand : public InstructionOperand {
       case MachineRepresentation::kCompressedPointer:
       case MachineRepresentation::kCompressed:
       case MachineRepresentation::kSandboxedPointer:
+#if defined(__CHERI_PURE_CAPABILITY__)
+        [[fallthrough]];
+      case MachineRepresentation::kCapability:
+#endif // defined(__CHERI_PURE_CAPABILITY__)
         return true;
       case MachineRepresentation::kBit:
       case MachineRepresentation::kWord8:
@@ -656,6 +666,13 @@ bool InstructionOperand::IsSimd128Register() const {
                                 MachineRepresentation::kSimd128;
 }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+bool InstructionOperand::IsCapabilityRegister() const {
+  return IsAnyRegister() &&
+	 IsCapability(LocationOperand::cast(this)->representation());
+}
+#endif // defined(__CHERI_PURE_CAPABILITY__)
+
 bool InstructionOperand::IsAnyStackSlot() const {
   return IsAnyLocationOperand() &&
          LocationOperand::cast(this)->location_kind() ==
@@ -695,6 +712,15 @@ bool InstructionOperand::IsSimd128StackSlot() const {
          LocationOperand::cast(this)->representation() ==
              MachineRepresentation::kSimd128;
 }
+
+#if defined(__CHERI_PURE_CAPABILITY__)
+bool InstructionOperand::IsCapabilityStackSlot() const {
+  return IsAnyLocationOperand() &&
+         LocationOperand::cast(this)->location_kind() ==
+             LocationOperand::STACK_SLOT &&
+	 IsCapability(LocationOperand::cast(this)->representation());
+}
+#endif // defined(__CHERI_PURE_CAPABILITY__)
 
 uint64_t InstructionOperand::GetCanonicalizedValue() const {
   if (IsAnyLocationOperand()) {
@@ -1119,9 +1145,9 @@ class V8_EXPORT_PRIVATE Constant final {
 
   explicit Constant(int32_t v);
   explicit Constant(int64_t v) : type_(kInt64), value_(v) {}
-#ifdef __CHERI_PURE_CAPABILITY__
+#if defined(__CHERI_PURE_CAPABILITY__)
   explicit Constant(intptr_t v) : type_(kIntPtr), value_(v) {}
-#endif
+#endif // defined(__CHERI_PURE_CAPABILITY__)
   explicit Constant(float v)
       : type_(kFloat32), value_(base::bit_cast<int32_t>(v)) {}
   explicit Constant(double v)
@@ -1196,11 +1222,11 @@ class V8_EXPORT_PRIVATE Constant final {
  private:
   Type type_;
   RelocInfo::Mode rmode_ = RelocInfo::NO_INFO;
-#ifdef __CHERI_PURE_CAPABILITY__
+#if defined(__CHERI_PURE_CAPABILITY__)
   intptr_t value_;
-#else
+#else // defined(__CHERI_PURE_CAPABILITY__)
   int64_t value_;
-#endif
+#endif // defined(__CHERI_PURE_CPABILITY__)
 };
 
 std::ostream& operator<<(std::ostream&, const Constant&);

@@ -55,9 +55,7 @@ void StaticCallInterfaceDescriptor<DerivedDescriptor>::
 // static
 constexpr auto WriteBarrierDescriptor::registers() {
 #if defined(__CHERI_PURE_CAPABILITY__)
-  // TODO(gcjenkinson): Why doesn't this match the parameters defined
-  // in the WriteBarrierDescriptor class?
-  return RegisterArray(c1, c5, c4, c2, c0, c3, kContextRegister);
+  return RegisterArray(c1, c5, c4, c2, c0, c3, kContextRegister, c7);
 #else
   // TODO(leszeks): Remove x7 which is just there for padding.
   return RegisterArray(x1, x5, x4, x2, x0, x3, kContextRegister, x7);

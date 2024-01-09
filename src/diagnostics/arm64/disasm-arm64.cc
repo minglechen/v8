@@ -553,7 +553,11 @@ void DisassemblingDecoder::VisitExtract(Instruction* instr) {
 void DisassemblingDecoder::VisitPCRelAddressing(Instruction* instr) {
   switch (instr->Mask(PCRelAddressingMask)) {
     case ADR:
+#if defined(__CHERI_PURE_CAPABILITY__)
+      Format(instr, "adr", "'Yd, 'AddrPCRelByte");
+#else
       Format(instr, "adr", "'Xd, 'AddrPCRelByte");
+#endif // __CHERI_PURE_CAPABILITY__
       break;
     // ADRP is not implemented.
     default:
@@ -3684,25 +3688,87 @@ void DisassemblingDecoder::VisitUnallocated(Instruction* instr) {
 }
 
 #if defined(__CHERI_PURE_CAPABILITY__)
-void DisassemblingDecoder::VisitAddSubCapabilityImmediate(Instruction* instr) {
-  const char* form = "'Yds, 'Yns, 'IAddSubC";
-  DCHECK(instr->Mask(AddSubCapabilityImmediateFMask) == AddSubCapabilityImmediateFixed);
-  switch(instr->Mask(AddSubCapabilityImmediateMask)) {
-  case ADDCAP_c_imm:
+void DisassemblingDecoder::VisitAddSubCapExtended(Instruction* instr) {
+  const char* form = "'Yds, 'Yns, 'Xm'Ext";
+  switch(instr->Mask(AddSubCapExtendedMask)) {
+  case ADD_c_ext:
     Format(instr, "add", form);
     break;
-  case SUBCAP_c_imm:
-    Format(instr, "sub", form);
-    break;
   default:
-    Format(instr, "unknown instruction", "(Add/sub capability)");
-    break;
+    UNREACHABLE();
   }
 }
 
-void DisassemblingDecoder::VisitLoadStoreCapUnsignedOffsetCapNormal(Instruction* instr) {
+void DisassemblingDecoder::VisitAddSubCapImmediate(Instruction* instr) {
+  const char* form = "'Yds, 'Yns, 'IAddSubC";
+  switch(instr->Mask(AddSubCapImmediateMask)) {
+  case ADD_c_imm:
+    Format(instr, "add", form);
+    break;
+  case SUB_c_imm:
+    Format(instr, "sub", form);
+    break;
+  default:
+    UNREACHABLE();
+  }
+}
+
+void DisassemblingDecoder::VisitCopyCapability(Instruction* instr) {
+  const char* form = "'Yds, 'Yns";
+  const char *mnemonic = "mov";
+  // MOV <Cd|CSP>, <Cn|CSP> is equivalent to CPY <Cd|CSP>, <Cn|CSP>
+  // and is always preferred disassembly.
+  switch(instr->Mask(CopyCapabilityMask)) {
+    case CPY:
+      Format(instr, mnemonic, form);
+      break;
+    default:
+      UNREACHABLE();
+  }
+}
+
+void DisassemblingDecoder::VisitConditionalSelectCap(Instruction* instr) {
+  const char *mnemonic = "csel";
+  const char* form = "'Yd, 'Yn, 'Ym, 'Cond";
+  switch (instr->Mask(ConditionalSelectCapMask)) {
+    case CSEL_c:
+      Format(instr, mnemonic, form);
+      break;
+    default:
+      UNREACHABLE();
+  }
+}
+
+void DisassemblingDecoder::VisitGetField1(Instruction* instr) {
+  const char* form = "'Xd, 'Yns";
+  const char *mnemonic = "gcvalue";
+  switch(instr->Mask(GetField1Mask)) {
+    case GCVALUE:
+      Format(instr, mnemonic, form);
+      break;
+    default:
+      UNREACHABLE();
+  }
+}
+
+void DisassemblingDecoder::VisitLoadStoreCapUnscaledOffsetNormal(
+    Instruction* instr) {
   const char* form = "'Yt, ['Yns'ILUC]";
-  DCHECK(instr->Mask(LoadStoreCapUnsignedOffsetCapNormalFMask) == LoadStoreCapUnsignedOffsetCapNormalFixed);
+  switch(instr->Mask(LoadStoreCapUnscaledOffsetNormalMask)) {
+    case LDRU_c_normal:
+      Format(instr, "ldur", form);
+      break;
+    case STRU_c_normal:
+      Format(instr, "stur", form);
+      break;
+    default:
+      UNREACHABLE();
+  }
+}
+
+void DisassemblingDecoder::VisitLoadStoreCapUnsignedOffsetCapNormal(
+    Instruction* instr) {
+  const char* form = "'Yt, ['Yns'ILUC]";
   switch(instr->Mask(LoadStoreCapUnsignedOffsetCapNormalMask)) {
     case LDR_c_unsigned_cap_normal:
       Format(instr, "ldr", form);
@@ -3711,49 +3777,74 @@ void DisassemblingDecoder::VisitLoadStoreCapUnsignedOffsetCapNormal(Instruction*
       Format(instr, "str", form);
       break;
     default:
-      Format(instr, "unknown instruction", "(Load/Store unsigned offset)");
-      break;
+      UNREACHABLE();
   }
 }
 
-void DisassemblingDecoder::VisitCopyCapability(Instruction* instr) {
-  DCHECK(instr->Mask(CopyCapabilityFMask) == CopyCapabilityFixed);
-  switch(instr->Mask(CopyCapabilityMask)) {
-    case CPY:
-      // MOV <Cd|CSP>, <Cn|CSP>
-      // is equivalent to CPY <Cd|CSP>, <Cn|CSP>
-      // and is always preferred disassembly.
-      Format(instr, "mov", "'Yds, 'Yns");
+void DisassemblingDecoder::VisitLoadStoreCapRegisterOffsetNormal(
+    Instruction* instr) {
+  const char* form = "'Yt, ['Yns 'Xm'Ext]";
+  switch(instr->Mask(LoadStoreCapRegisterOffsetNormalMask)) {
+    case LDR_c_reg_normal:
+      Format(instr, "ldr", form);
+      break;
+    case STR_c_reg_normal:
+      Format(instr, "str", form);
       break;
     default:
-      Format(instr, "unknown instruction", "(Move capability)");
-      break;
+      UNREACHABLE();
   }
 }
 
-void DisassemblingDecoder::VisitGetField1(Instruction* instr) {
-  DCHECK(instr->Mask(GetField1FMask) == GetField1Fixed);
-  const char* form = "'Xd, 'Yns";
-  switch(instr->Mask(GetField1Mask)) {
-    case GCVALUE:
-      Format(instr, "gcvalue", form);
+void DisassemblingDecoder::VisitLoadStorePostCapIndex(Instruction* instr) {
+  const char* form = "'Yt, ['Yns] 'ILUC]!";
+  switch(instr->Mask(LoadStorePostCapIndexMask)) {
+    case LDR_c_post:
+      Format(instr, "ldr", form);
+      break;
+    case STR_c_post:
+      Format(instr, "str", form);
       break;
     default:
-      Format(instr, "unknown instruction", "(Get capability value)");
+      UNREACHABLE();
+  }
+}
+
+void DisassemblingDecoder::VisitLoadStorePreCapIndex(Instruction* instr) {
+  const char* form = "'Yt, ['Yns 'ILUC]!";
+  switch(instr->Mask(LoadStorePreCapIndexMask)) {
+    case LDR_c_pre:
+      Format(instr, "ldr", form);
       break;
+    case STR_c_pre:
+      Format(instr, "str", form);
+      break;
+    default:
+      UNREACHABLE();
   }
 }
 
 void DisassemblingDecoder::VisitSetField1(Instruction* instr) {
-  DCHECK(instr->Mask(SetField1FMask) == SetField1Fixed);
   const char* form = "'Yds, 'Yns, 'Xm";
+  const char *mnemonic = "scvalue";
   switch(instr->Mask(SetField1Mask)) {
     case SCVALUE:
-      Format(instr, "scvalue", form);
+      Format(instr, mnemonic, form);
       break;
     default:
-      Format(instr, "unknown instruction", "(Set capability value)");
+      UNREACHABLE();
+  }
+}
+
+void DisassemblingDecoder::VisitCompareCapabilities(Instruction* instr) {
+  const char* form = "'Yn, 'Ym";
+  const char *mnemonic = "cmp";
+  switch(instr->Mask(CompareCapabilitiesMask)) {
+    case SUBS_c:
+      Format(instr, mnemonic, form);
       break;
+    default:
+      UNREACHABLE();
   }
 }
 #endif // __CHERI_PURE_CAPABILITY__
@@ -3794,7 +3885,7 @@ void DisassemblingDecoder::AppendRegisterNameToOutput(const CPURegister& reg) {
   }
 
 #if defined(__CHERI_PURE_CAPABILITY__)
-  if (reg.IsVRegister() || !(reg.Aliases(sp) || reg.Aliases(csp)) || 
+  if (reg.IsVRegister() || !(reg.Aliases(sp) || reg.Aliases(csp)) ||
       reg.Aliases(xzr) || reg.Aliases(czr)) {
 #else
   if (reg.IsVRegister() || !(reg.Aliases(sp) || reg.Aliases(xzr))) {
@@ -4099,9 +4190,8 @@ int DisassemblingDecoder::SubstituteImmediateField(Instruction* instr,
 #if defined(__CHERI_PURE_CAPABILITY__)
 	  if (format[3] == 'C') { // ILUC - Immediate Load/Store Unsigned.
             if (instr->ImmLSUnsigned() != 0) {
-	      // Use a fixed shift value of 4 as unlike in the iv8 A-profile
-	      // instructions the size is not encoded in the instruction.
-              AppendToOutput(", #%" PRId32, instr->ImmLSUnsigned() << 4);
+              int shift = instr->SizeLS();
+              AppendToOutput(", #%" PRId32, instr->ImmLSUnsigned() << shift);
 	    }
             return 4;
 	  }
@@ -4126,7 +4216,7 @@ int DisassemblingDecoder::SubstituteImmediateField(Instruction* instr,
 	// Note: In the Morello capabiltiy add immediate instruction bit 23 is
 	// used to differentiate the addition and subtraction. Using the
 	// ShiftAddSub getter erronously accessess both bits 22 and 23
-	// causing the immediate value to be incorrectly calculated. 
+	// causing the immediate value to be incorrectly calculated.
         int64_t imm = instr->ImmAddSubCapability() <<
             (12 * instr->Bit(ShiftAddSubCapability_offset));
         AppendToOutput("#0x%" PRIx64 " (%" PRId64 ")", imm, imm);

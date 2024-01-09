@@ -200,6 +200,12 @@ unsigned CalcLSPairDataSize(LoadStorePairOp op) {
     case STP_d:
     case LDP_d:
       return kXRegSizeLog2;
+#if defined(__CHERI_PURE_CAPABILITY__)
+    case STP_c:
+      [[fallthrough]];
+    case LDP_c:
+      return kCRegSizeLog2;
+#endif // defined(__CHERI_PURE_CAPABILITY__)
     default:
       return kWRegSizeLog2;
   }

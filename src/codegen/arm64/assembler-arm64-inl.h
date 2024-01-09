@@ -1200,7 +1200,7 @@ unsigned Assembler::CalcLSDataSize(LoadStoreOp op) {
   DCHECK((LSSize_offset + LSSize_width) == (kInstrSize * 8));
 #if defined(__CHERI_PURE_CAPABILITY__)
   if (op == STR_c || op == LDR_c) {
-    return kSystemPointerSizeLog2;
+    return kCRegSizeLog2;
   }
 #endif // __CHERI_PURE_CAPABILITY_
   unsigned size = static_cast<Instr>(op >> LSSize_offset);

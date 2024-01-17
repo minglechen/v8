@@ -2191,9 +2191,9 @@ class V8_EXPORT_PRIVATE Assembler : public AssemblerBase {
   }
 
 #if defined(__CHERI_PURE_CAPABILITY__)
-  static Instr CdCSP(Register cn) {
-    DCHECK(!cn.IsZero());
-    return (cn.code() & kRegCodeMask) << Cd_offset;
+  static Instr CdCSP(Register cd) {
+    DCHECK(!cd.IsZero());
+    return (cd.code() & kRegCodeMask) << Cd_offset;
   }
 
   static Instr CnCSP(Register cn) {

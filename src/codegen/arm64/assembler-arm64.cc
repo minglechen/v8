@@ -1427,11 +1427,6 @@ void Assembler::str(const CPURegister& rt, const MemOperand& src) {
 }
 
 #if defined(__CHERI_PURE_CAPABILITY__)
-//void Assembler::addc(const Register& cd, const Register& cn,
-//		    const Operand& operand) {
-  //AddSubCapability(cd, cn, operand, ADDCAP);
-//}
-
 void Assembler::cpy(const Register& cd, const Register& cn) {
   Emit(CPY | CdCSP(cd) | CnCSP(cn));
 }
@@ -1442,10 +1437,6 @@ void Assembler::cselc(const Register& cd, const Register& cn,
   DCHECK(cd.SizeInBits() == cm.SizeInBits());
   Emit(CSEL_c | Cm(cm) | Cond(cond) | Cn(cn) | Cd(cd));
 }
-
-//void Assembler::ldrc(const Register& ct, const MemOperand& src) {
-//  LoadStoreCapability(ct, src, LoadCap);
-//}
 
 void Assembler::gcvalue(const Register& cn, const Register& rd)
 {
@@ -3843,10 +3834,11 @@ void Assembler::AddSub(const Register& rd, const Register& rn,
  #if defined(__CHERI_PURE_CAPABILITY__)
       if (rn.IsC()) {
         DCHECK(rd.IsC());
+        Instr dest_reg = (S == SetFlags) ? Cd(rd) : CdCSP(rd);
         Emit(ADD_c_ext | Rm(operand.ToExtendedRegister().reg()) |
              ExtendMode(operand.ToExtendedRegister().extend()) |
 	     ImmExtendShift(operand.shift_amount()) |
-             CdCSP(rd) | CnCSP(rn));
+             dest_reg | CnCSP(rn));
         return;
       }
 #endif // __CHERI_PURE_CAPABILITY__
@@ -3868,9 +3860,10 @@ void Assembler::AddSub(const Register& rd, const Register& rn,
     DCHECK(operand.IsExtendedRegister());
 #if defined(__CHERI_PURE_CAPABILITY__)
     if (rn.IsC() && rd.IsC()) {
-      Emit(AddSubCapExtendedFixed | Rm(operand.reg()) |
+      Instr dest_reg = (S == SetFlags) ? Cd(rd) : CdCSP(rd);
+      Emit(ADD_c_ext | Rm(operand.reg()) |
            ExtendMode(operand.extend()) | ImmExtendShift(operand.shift_amount()) |
-           CdCSP(rd) | CnCSP(rn));
+           dest_reg | CnCSP(rn));
       return;
     }
 #endif // __CHERI_PURE_CAPABILITY__
@@ -4223,7 +4216,7 @@ void Assembler::LoadStore(const CPURegister& rt, const MemOperand& addr,
       return;
     }
 #endif // __CHERI_PURE_CAPABILITY__
-   Emit(LoadStoreRegisterOffsetFixed | memop | Rm(addr.regoffset()) |
+    Emit(LoadStoreRegisterOffsetFixed | memop | Rm(addr.regoffset()) |
          ExtendMode(ext) | ImmShiftLS((shift_amount > 0) ? 1 : 0));
   } else {
     // Pre-index and post-index modes.

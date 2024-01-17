@@ -788,10 +788,6 @@ class V8_EXPORT_PRIVATE TurboAssembler : public TurboAssemblerBase {
   inline void DropSlots(int64_t count);
 
   inline void PushArgument(const Register& arg);
-#if defined(__CHERI_PURE_CAPABILITY__)
-  // Push a single capability argument, without padding, to the stack.
-  inline void PushArgumentCapability(const Register& arg);
-#endif // __CHERI_PURE_CAPABILITY__
 
   // Add and sub macros.
   inline void Add(const Register& rd, const Register& rn,

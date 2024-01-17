@@ -565,6 +565,8 @@ const int kSFOffset = 31;
 enum AddSubOp : uint32_t {
 #if defined(__CHERI_PURE_CAPABILITY__)
   ADD_c = 0x00000000,
+  // Bit 23 is fixed for Add (extended register) and is used in
+  // Add (immediate) to identify add and subtract operations.
   SUB_c = 0x00800000,
   CompareCapabilitiesFixed = 0xC2E09800,
   CompareCapabilitiesFMask = 0xC2E09800,

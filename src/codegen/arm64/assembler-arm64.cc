@@ -4931,7 +4931,11 @@ void PatchingAssembler::PatchSubSp(uint32_t immediate) {
   // Verify the expected code.
   Instruction* expected_adr = InstructionAt(0);
   CHECK(expected_adr->IsAddSubImmediate());
+#if defined(__CHERI_PURE_CAPABILITY__)
+  sub(csp, csp, immediate);
+#else // defined(__CHERI_PURE_CAPABILITY__)
   sub(sp, sp, immediate);
+#endif // defined(__CHERI_PURE_CAPABILITY__)
 }
 
 #undef NEON_3DIFF_LONG_LIST

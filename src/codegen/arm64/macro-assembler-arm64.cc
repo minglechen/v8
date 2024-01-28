@@ -865,26 +865,27 @@ void TurboAssembler::AddSubMacro(const Register& rd, const Register& rn,
     // extended register from a capability register.
     if (op == SUB_c) {
       // The Morello ISA doesn't possess an instruction for subtracting an
-      // extended register from a capability register. Therefore, negate
-      // the operand (shifted register) and add the valuei converted to
-      // an extended register.
+      // extended register from a capability register.
       UseScratchRegisterScope temps(this);
       Register temp = temps.AcquireX();
-      neg(temp, operand);
-      AddSub(rd, rn, temp, S, ADD_c);
+      Gcvalue(rn, temp);
+      AddSub(temp, temp, operand, S, SUB);
+      Mov(rd, rn);
+      Scvalue(rd, rd, temp);
     } else {
-      AddSub(rd, rn, operand.ToExtendedRegister(), S, ADD_c);
+      DCHECK((operand.shift() == LSL) && (operand.shift_amount() <= 4));
+      AddSub(rd, rn, Operand(operand.reg(), SXTW, operand.shift_amount()), S, ADD_c);
     }
   } else if (rd.IsC() && operand.IsExtendedRegister()) {
     if (op == SUB_c) {
       // The Morello ISA doesn't possess an instruction for subtracting an
-      // extended register from a capability register. Therefore, negate
-      // the operand and add the value.
+      // extended register from a capability register.
       UseScratchRegisterScope temps(this);
       Register temp = temps.AcquireX();
-      neg(temp, operand.reg());
-      AddSub(rd, rn, Operand(temp, operand.extend(), operand.shift_amount()),
-             S, ADD_c);
+      Gcvalue(rn, temp);
+      AddSub(temp, temp, operand, S, SUB);
+      Mov(rd, rn);
+      Scvalue(rd, rd, temp);
     } else {
       AddSub(rd, rn, operand, S, ADD_c);
     }
@@ -2207,7 +2208,7 @@ void TurboAssembler::CallCFunction(Register function, int num_of_reg_args,
   } else {
     DCHECK_NOT_NULL(isolate());
 #if defined(__CHERI_PURE_CAPABILITY__)
-    Push(addr_scratch);
+    Push(addr_scratch, czr);
 #else
     Push(addr_scratch, xzr);
 #endif // __CHERI_PURE_CAPABILITY__
@@ -2215,7 +2216,7 @@ void TurboAssembler::CallCFunction(Register function, int num_of_reg_args,
         ExternalReference::fast_c_call_caller_fp_address(isolate()));
 #if defined(__CHERI_PURE_CAPABILITY__)
     Str(czr, MemOperand(addr_scratch));
-    Pop(addr_scratch);
+    Pop(addr_scratch, czr);
 #else
     Str(xzr, MemOperand(addr_scratch));
     Pop(xzr, addr_scratch);
@@ -2280,9 +2281,13 @@ void TurboAssembler::JumpHelper(int64_t offset, RelocInfo::Mode rmode,
     near_jump(static_cast<int>(offset), rmode);
   } else {
     UseScratchRegisterScope temps(this);
-    // TODO(gcjenkinson): What to do here?
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Register temp = temps.AcquireC();
+    uint64_t imm = (reinterpret_cast<uint64_t>(pc_) + offset * kInstrSize) | 0x1;
+#else // defined(__CHERI_PURE_CAPABILITY__)
     Register temp = temps.AcquireX();
     uint64_t imm = reinterpret_cast<uint64_t>(pc_) + offset * kInstrSize;
+#endif // defined(__CHERI_PURE_CAPABILITY__)
     Mov(temp, Immediate(imm, rmode));
     Br(temp);
   }
@@ -2512,6 +2517,7 @@ void TurboAssembler::CallBuiltin(Builtin builtin) {
 #if defined(__CHERI_PURE_CAPABILITY__)
     Register scratch = temps.AcquireC();
     Ldr(scratch, Operand(BuiltinEntry(builtin), RelocInfo::OFF_HEAP_TARGET));
+    Orr(scratch, scratch, 0x1);
 #else // defined(__CHERI_PURE_CAPABILITY__)
     Register scratch = temps.AcquireX();
     Ldr(scratch, Operand(BuiltinEntry(builtin), RelocInfo::OFF_HEAP_TARGET));
@@ -2628,8 +2634,8 @@ void TurboAssembler::JumpCodeObject(Register code_object, JumpMode jump_mode) {
   if (code_object != c17) {
     temps.Exclude(c17);
     Mov(c17, code_object);
-    Orr(c17, c17, 0x1);
   }
+  Orr(c17, c17, 0x1);
   Jump(c17);
 #else
   if (code_object != x17) {
@@ -2651,7 +2657,8 @@ void TurboAssembler::LoadCodeDataContainerEntry(
                       CodeDataContainer::kCodeEntryPointOffset),
       kCodeEntryPointTag);
 #if defined(__CHERI_PURE_CAPABILITY__)
-  // TODO(gcjenkinson): Is this needed?
+  // TODO(gcjenkinson): How to ensure that the field
+  // is set with the lower bit for C64?
   Orr(destination, destination, 0x1);
 #endif // __CHERI_PURE_CAPABILITY__
 }
@@ -2685,7 +2692,6 @@ void TurboAssembler::JumpCodeDataContainerObject(
     temps.Exclude(c17);
     Mov(c17, code_data_container_object);
   }
-  Orr(c17, c17, 0x1);
   Jump(c17);
 #else
   if (code_data_container_object != x17) {
@@ -2819,7 +2825,11 @@ void MacroAssembler::StackOverflowCheck(Register num_args,
                                         Label* stack_overflow) {
   ASM_CODE_COMMENT(this);
   UseScratchRegisterScope temps(this);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register scratch = temps.AcquireC();
+#else
   Register scratch = temps.AcquireX();
+#endif // __CHERI_PURE_CAPABILITY__
 
   // Check the stack for overflow.
   // We are not trying to catch interruptions (e.g. debug break and
@@ -2829,11 +2839,7 @@ void MacroAssembler::StackOverflowCheck(Register num_args,
   // Make scratch the space we have left. The stack might already be overflowed
   // here which will cause scratch to become negative.
 #if defined(__CHERI_PURE_CAPABILITY__)
-  {
-    Register temp = temps.AcquireX();
-    Gcvalue(csp, temp);
-    Sub(scratch, temp, scratch);
-  }
+  Sub(scratch, csp, scratch);
 #else
   Sub(scratch, sp, scratch);
 #endif // __CHERI_PURE_CAPABILITY__
@@ -3410,7 +3416,7 @@ void MacroAssembler::EnterExitFrame(bool save_doubles, const Register& scratch,
 #if defined(__CHERI_PURE_CAPABILITY__)
   Mov(fp, csp);
   Mov(scratch.X(), StackFrame::TypeToMarker(frame_type));
-  Push(scratch, padregc);
+  Push(scratch, czr);
   //          fp[16]: CallerPC (lr)
   //    fp -> fp[0]: CallerFP (old fp)
   //          fp[-16]: STUB marker

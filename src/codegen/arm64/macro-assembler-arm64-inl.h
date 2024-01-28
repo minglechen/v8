@@ -65,7 +65,15 @@ void TurboAssembler::Ands(const Register& rd, const Register& rn,
 void TurboAssembler::Tst(const Register& rn, const Operand& operand) {
   DCHECK(allow_macro_instructions());
 #if defined(__CHERI_PURE_CAPABILITY__)
-  if (rn.IsC()) {
+  if (rn.IsC() && !operand.IsImmediate() && operand.reg().IsC()) {
+    UseScratchRegisterScope temps(this);
+    Register temp = temps.AcquireX();
+    Register temp2 = temps.AcquireX();
+    Gcvalue(rn, temp);
+    Gcvalue(operand.reg(), temp2);
+    LogicalMacro(AppropriateZeroRegFor(temp), temp, Operand(temp2), ANDS);
+    return;
+ } else if (rn.IsC()) {
     UseScratchRegisterScope temps(this);
     Register temp = temps.AcquireX();
     Gcvalue(rn, temp);
@@ -308,14 +316,14 @@ void TurboAssembler::Cmp(const Register& rn, const Operand& operand) {
   DCHECK(allow_macro_instructions());
 #if defined(__CHERI_PURE_CAPABILITY__)
   if (rn.IsC()) {
-    if (operand.IsImmediate()) {
+    if (operand.IsImmediate() || !operand.reg().IsC()) {
       UseScratchRegisterScope temps(this);
       Register temp = temps.AcquireX();
       Gcvalue(rn, temp);
-      Cmp(temp, operand);
+      Subs(AppropriateZeroRegFor(temp), temp, operand);
+      return;
     } else {
-      DCHECK(operand.reg().IsC());
-      Cmpc(rn, operand);
+      Subsc(xzr, rn, operand);
     }
     return;
   }
@@ -940,6 +948,17 @@ void TurboAssembler::Lsl(const Register& rd, const Register& rn,
                          unsigned shift) {
   DCHECK(allow_macro_instructions());
   DCHECK(!rd.IsZero());
+#if defined(__CHERI_PURE_CAPABILITY__)
+  if (rn.IsC()) {
+    // TODO(gcjenkinson): Does this case actually make sense
+    UseScratchRegisterScope temps(this);
+    Register temp = temps.AcquireX();
+    Gcvalue(rn, temp);
+    lsl(rd, temp, shift);
+    Scvalue(rn, rn, temp);
+    return;
+  }
+#endif // defined(__CHERI_PURE_CAPABILITY__)
   lsl(rd, rn, shift);
 }
 
@@ -947,6 +966,17 @@ void TurboAssembler::Lsl(const Register& rd, const Register& rn,
                          const Register& rm) {
   DCHECK(allow_macro_instructions());
   DCHECK(!rd.IsZero());
+#if defined(__CHERI_PURE_CAPABILITY__)
+  if (rn.IsC()) {
+    // TODO(gcjenkinson): Does this case actually make sense
+    UseScratchRegisterScope temps(this);
+    Register temp = temps.AcquireX();
+    Gcvalue(rn, temp);
+    lslv(rd, temp, rm);
+    Scvalue(rn, rn, temp);
+    return;
+  }
+#endif // defined(__CHERI_PURE_CAPABILITY__)
   lslv(rd, rn, rm);
 }
 
@@ -954,6 +984,17 @@ void TurboAssembler::Lsr(const Register& rd, const Register& rn,
                          unsigned shift) {
   DCHECK(allow_macro_instructions());
   DCHECK(!rd.IsZero());
+#if defined(__CHERI_PURE_CAPABILITY__)
+  if (rn.IsC()) {
+    // TODO(gcjenkinson): Does this case actually make sense
+    UseScratchRegisterScope temps(this);
+    Register temp = temps.AcquireX();
+    Gcvalue(rn, temp);
+    lsr(rd, temp, shift);
+    Scvalue(rn, rn, temp);
+    return;
+  }
+#endif // defined(__CHERI_PURE_CAPABILITY__)
   lsr(rd, rn, shift);
 }
 
@@ -961,6 +1002,17 @@ void TurboAssembler::Lsr(const Register& rd, const Register& rn,
                          const Register& rm) {
   DCHECK(allow_macro_instructions());
   DCHECK(!rd.IsZero());
+#if defined(__CHERI_PURE_CAPABILITY__)
+  if (rn.IsC()) {
+    // TODO(gcjenkinson): Does this case actually make sense
+    UseScratchRegisterScope temps(this);
+    Register temp = temps.AcquireX();
+    Gcvalue(rn, temp);
+    lsrv(rd, temp, rm);
+    Scvalue(rn, rn, temp);
+    return;
+  }
+#endif // defined(__CHERI_PURE_CAPABILITY__)
   lsrv(rd, rn, rm);
 }
 
@@ -1216,6 +1268,7 @@ void TurboAssembler::SmiTag(Register dst, Register src) {
 #endif // __CHERI_PURE_CAPABILITY__
   DCHECK(SmiValuesAre32Bits() || SmiValuesAre31Bits());
 #if defined(__CHERI_PURE_CAPABILITY__)
+  // TODO(gcjenkinson): Should I assert !dst.IsC() here?
   if (dst.IsC()) {
     UseScratchRegisterScope temps(this);
     Register temp = temps.AcquireX();
@@ -1224,9 +1277,8 @@ void TurboAssembler::SmiTag(Register dst, Register src) {
     Scvalue(dst, dst, temp);
     return;
   }
-#else
-  Lsl(dst, src, kSmiShift);
 #endif // __CHERI_PURE_CAPABILITY__
+  Lsl(dst, src, kSmiShift);
 }
 
 void TurboAssembler::SmiTag(Register smi) { SmiTag(smi, smi); }
@@ -1579,9 +1631,9 @@ void TurboAssembler::Drop(const Register& count, uint64_t unit_size) {
   AssertPositiveOrZero(count);
 #if defined(__CHERI_PURE_CAPABILITY__)
   Add(csp, csp, size);
-#else
+#else // defined(__CHERI_PURE_CAPABILITY__)
   Add(sp, sp, size);
-#endif // __CHERI_PURE_CAPABILITY__
+#endif // defined(__CHERI_PURE_CAPABILITY__)
 }
 
 void TurboAssembler::DropArguments(const Register& count,
@@ -1597,32 +1649,38 @@ void TurboAssembler::DropArguments(const Register& count,
   Bic(tmp, tmp, 1);
 #if defined(__CHERI_PURE_CAPABILITY__)
   Drop(tmp, kCRegSize);
-#else
+#else // defined(__CHERI_PURE_CAPABILITY__)
   Drop(tmp, kXRegSize);
-#endif // __CHERI_PURE_CAPABILITY__
+#endif // defined(__CHERI_PURE_CAPABILITY__)
 }
 
-#if defined(__CHERI_PURE_CAPABILITY__)
 void TurboAssembler::DropArguments(int64_t count, ArgumentsCountMode mode) {
-#else
-void TurboAssembler::DropArguments(int64_t count, ArgumentsCountMode mode) {
-#endif // __CHERI_PURE_CAPABILITY__
   if (mode == kCountExcludesReceiver) {
     // Add a slot for the receiver.
     ++count;
   }
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Drop(RoundUp(count, 2), kCRegSize);
+#else // defined(__CHERI_PURE_CAPABILITY__)
   Drop(RoundUp(count, 2), kXRegSize);
+#endif // defined(__CHERI_PURE_CAPABILITY__)
 }
 
 void TurboAssembler::DropSlots(int64_t count) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Drop(RoundUp(count, 2), kCRegSize);
+#else // defined(__CHERI_PURE_CAPABILITY__)
   Drop(RoundUp(count, 2), kXRegSize);
+#endif // defined(__CHERI_PURE_CAPABILITY__)
 }
 
 #if defined(__CHERI_PURE_CAPABILITY__)
-void TurboAssembler::PushArgument(const Register& arg) { Push(arg); }
-#else
+void TurboAssembler::PushArgument(const Register& arg) {
+   Push(padregc, arg.C());
+}
+#else // defined(__CHERI_PURE_CAPABILITY__)
 void TurboAssembler::PushArgument(const Register& arg) { Push(padreg, arg); }
-#endif // __CHERI_PURE_CAPABILITY__
+#endif // defined(__CHERI_PURE_CAPABILITY__)
 
 void TurboAssembler::CompareAndBranch(const Register& lhs, const Operand& rhs,
                                       Condition cond, Label* label) {

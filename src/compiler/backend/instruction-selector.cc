@@ -1607,11 +1607,6 @@ void InstructionSelector::VisitNode(Node* node) {
       return VisitUint64LessThanOrEqual(node);
     case IrOpcode::kUint64Mod:
       return MarkAsWord64(node), VisitUint64Mod(node);
-#if defined(__CHERI_PURE_CAPABILITY__)
-    case IrOpcode::kIntPtrAdd:
-      return MarkAsCapability(node), VisitIntPtrAdd(node);
-      break;
-#endif
     case IrOpcode::kBitcastTaggedToWord:
     case IrOpcode::kBitcastTaggedToWordForTagAndSmiBits:
       return MarkAsRepresentation(MachineType::PointerRepresentation(), node),
@@ -2368,6 +2363,12 @@ void InstructionSelector::VisitNode(Node* node) {
       return MarkAsSimd128(node), VisitI16x8DotI8x16I7x16S(node);
     case IrOpcode::kI32x4DotI8x16I7x16AddS:
       return MarkAsSimd128(node), VisitI32x4DotI8x16I7x16AddS(node);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    case IrOpcode::kCapAdd:
+      // TODO(gcjenkinson): Add Visitor for CapAdd
+      // return MarkAsPointer(node), VisitCapAdd(node);
+      return MarkAsWord64(node), VisitInt64Add(node);
+#endif // defined(__CHERI_PURE_CAPABILITY__)
     default:
       FATAL("Unexpected operator #%d:%s @ node #%d", node->opcode(),
             node->op()->mnemonic(), node->id());

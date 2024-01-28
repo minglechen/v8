@@ -141,14 +141,21 @@ class StoreRepresentation final {
  public:
   StoreRepresentation(MachineRepresentation representation,
                       WriteBarrierKind write_barrier_kind)
-      : representation_(representation),
+      : machine_type_(MachineType(representation, MachineSemantic::kCapability)),
         write_barrier_kind_(write_barrier_kind) {}
 
-  MachineRepresentation representation() const { return representation_; }
+  StoreRepresentation(MachineType machine_type,
+                      WriteBarrierKind write_barrier_kind)
+      : machine_type_(machine_type),
+        write_barrier_kind_(write_barrier_kind) {}
+
+  MachineRepresentation representation() const { return machine_type_.representation(); }
+  MachineSemantic semantic() const { return machine_type_.semantic(); }
+  MachineType machine_type() const { return machine_type_; }
   WriteBarrierKind write_barrier_kind() const { return write_barrier_kind_; }
 
  private:
-  MachineRepresentation representation_;
+  MachineType machine_type_;
   WriteBarrierKind write_barrier_kind_;
 };
 
@@ -1029,9 +1036,33 @@ class V8_EXPORT_PRIVATE MachineOperatorBuilder final
   // new_value_high, new_value_low
   const Operator* Word32AtomicPairCompareExchange();
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  const Operator* IntPtrAdd();
+#endif // __CHERI_PURE_CAPABILITY__
+
   // Target machine word-size assumed by this builder.
+#if defined(__CHERI_PURE_CAPABILITY__)
+  // For CHERI the machine representation is twice the word size of the
+  // native architure.
+  bool Is32() const {
+    if (word() == MachineRepresentation::kCapability) {
+      DCHECK(kSystemPointerSize == (2 * kSystemPointerAddrSize));
+      return kSystemPointerSize == sizeof(uint32_t) * 2;
+    } else {
+      return word() == MachineRepresentation::kWord32; }
+  }
+  bool Is64() const {
+    if (word() == MachineRepresentation::kCapability) {
+      DCHECK(kSystemPointerSize == (2 * kSystemPointerAddrSize));
+      return kSystemPointerSize == sizeof(uint64_t) * 2;
+    } else {
+	return word() == MachineRepresentation::kWord64;
+    }
+  }
+#else // defined(__CHERI_PURE_CAPABILITY__)
   bool Is32() const { return word() == MachineRepresentation::kWord32; }
   bool Is64() const { return word() == MachineRepresentation::kWord64; }
+#endif // defined(__CHERI_PURE_CAPABILITY__)
   MachineRepresentation word() const { return word_; }
 
   bool UnalignedLoadSupported(MachineRepresentation rep) {

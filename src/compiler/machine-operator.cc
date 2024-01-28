@@ -612,6 +612,13 @@ std::ostream& operator<<(std::ostream& os, TruncateKind kind) {
   V(I16x8DotI8x16I7x16S, Operator::kCommutative, 2, 0, 1)                  \
   V(I32x4DotI8x16I7x16AddS, Operator::kNoProperties, 3, 0, 1)
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+// The format is:
+// V(Name, properties, value_input_count, control_input_count, output_count)
+#define MACHINE_PURE_OP_LIST_PURECAP(V)                                    \
+  V(CapAdd, Operator::kAssociative | Operator::kCommutative, 2, 0, 1)
+#endif // __CHERI_PURE_CAPABILITY__
+
 // The format is:
 // V(Name, properties, value_input_count, control_input_count, output_count)
 #define PURE_OPTIONAL_OP_LIST(V)                            \
@@ -672,6 +679,25 @@ std::ostream& operator<<(std::ostream& os, TruncateKind kind) {
   V(AnyCompressed)           \
   V(Simd256)
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define MACHINE_REPRESENTATION_LIST(V) \
+  V(kFloat32)                          \
+  V(kFloat64)                          \
+  V(kSimd128)                          \
+  V(kWord8)                            \
+  V(kWord16)                           \
+  V(kWord32)                           \
+  V(kWord64)                           \
+  V(kCapability)                       \
+  V(kMapWord)                          \
+  V(kTaggedSigned)                     \
+  V(kTaggedPointer)                    \
+  V(kTagged)                           \
+  V(kCompressedPointer)                \
+  V(kSandboxedPointer)                 \
+  V(kCompressed)                       \
+  V(kSimd256)
+#else // defined(__CHERI_PURE_CAPABILITY__)
 #define MACHINE_REPRESENTATION_LIST(V) \
   V(kFloat32)                          \
   V(kFloat64)                          \
@@ -688,6 +714,7 @@ std::ostream& operator<<(std::ostream& os, TruncateKind kind) {
   V(kSandboxedPointer)                 \
   V(kCompressed)                       \
   V(kSimd256)
+#endif // defined(__CHERI_PURE_CAPABILITY__)
 
 #define LOAD_TRANSFORM_LIST(V) \
   V(S128Load8Splat)            \
@@ -820,6 +847,9 @@ struct MachineOperatorGlobalCache {
   };                                                                           \
   Name##Operator k##Name;
   MACHINE_PURE_OP_LIST(PURE)
+#if defined(__CHERI_PURE_CAPABILITY__)
+  MACHINE_PURE_OP_LIST_PURECAP(PURE)
+#endif // defined(__CHERI_PURE_CAPABILITY__)
   struct NormalWord32SarOperator final : public Operator1<ShiftKind> {
     NormalWord32SarOperator()
         : Operator1<ShiftKind>(IrOpcode::kWord32Sar, Operator::kPure,
@@ -1326,8 +1356,14 @@ MachineOperatorBuilder::MachineOperatorBuilder(
       word_(word),
       flags_(flags),
       alignment_requirements_(alignmentRequirements) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  DCHECK(word == MachineRepresentation::kWord32 ||
+         word == MachineRepresentation::kWord64 ||
+	 word == MachineRepresentation::kCapability);
+#else // defined(__CHERI_PURE_CAPABILITY__)
   DCHECK(word == MachineRepresentation::kWord32 ||
          word == MachineRepresentation::kWord64);
+#endif // defined(__CHERI_PURE_CAPABILITY__)
 }
 
 const Operator* MachineOperatorBuilder::UnalignedLoad(LoadRepresentation rep) {
@@ -1359,6 +1395,9 @@ const Operator* MachineOperatorBuilder::UnalignedStore(
              output_count)                                             \
   const Operator* MachineOperatorBuilder::Name() { return &cache_.k##Name; }
 MACHINE_PURE_OP_LIST(PURE)
+#if defined(__CHERI_PURE_CAPABILITY__)
+MACHINE_PURE_OP_LIST_PURECAP(PURE)
+#endif // defined(__CHERI_PURE_CAPABILITY__)
 #undef PURE
 
 const Operator* MachineOperatorBuilder::Word32Sar(ShiftKind kind) {
@@ -2037,6 +2076,9 @@ StackCheckKind StackCheckKindOf(Operator const* op) {
 #undef PURE_BINARY_OP_LIST_32
 #undef PURE_BINARY_OP_LIST_64
 #undef MACHINE_PURE_OP_LIST
+#if defined(__CHERI_PURE_CAPABILITY__)
+#undef MACHINE_PURE_OP_LIST_PURECAP
+#endif // __CHERI_PURE_CAPABILITY__
 #undef PURE_OPTIONAL_OP_LIST
 #undef OVERFLOW_OP_LIST
 #undef MACHINE_TYPE_LIST

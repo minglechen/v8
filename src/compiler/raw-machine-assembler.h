@@ -584,6 +584,12 @@ class V8_EXPORT_PRIVATE RawMachineAssembler {
         value);
   }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Node* CapAdd(Node* a, Node* b) {
+    return AddNode(machine()->CapAdd(), a, b);
+  }
+#endif // defined(__CHERI_PURE_CAPABILITY__)
+
 #define INTPTR_BINOP(prefix, name)                           \
   Node* IntPtr##name(Node* a, Node* b) {                     \
     return kSystemPointerAddrSize == 8 ? prefix##64##name(a, b)  \

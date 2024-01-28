@@ -1015,31 +1015,22 @@
   V(LoadLane)                    \
   V(StoreLane)
 
-#if defined(__CHERI_PURE_CAPABILITY__)
-// Opcodes for capability operators.
-#define MACHINE_CAP_OP_LIST(V)   \
-  V(IntPtrAdd)
-
-#define VALUE_OP_LIST(V)  \
-  COMMON_OP_LIST(V)       \
-  SIMPLIFIED_OP_LIST(V)   \
-  MACHINE_OP_LIST(V)      \
-  MACHINE_SIMD_OP_LIST(V) \
-  MACHINE_CAP_OP_LIST(V)  \
-  JS_OP_LIST(V)
-#else
 #define VALUE_OP_LIST(V)  \
   COMMON_OP_LIST(V)       \
   SIMPLIFIED_OP_LIST(V)   \
   MACHINE_OP_LIST(V)      \
   MACHINE_SIMD_OP_LIST(V) \
   JS_OP_LIST(V)
-#endif // __CHERI_PURE_CAPABILITY__
 
 // The combination of all operators at all levels and the common operators.
 #define ALL_OP_LIST(V) \
   CONTROL_OP_LIST(V)   \
   VALUE_OP_LIST(V)
+
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define PURECAP_OP_LIST(V)  \
+  V(CapAdd)
+#endif // defined(__CHERI_PURE_CAPABILITY__)
 
 namespace v8 {
 namespace internal {
@@ -1052,6 +1043,9 @@ class V8_EXPORT_PRIVATE IrOpcode {
   enum Value {
 #define DECLARE_OPCODE(x, ...) k##x,
     ALL_OP_LIST(DECLARE_OPCODE)
+#if defined(__CHERI_PURE_CAPABILITY__)
+    PURECAP_OP_LIST(DECLARE_OPCODE)
+#endif // defined(__CHERI_PURE_CAPABILITY__)
 #undef DECLARE_OPCODE
         kLast = -1
 #define COUNT_OPCODE(...) +1

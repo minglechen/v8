@@ -4226,7 +4226,8 @@ void Assembler::LoadStore(const CPURegister& rt, const MemOperand& addr,
       if (addr.IsPreIndex()) {
 #if defined(__CHERI_PURE_CAPABILITY__)
         if (rt.IsC()) {
-          Emit(LoadStorePreCapIndexFixed | memop | ImmLS(offset));
+          unsigned size = CalcLSDataSize(op);
+          Emit(LoadStorePreCapIndexFixed | memop | ImmLS(offset >>size));
           return;
 	}
 #endif // __CHERI_PURE_CAPABILITY__
@@ -4235,7 +4236,8 @@ void Assembler::LoadStore(const CPURegister& rt, const MemOperand& addr,
         DCHECK(addr.IsPostIndex());
 #if defined(__CHERI_PURE_CAPABILITY__)
         if (rt.IsC()) {
-          Emit(LoadStorePostCapIndexFixed | memop | ImmLS(offset));
+          unsigned size = CalcLSDataSize(op);
+          Emit(LoadStorePostCapIndexFixed | memop | ImmLS(offset >> size));
           return;
 	}
 #endif // __CHERI_PURE_CAPABILITY__

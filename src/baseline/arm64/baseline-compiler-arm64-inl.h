@@ -105,7 +105,7 @@ void BaselineCompiler::PrologueFillFrame() {
 void BaselineCompiler::VerifyFrameSize() {
   ASM_CODE_COMMENT(&masm_);
 #if defined(__CHERI_PURE_CAPABILITY__)
-  __ masm()->Add(c15, cp,
+  __ masm()->Add(c15, csp,
 #else // defined(__CHERI_PURE_CAPABILITY__)
   __ masm()->Add(x15, sp,
 #endif // defined(__CHERI_PURE_CAPABILITY__)

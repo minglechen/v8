@@ -22,14 +22,24 @@ class BaselineAssembler::ScratchRegisterScope {
     if (!assembler_->scratch_register_scope_) {
       // If we haven't opened a scratch scope yet, for the first one add a
       // couple of extra registers.
+#if defined(__CHERI_PURE_CAPABILITY__)
+      wrapped_scope_.Include(c14, c15);
+      wrapped_scope_.Include(c19);
+#else
       wrapped_scope_.Include(x14, x15);
       wrapped_scope_.Include(x19);
+#endif // __CHERI_PURE_CAPABILITY__
     }
     assembler_->scratch_register_scope_ = this;
   }
   ~ScratchRegisterScope() { assembler_->scratch_register_scope_ = prev_scope_; }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register AcquireScratch() { return wrapped_scope_.AcquireC(); }
+  Register AcquireScratchX() { return wrapped_scope_.AcquireX(); }
+#else
   Register AcquireScratch() { return wrapped_scope_.AcquireX(); }
+#endif // __CHERI_PURE_CAPABILITY__
 
  private:
   BaselineAssembler* assembler_;
@@ -153,7 +163,11 @@ void BaselineAssembler::TailCallBuiltin(Builtin builtin) {
     // builtins we have to use a workaround.
     // x17 is used to allow using "Call" (i.e. `bti c`) rather than "Jump" (i.e.
     // `bti j`) landing pads for the tail-called code.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    Register temp = c17;
+#else
     Register temp = x17;
+#endif // __CHERI_PURE_CAPABILITY__
 
     // Make sure we're don't use this register as a temporary.
     UseScratchRegisterScope temps(masm());
@@ -179,7 +193,11 @@ void BaselineAssembler::JumpIfObjectType(Condition cc, Register object,
                                          Register map, Label* target,
                                          Label::Distance) {
   ScratchRegisterScope temps(this);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register type = temps.AcquireScratchX();
+#else
   Register type = temps.AcquireScratch();
+#endif // __CHERI_PURE_CAPABILITY__
   __ LoadMap(map, object);
   __ Ldrh(type, FieldMemOperand(map, Map::kInstanceTypeOffset));
   JumpIf(cc, type, instance_type, target);
@@ -188,7 +206,11 @@ void BaselineAssembler::JumpIfInstanceType(Condition cc, Register map,
                                            InstanceType instance_type,
                                            Label* target, Label::Distance) {
   ScratchRegisterScope temps(this);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register type = temps.AcquireScratchX();
+#else
   Register type = temps.AcquireScratch();
+#endif // __CHERI_PURE_CAPABILITY__
   if (FLAG_debug_code) {
     __ AssertNotSmi(map);
     __ CompareObjectType(map, type, type, MAP_TYPE);
@@ -614,21 +636,35 @@ void BaselineAssembler::EmitReturn(MacroAssembler* masm) {
     Label skip_interrupt_label;
     __ AddToInterruptBudgetAndJumpIfNotExceeded(weight, &skip_interrupt_label);
     __ masm()->SmiTag(params_size);
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ masm()->Push(params_size, padreg);
+    __ masm()->Push(kInterpreterAccumulatorRegister);
+#else
     __ masm()->Push(params_size, kInterpreterAccumulatorRegister);
+#endif // __CHERI_PURE_CAPABILITY__
 
     __ LoadContext(kContextRegister);
     __ LoadFunction(kJSFunctionRegister);
     __ masm()->PushArgument(kJSFunctionRegister);
     __ CallRuntime(Runtime::kBytecodeBudgetInterrupt, 1);
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+    __ masm()->Pop(kInterpreterAccumulatorRegister);
+    __ masm()->Pop(padreg, params_size);
+#else
     __ masm()->Pop(kInterpreterAccumulatorRegister, params_size);
+#endif // __CHERI_PURE_CAPABILITY__
     __ masm()->SmiUntag(params_size);
 
   __ Bind(&skip_interrupt_label);
   }
 
   BaselineAssembler::ScratchRegisterScope temps(&basm);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  Register actual_params_size = temps.AcquireScratchX();
+#else
   Register actual_params_size = temps.AcquireScratch();
+#endif // __CHERI_PURE_CAPABILITY__
   // Compute the size of the actual parameters + receiver (in bytes).
   __ Move(actual_params_size,
           MemOperand(fp, StandardFrameConstants::kArgCOffset));

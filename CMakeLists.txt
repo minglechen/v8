@@ -1,16 +1,27 @@
-# install devel/glib20
-# pkg64 install devel/py-Jinja2
-# pkg64c install devel/icu
 cmake_minimum_required(VERSION 3.24)
 include(ExternalProject)
 
 project(v8)
 
-find_package(
-        Python3
-        REQUIRED
-        COMPONENTS Interpreter
+find_package(PkgConfig REQUIRED)
+
+pkg_search_module(GLIB REQUIRED glib-2.0)
+pkg_search_module(ICU REQUIRED icu-i18n)
+
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
+execute_process(
+	COMMAND pkg64 show devel/gn
+        RESULT_VARIABLE EXIT_CODE
+	OUTPUT_QUIET
 )
+
+if (NOT ${EXIT_CODE} EQUAL 0)
+    message(
+	    FATAL_ERROR
+	    "The \"jinja2\" Python3 package is not installed. Please install it using the following command: \"pkg64 install py-Jinja2\"."
+    )
+endif()
 
 file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/base/trace_event/common)
 file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
@@ -94,18 +105,15 @@ ExternalProject_Add(
   cheribsd-ports 
   SOURCE_DIR	 cheribsd-ports
   GIT_REPOSITORY https://github.com/gcjenkinson/cheribsd-ports.git
-  GIT_TAG        v8_dependencies 
+  GIT_TAG        main 
   GIT_SHALLOW	 true
   CONFIGURE_COMMAND ""
   BUILD_COMMAND ""
   INSTALL_COMMAND ""
-)
+  )
 
 add_custom_target(apply-patches ALL
 	COMMAND find ${CMAKE_BINARY_DIR}/cheribsd-ports/lang/v8/files -type f -name 'patch-*' -print0 | xargs -t -0 -n 1 patch -p0 -u -N -d ${CMAKE_SOURCE_DIR} -i || true)
-
-add_custom_target(apply-cheribsd-patche ALL
-	COMMAND patch -p0 -u -N -d ${CMAKE_SOURCE_DIR} < ${CMAKE_BINARY_DIR}/cheribsd-ports/lang/v8/files/cheribsd.patch || true)
 
 add_custom_target(gcc-toolchain ALL
 	COMMAND echo 'checkout_google_benchmark = false' > ${CMAKE_SOURCE_DIR}/build/config/gclient_args.gni)
@@ -124,6 +132,28 @@ add_custom_target(cp-icu ALL
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 	COMMAND cp -R /usr/local64/include/unicode ${CMAKE_SOURCE_DIR}/out/Release/gen/include/unicode)
 
+set(GN_ARGS
+	clang_use_chrome_plugins=false
+	extra_cxxflags=\"-mabi=purecap -march=morello -Xclang -morello-vararg=new\"
+	extra_ldflags=\"\"
+	is_clang=true
+	is_component_build=true
+	is_debug=true
+	treat_warnings_as_errors=false
+	use_aura=true use_lld=true
+	use_custom_libcxx=false
+	v8_use_snapshot=false
+	v8_use_external_snapshot_data=false
+	v8_enable_webassembly=false
+	v8_enable_external_code_space=true
+	v8_enable_sandbox=true
+	v8_optimized_debug=true)
+
 add_custom_target(generate-ninja ALL
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-	COMMAND gn gen out/Release)
+	COMMAND gn gen out/Release --args='${GN_ARGS}')
+
+add_custom_target(build-v8 ALL
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+	COMMAND ninja -C out/Release)
+

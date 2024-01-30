@@ -904,6 +904,13 @@ void Simulator::DoRuntimeCall(Instruction* instr) {
   set_pc(return_address);
 }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+const char* Simulator::creg_names[] = {
+    "c0",  "c1",  "c2",  "c3",  "c4",  "c5",  "c6",  "c7",  "c8",  "c9",  "c10",
+    "c11", "c12", "c13", "c14", "c15", "ip0", "ip1", "c18", "c19", "c20", "c21",
+    "c22", "c23", "c24", "c25", "c26", "cp",  "c28", "fp",  "lr",  "czr", "csp"};
+#endif // __CHERI_PURE_CAPABILITY__
+
 const char* Simulator::xreg_names[] = {
     "x0",  "x1",  "x2",  "x3",  "x4",  "x5",  "x6",  "x7",  "x8",  "x9",  "x10",
     "x11", "x12", "x13", "x14", "x15", "ip0", "ip1", "x18", "x19", "x20", "x21",
@@ -1039,6 +1046,9 @@ void LogicVRegister::WriteUintToMem(VectorFormat vform, int index,
 int Simulator::CodeFromName(const char* name) {
   for (unsigned i = 0; i < kNumberOfRegisters; i++) {
     if ((strcmp(xreg_names[i], name) == 0) ||
+#if defined(__CHERI_PURE_CAPABILITY__)
+        (strcmp(creg_names[i], name) == 0) ||
+#endif // __CHERI_PURE_CAPABILITY__
         (strcmp(wreg_names[i], name) == 0)) {
       return i;
     }
@@ -1050,6 +1060,11 @@ int Simulator::CodeFromName(const char* name) {
       return i;
     }
   }
+#if defined(__CHERI_PURE_CAPABILITY__)
+  if ((strcmp("csp", name) == 0)) {
+    return kSPRegInternalCode;
+  }
+#endif // __CHERI_PURE_CAPABILITY__
   if ((strcmp("sp", name) == 0) || (strcmp("wsp", name) == 0)) {
     return kSPRegInternalCode;
   }
@@ -1096,9 +1111,21 @@ void Simulator::AddSubWithCarry(Instruction* instr) {
   T op2 = reg<T>(instr->Rm());
   T new_val;
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  if (std::is_same,Y, uintptr_t>::value) {
+     if (instr->Mask(CompareCapabilitiesMask)) {
+       op2 = ~op2;
+     }
+  } else {
+    if ((instr->Mask(AddSubOpMask) == SUB) || instr->Mask(AddSubOpMask) == SUBS) {
+      op2 = ~op2;
+    }
+  }
+#else
   if ((instr->Mask(AddSubOpMask) == SUB) || instr->Mask(AddSubOpMask) == SUBS) {
     op2 = ~op2;
   }
+#endif // __CHERI_PURE_CAPABILITY__
 
   new_val = AddWithCarry<T>(instr->FlagsUpdate(), reg<T>(instr->Rn()), op2,
                             nzcv().C());
@@ -2043,7 +2070,18 @@ void Simulator::LoadStoreHelper(Instruction* instr, int64_t offset,
     stack = sp();
   }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  LoadStoreOp op;
+  if (LoadStoreAnyFMask == LoadStoreAnyFixed) {
+    op = static_cast<LoadStoreOp>(instr->Mask(LoadStoreMask));
+  } else if (LoadStoreCapAnyFMask == LoadStoreCapAnyFixed) {
+    op = static_cast<LoadStoreOp>(instr->Mask(LoadStoreCapMask));
+  } else {
+    UNREACHABLE();
+  }
+#else
   LoadStoreOp op = static_cast<LoadStoreOp>(instr->Mask(LoadStoreMask));
+#endif // __CHERI_PURE_CAPABILITY__
   switch (op) {
     // Use _no_log variants to suppress the register trace (LOG_REGS,
     // LOG_VREGS). We will print a more detailed log.
@@ -2059,6 +2097,11 @@ void Simulator::LoadStoreHelper(Instruction* instr, int64_t offset,
     case LDR_x:
       set_xreg_no_log(srcdst, MemoryRead<uint64_t>(address));
       break;
+#if defined(__CHERI_PURE_CAPABILITY__)
+    case LDR_c:
+      set_creg_no_log(srcdst, MemoryRead<uintptr_t>(address));
+      break;
+#endif // __CHERI_PURE_CAPABILITY__
     case LDRSB_w:
       set_wreg_no_log(srcdst, MemoryRead<int8_t>(address));
       break;
@@ -2102,6 +2145,11 @@ void Simulator::LoadStoreHelper(Instruction* instr, int64_t offset,
     case STR_x:
       MemoryWrite<uint64_t>(address, xreg(srcdst));
       break;
+#if defined(__CHERI_PURE_CAPABILITY__)
+    case STR_c:
+      MemoryWrite<uintptr_t>(address, creg(srcdst));
+      break;
+#endif // __CHERI_PURE_CAPABILITY__
     case STR_b:
       MemoryWrite<uint8_t>(address, breg(srcdst));
       break;
@@ -2206,8 +2254,19 @@ void Simulator::LoadStorePairHelper(Instruction* instr, AddrMode addrmode) {
     stack = sp();
   }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  LoadStorePairOp op;
+  if (LoadStorePairAnyFMask == LoadStorePairAnyFixed) {
+    op = static_cast<LoadStorePairOp>(instr->Mask(LoadStorePairMask));
+  } else if (LoadStorePairCapAnyFMask == LoadStorePairCapAnyFixed) {
+    op = static_cast<LoadStorePairOp>(instr->Mask(LoadStorePairCapMask));
+  } else {
+    UNREACHABLE();
+  }
+#else
   LoadStorePairOp op =
       static_cast<LoadStorePairOp>(instr->Mask(LoadStorePairMask));
+#endif // __CHERI_PURE_CAPANBILITY__
 
   // 'rt' and 'rt2' can only be aliased for stores.
   DCHECK(((op & LoadStorePairLBit) == 0) || (rt != rt2));
@@ -2227,6 +2286,14 @@ void Simulator::LoadStorePairHelper(Instruction* instr, AddrMode addrmode) {
       set_sreg_no_log(rt2, MemoryRead<float>(address2));
       break;
     }
+#if defined(__CHERI_PURE_CAPABILITY__)
+    case LDP_c: {
+      DCHECK_EQ(access_size, static_cast<unsigned>(kCRegSize));
+      set_creg_no_log(rt, MemoryRead<intptr_t>(address));
+      set_creg_no_log(rt2, MemoryRead<intptr_t>(address2));
+      break;
+    }
+#endif // __CHERI_PURE_CAPANBILITY__
     case LDP_x: {
       DCHECK_EQ(access_size, static_cast<unsigned>(kXRegSize));
       set_xreg_no_log(rt, MemoryRead<uint64_t>(address));
@@ -2263,6 +2330,14 @@ void Simulator::LoadStorePairHelper(Instruction* instr, AddrMode addrmode) {
       MemoryWrite<float>(address2, sreg(rt2));
       break;
     }
+#if defined(__CHERI_PURE_CAPABILITY__)
+    case STP_c: {
+      DCHECK_EQ(access_size, static_cast<unsigned>(kCRegSize));
+      MemoryWrite<uintptr_t>(address, creg(rt));
+      MemoryWrite<uintptr_t>(address2, creg(rt2));
+      break;
+    }
+#endif // __CHERI_PURE_CAPANBILITY__
     case STP_x: {
       DCHECK_EQ(access_size, static_cast<unsigned>(kXRegSize));
       MemoryWrite<uint64_t>(address, xreg(rt));
@@ -6072,51 +6147,101 @@ void Simulator::VisitNEONPerm(Instruction* instr) {
 }
 
 #if defined(__CHERI_PURE_CAPABILITY__)
-void Simulator::VisitAddSubCapExtendedRegister(Instruction* instr) {
+void Simulator::VisitAddSubCapExtended(Instruction* instr) {
+  uint64_t op2 = ExtendValue(xreg(instr->Rm()), ext, left_shift);
+  unsigned left_shift = instr->ImmExtendShift();
+  intptr_t new_val;
+ 
+  new_value = AddWithCarry<intptr_t>(set_flags, reg<intptr_t>(instr->Rn(), instr->RnMode()), op2);
+  set_reg<intptr_t>(instr->Rd(), new_val, instr->RdMode());
 }
 
 void Simulator::VisitAddSubCapImmediate(Instruction* instr) {
+  int64_t op2 = instr->ImmAddSub() << ((instr->ShiftAddSub() == 1) ? 12 : 0);
+  intptr_t new_val;
+ 
+  new_value = AddWithCarry<intptr_t>(set_flags, reg<intptr_t>(instr->Rn(), instr->RnMode()), op2);
+  set_reg<intptr_t>(instr->Rd(), new_val, instr->RdMode());
 }
 
 void Simulator::VisitCompareCapabilities(Instruction* instr) {
+  AddSubWithCarry<uintptr_t>(instr);
 }
 
-void Simulator::VisitConditionalSelectCapability(Instruction* instr) {
+void Simulator::VisitConditionalSelectCap(Instruction* instr) {
+  uintptr_t new_val = creg(instr->Rn());
+  if (ConditionFailed(static_cast<Condition>(instr->Condition()))) {
+    new_val = creg(instr->Rm());
+    switch (instr->Mask(ConditionalSelectCapMask)) {
+      case CSEL_c:
+        break;
+      default:
+        UNREACHABLE();
+    }
+  }
+  set_creg(instr-Rd(), new_val);
 }
 
 void Simulator::VisitLoadStoreCapUnscaledOffsetNormal(Instruction* instr) {
+  LoadStoreHelper(instr, instr->ImmLS(), Offset);
 }
 
 void Simulator::VisitLoadStoreCapUnsignedOffsetCapNormal(Instruction* instr) {
+  int offset = instr->ImmLSUnsigned() << instr->SizeLS();
+  LoadStoreHelper(instr, offset, Offset);
 }
 
 void Simulator::VisitLoadStoreCapRegisterOffsetNormal(Instruction* instr) {
+  Extend ext = static_cast<Extend>(instr->ExtendMode());
+  DCHECK((ext == UXTW) || (ext == UXTX) || (ext == SXTW) || (ext == SXTX));
+  unsigned shift_amount = instr->ImmShiftLS() * instr->SizeLS();
+
+  int64_t offset = ExtendValue(creg(instr->Rm()), ext, shift_amount);
+  LoadStoreHelper(instr, offset, Offset);
 }
 
 void Simulator::VisitLoadStorePreCapIndex(Instruction* instr) {
+  LoadStoreHelper(instr, instr->ImmLS(), PreIndex);
 }
 
 void Simulator::VisitLoadStorePostCapIndex(Instruction* instr) {
+  LoadStoreHelper(instr, instr->ImmLS(), PostIndex);
 }
 
 void Simulator::VisitCopyCapability(Instruction* instr) {
+  uintptr_t new_val = creg(instr->Rn());
+  set_creg(instr-Rd(), new_val);
 }
 
 void Simulator::VisitLoadStorePairCapPostIndex(Instruction* instr) {
+  LoadStorePairHelper(instr, PostIndex);
 }
 
 void Simulator::VisitLoadStorePairCapPreIndex(Instruction* instr) {
+  LoadStorePairHelper(instr, PreIndex);
 }
 
 void Simulator::VisitLoadStorePairCapOffset(Instruction* instr) {
+  LoadStorePairHelper(instr, Offset);
 }
 
 void Simulator::VisitGetField1(Instruction* instr) {
+  intptr_t temp_cap;
+  int64_t new_value;
+  temp_cap = creg(instr->Rn(), instr->RnMode());
+  new_val = cheri_address_get(temp_cap);
+  set_xreg(instr->Rd(), static_cast<uint64_t>(new_val), instr->RdMode());
 }
 
 void Simulator::VisitSetField1(Instruction* instr) {
+  int64_t new_value;
+  intptr_t old_cap, new_cap;
+  old_cap = creg(instr->Rn(), instr->RnMode());
+  new_val = xreg(instr->Rm(), Reg31IsZeroRegister);
+  new_cap = cheri_address_set((old_cap, new_val);
+  set_reg<intptr_t>(instr->Rd(), new_cap, instr->RdMode());
 }
-#endif
+#endif // __CHERI_PURE_CAPANBILITY__
 
 void Simulator::DoPrintf(Instruction* instr) {
   DCHECK((instr->Mask(ExceptionMask) == HLT) &&
@@ -6206,6 +6331,11 @@ void Simulator::DoPrintf(Instruction* instr) {
         case kPrintfArgX:
           part_result = fprintf(stream_, chunks[i], xreg(pcs_r++));
           break;
+#if defined(__CHERI_PURE_CAPABILITY__)
+        case kPrintfArgC:
+          part_result = fprintf(stream_, chunks[i], creg(pcs_r++));
+          break;
+#endif // __CHERI_PURE_CAPABILITY__
         case kPrintfArgD:
           part_result = fprintf(stream_, chunks[i], dreg(pcs_f++));
           break;

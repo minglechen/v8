@@ -1310,7 +1310,7 @@ static void Generate_JSEntryTrampolineHelper(MacroAssembler* masm,
 #endif // defined(__CHERI_PURE_CAPABILITY__)
     // Dereference the handle.
 #if defined(__CHERI_PURE_CAPABILITY__)
-    __ Ldr(x11, MemOperand(c11));
+    __ Ldr(c11, MemOperand(c11));
 #else // defined(__CHERI_PURE_CAPABILITY__)
     __ Ldr(x11, MemOperand(x11));
 #endif // defined(__CHERI_PURE_CAPABILITY__)
@@ -1405,8 +1405,9 @@ void Builtins::Generate_RunMicrotasksTrampoline(MacroAssembler* masm) {
 #if defined(__CHERI_PURE_CAPABILITY__)
   __ Mov(RunMicrotasksDescriptor::MicrotaskQueueRegister(), c1);
 #else // defined(__CHERI_PURE_CAPABILITY__)
-  __ Jump(BUILTIN_CODE(masm->isolate(), RunMicrotasks), RelocInfo::CODE_TARGET);
+  __ Mov(RunMicrotasksDescriptor::MicrotaskQueueRegister(), x1);
 #endif // defined(__CHERI_PURE_CAPABILITY__)
+  __ Jump(BUILTIN_CODE(masm->isolate(), RunMicrotasks), RelocInfo::CODE_TARGET);
 }
 
 static void ReplaceClosureCodeWithOptimizedCode(MacroAssembler* masm,
@@ -1814,16 +1815,12 @@ void Builtins::Generate_BaselineOutOfLinePrologue(MacroAssembler* masm) {
     // building the frame we can quickly precheck both at once.
     UseScratchRegisterScope temps(masm);
 
-    Register sp_minus_frame_size = temps.AcquireX();
 #if defined(__CHERI_PURE_CAPABILITY__)
-    {
-      UseScratchRegisterScope temps(masm);
-      Register temp = temps.AcquireX();
-      __ Gcvalue(csp, temp);
-      __ Sub(sp_minus_frame_size, temp, frame_size);
-    }
+    Register sp_minus_frame_size = temps.AcquireC();
+    __ Sub(sp_minus_frame_size, csp, frame_size);
     Register interrupt_limit = temps.AcquireC();
 #else // defined(__CHERI_PURE_CAPABILITY__)
+    Register sp_minus_frame_size = temps.AcquireX();
     __ Sub(sp_minus_frame_size, sp, frame_size);
     Register interrupt_limit = temps.AcquireX();
 #endif // defined(__CHERI_PURE_CAPABILITY__)
@@ -2424,6 +2421,9 @@ static void Generate_InterpreterEnterBytecode(MacroAssembler* masm) {
   // executing the function.
   Label return_from_bytecode_dispatch;
   __ Adr(lr, &return_from_bytecode_dispatch);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Orr(lr, lr, 0x1);
+#endif // defined(__CHERI_PURE_CAPABILITY__)
 
   // Dispatch to the target bytecode.
   __ Ldrb(x23, MemOperand(kInterpreterBytecodeArrayRegister,
@@ -2437,7 +2437,6 @@ static void Generate_InterpreterEnterBytecode(MacroAssembler* masm) {
     temps.Exclude(x17);
 #if defined(__CHERI_PURE_CAPABILITY__)
     __ Mov(c17, kJavaScriptCallCodeStartRegister);
-    __ Orr(c17, c17, 0x1);
     __ Jump(c17);
 #else // defined(__CHERI_PURE_CAPABILITY__)
     __ Mov(x17, kJavaScriptCallCodeStartRegister);
@@ -2708,6 +2707,9 @@ void Generate_OSREntry(MacroAssembler* masm, Register entry_address,
   // buffer, since we'll never return to it.
   Label jump;
   __ Adr(lr, &jump);
+#if defined(__CHERI_PURE_CAPABILITY__)
+  __ Orr(lr, lr, 0x1);
+#endif // defined(__CHERI_PURE_CAPABILITY__)
   __ Ret();
 
   __ Bind(&jump);
@@ -3593,10 +3595,12 @@ void Generate_PushBoundArguments(MacroAssembler* masm) {
       // Make x10 the space we have left. The stack might already be overflowed
       // here which will cause x10 to become negative.
 #if defined(__CHERI_PURE_CAPABILITY__)
-      UseScratchRegisterScope temps(masm);
-      Register temp = temps.AcquireX();
-      __ Gcvalue(csp, temp);
-      __ Sub(x10, temp, x10);
+      {
+        UseScratchRegisterScope temps(masm);
+        Register temp = temps.AcquireX();
+        __ Gcvalue(csp, temp);
+        __ Sub(x10, temp, x10);
+      }
 #else // defined(__CHERI_PURE_CAPABILITY__)
       __ Sub(x10, sp, x10);
 #endif // defined(__CHERI_PURE_CAPABILITY__)
@@ -4107,7 +4111,6 @@ void Builtins::Generate_WasmCompileLazy(MacroAssembler* masm) {
 #endif // defined(__CHERI_PURE_CAPABILITY__)
   // Finally, jump to the jump table slot for the function.
 #if defined(__CHERI_PURE_CAPABILITY__)
-  __ Orr(c17, c17, 0x1);
   __ Jump(c17);
 #else // defined(__CHERI_PURE_CAPABILITY__)
   __ Jump(x17);
@@ -5192,6 +5195,7 @@ void Generate_DeoptimizationEntry(MacroAssembler* masm,
 
 #if defined(__CHERI_PURE_CAPABILITY__)
   Register code_object = c2;
+  Register fp_to_sp = c3;
 #else // defined(__CHERI_PURE_CAPABILITY__)
   Register code_object = x2;
   Register fp_to_sp = x3;
@@ -5201,16 +5205,8 @@ void Generate_DeoptimizationEntry(MacroAssembler* masm,
   __ Mov(code_object, lr);
   // Compute the fp-to-sp delta.
 #if defined(__CHERI_PURE_CAPABILITY__)
-  {
-    UseScratchRegisterScope temps(masm);
-    Register temp = temps.AcquireX();
-    __ Gcvalue(csp, temp);
-    __ Add(temp, temp, kSavedRegistersAreaSize);
-    Register temp_fp = temps.AcquireX();
-    __ Gcvalue(fp, temp_fp);
-    __ Sub(temp, temp_fp, temp);
-    __ Scvalue(csp, csp, temp);
-  }
+  __ Add(fp_to_sp, csp, kSavedRegistersAreaSize);
+  __ Sub(fp_to_sp, fp, fp_to_sp);
 #else // defined(__CHERI_PURE_CAPABILITY__)
   __ Add(fp_to_sp, sp, kSavedRegistersAreaSize);
   __ Sub(fp_to_sp, fp, fp_to_sp);

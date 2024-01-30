@@ -69,7 +69,11 @@ Handle<Code> BuildPlaceholder(Isolate* isolate, Builtin builtin) {
     FrameScope frame_scope(&masm, StackFrame::NO_FRAME_TYPE);
     // The contents of placeholder don't matter, as long as they don't create
     // embedded constants or external references.
+#if defined(__CHERI_PURE_CAPABILITY__)
+    masm.Move(kJavaScriptCallCodeStartRegister.X(), Smi::zero());
+#else
     masm.Move(kJavaScriptCallCodeStartRegister, Smi::zero());
+#endif // __CHERI_PURE_CAPABILITY__
     masm.Call(kJavaScriptCallCodeStartRegister);
   }
   CodeDesc desc;

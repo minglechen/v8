@@ -25,7 +25,12 @@ enum class MachineRepresentation : uint8_t {
   kWord32,
   kWord64,
 #if defined(__CHERI_PURE_CAPABILITY__)
-  // Double the width of the native architecture.
+  // kCapability is the representation of a capabiltiy value, it is double the
+  // width of the native integer pointer type of the baseline architecture.
+  // Each capability consists of an integer (virtual) address of the natural
+  // size for the architecture (e.g. 32 or 64 bit), and also additional
+  // metadata that is is compressed to fit in the remaining 32 or 64 bits of
+  // the capability.
   kCapability,
 #endif // defined(__CHERI_PURE_CAPABILITY__)
   // (uncompressed) MapWord
@@ -221,6 +226,11 @@ class MachineType {
   }
   constexpr static MachineType Pointer() {
 #if defined(__CHERI_PURE_CAPABILITY__)
+    // TODO(gcjenkinson): Should this be an integeral type kWord128,
+    // with semantic kCapability? This would allow kTagged to be have
+    // semantic capabiltiy and both cases treated the same. As I'm not
+    // sure that the semantic is preserved into code generation, I am
+    // currently using an abstract machine representation of kCapability.
     return MachineType(PointerRepresentation(), MachineSemantic::kCapability);
 #else // defined(__CHERI_PURE_CAPABILITY__)
     return MachineType(PointerRepresentation(), MachineSemantic::kNone);
@@ -404,6 +414,13 @@ inline bool IsAnyCompressed(MachineRepresentation rep) {
   return CanBeCompressedPointer(rep);
 }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+inline bool IsCapability(MachineRepresentation rep) {
+  return ((rep == MachineRepresentation::kCapability) ||
+         CanBeTaggedPointer(rep));
+}
+#endif // defined(__CHERI_PURE_CAPABILITY__)
+
 // Gets the log2 of the element size in bytes of the machine type.
 V8_EXPORT_PRIVATE inline constexpr int ElementSizeLog2Of(
     MachineRepresentation rep) {
@@ -430,12 +447,18 @@ V8_EXPORT_PRIVATE inline constexpr int ElementSizeLog2Of(
     case MachineRepresentation::kCompressedPointer:
     case MachineRepresentation::kCompressed:
       return kTaggedSizeLog2;
+    case MachineRepresentation::kSandboxedPointer:
+#if defined(__CHERI_PURE_CAPABILITY__)
+      // A 64-bit pointer encoded in a way (e.g. as offset) that guarantees it
+      // will point into the sandbox.
+      return kSystemPointerAddrSizeLog2;
+#else // defined(__CHERI_PURE_CAPABILITY__)
+      return kSystemPointerSizeLog2;
+#endif // defined(__CHERI_PURE_CAPABILITY__)
 #if defined(__CHERI_PURE_CAPABILITY__)
     case MachineRepresentation::kCapability:
-      [[fallthrough]];
-#endif // __CHERI_PURE_CAPABILITY__
-    case MachineRepresentation::kSandboxedPointer:
       return kSystemPointerSizeLog2;
+#endif // defined(__CHERI_PURE_CAPABILITY__)
     default:
       UNREACHABLE();
   }
@@ -468,6 +491,10 @@ inline constexpr uint64_t MaxUnsignedValue(MachineRepresentation rep) {
     case MachineRepresentation::kWord32:
       return std::numeric_limits<uint32_t>::max();
     case MachineRepresentation::kWord64:
+#if defined(__CHERI_PURE_CAPABILITY__)
+      [[fallthrough]];
+    case MachineRepresentation::kCapability:
+#endif // defined(__CHERI_PURE_CAPABILITY__)
       return std::numeric_limits<uint64_t>::max();
     default:
       UNREACHABLE();

@@ -61,6 +61,10 @@ const char* MachineReprToString(MachineRepresentation rep) {
       return "kRepMapWord";
     case MachineRepresentation::kSandboxedPointer:
       return "kRepSandboxedPointer";
+#if defined(__CHERI_PURE_CAPABILITY__)
+    case MachineRepresentation::kCapability:
+      return "kRepCapability";
+#endif // __CHERI_PURE_CAPABILITY__
   }
   UNREACHABLE();
 }
@@ -83,6 +87,10 @@ std::ostream& operator<<(std::ostream& os, MachineSemantic type) {
       return os << "kTypeNumber";
     case MachineSemantic::kAny:
       return os << "kTypeAny";
+#if defined(__CHERI_PURE_CAPABILITY__)
+    case MachineSemantic::kCapability:
+      return os << "kCapability";
+#endif // __CHERI_PURE_CAPABILITY__
   }
   UNREACHABLE();
 }

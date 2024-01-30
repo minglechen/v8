@@ -272,6 +272,11 @@ std::ostream& operator<<(std::ostream& os, const InstructionOperand& op) {
         case MachineRepresentation::kSandboxedPointer:
           os << "|sb";
           break;
+#if defined(__CHERI_PURE_CAPABILITY__)
+        case MachineRepresentation::kCapability:
+          os << "|cap";
+          break;
+#endif // defined(__CHERI_PURE_CAPABILITY__)
         case MachineRepresentation::kMapWord:
           UNREACHABLE();
       }
@@ -945,6 +950,9 @@ static MachineRepresentation FilterRepresentation(MachineRepresentation rep) {
     case MachineRepresentation::kCompressedPointer:
     case MachineRepresentation::kCompressed:
     case MachineRepresentation::kSandboxedPointer:
+#if defined(__CHERI_PURE_CAPABILITY__)
+    case MachineRepresentation::kCapability:
+#endif // defined(__CHERI_PURE_CAPABILITY__)
       return rep;
     case MachineRepresentation::kNone:
     case MachineRepresentation::kMapWord:

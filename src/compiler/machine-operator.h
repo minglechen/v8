@@ -1037,7 +1037,7 @@ class V8_EXPORT_PRIVATE MachineOperatorBuilder final
   const Operator* Word32AtomicPairCompareExchange();
 
 #if defined(__CHERI_PURE_CAPABILITY__)
-  const Operator* IntPtrAdd();
+  const Operator* CapAdd();
 #endif // __CHERI_PURE_CAPABILITY__
 
   // Target machine word-size assumed by this builder.

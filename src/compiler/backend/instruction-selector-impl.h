@@ -387,10 +387,6 @@ class OperandGenerator {
             return Constant(static_cast<double>(0));
           case MachineRepresentation::kFloat32:
             return Constant(static_cast<float>(0));
-#if defined(__CHERI_PURE_CAPABILITY__)
-          case MachineRepresentation::kCapability:
-            return Constant(static_cast<intptr_t>(0));
-#endif
           default:
             UNREACHABLE();
         }

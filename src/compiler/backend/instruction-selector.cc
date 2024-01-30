@@ -2365,9 +2365,7 @@ void InstructionSelector::VisitNode(Node* node) {
       return MarkAsSimd128(node), VisitI32x4DotI8x16I7x16AddS(node);
 #if defined(__CHERI_PURE_CAPABILITY__)
     case IrOpcode::kCapAdd:
-      // TODO(gcjenkinson): Add Visitor for CapAdd
-      // return MarkAsPointer(node), VisitCapAdd(node);
-      return MarkAsWord64(node), VisitInt64Add(node);
+      return MarkAsCapability(node), VisitCapAdd(node);
 #endif // defined(__CHERI_PURE_CAPABILITY__)
     default:
       FATAL("Unexpected operator #%d:%s @ node #%d", node->opcode(),

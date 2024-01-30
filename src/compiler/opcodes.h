@@ -1022,14 +1022,21 @@
   MACHINE_SIMD_OP_LIST(V) \
   JS_OP_LIST(V)
 
-// The combination of all operators at all levels and the common operators.
-#define ALL_OP_LIST(V) \
-  CONTROL_OP_LIST(V)   \
-  VALUE_OP_LIST(V)
-
 #if defined(__CHERI_PURE_CAPABILITY__)
 #define PURECAP_OP_LIST(V)  \
   V(CapAdd)
+#endif // defined(__CHERI_PURE_CAPABILITY__)
+
+// The combination of all operators at all levels and the common operators.
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define ALL_OP_LIST(V) \
+  CONTROL_OP_LIST(V)   \
+  VALUE_OP_LIST(V)     \
+  PURECAP_OP_LIST(V)
+#else // defined(__CHERI_PURE_CAPABILITY__)
+#define ALL_OP_LIST(V) \
+  CONTROL_OP_LIST(V)   \
+  VALUE_OP_LIST(V)
 #endif // defined(__CHERI_PURE_CAPABILITY__)
 
 namespace v8 {
@@ -1043,9 +1050,6 @@ class V8_EXPORT_PRIVATE IrOpcode {
   enum Value {
 #define DECLARE_OPCODE(x, ...) k##x,
     ALL_OP_LIST(DECLARE_OPCODE)
-#if defined(__CHERI_PURE_CAPABILITY__)
-    PURECAP_OP_LIST(DECLARE_OPCODE)
-#endif // defined(__CHERI_PURE_CAPABILITY__)
 #undef DECLARE_OPCODE
         kLast = -1
 #define COUNT_OPCODE(...) +1

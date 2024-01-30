@@ -615,8 +615,12 @@ std::ostream& operator<<(std::ostream& os, TruncateKind kind) {
 #if defined(__CHERI_PURE_CAPABILITY__)
 // The format is:
 // V(Name, properties, value_input_count, control_input_count, output_count)
+// TODO(gcjenkinson): I'm not sure about the commutative property here,
+// I'm adding an IntPtrT to a WordT, drawing a distinction between a
+// pointer and an integer constant so I don't think the operation is
+// commutative.
 #define MACHINE_PURE_OP_LIST_PURECAP(V)                                    \
-  V(CapAdd, Operator::kAssociative | Operator::kCommutative, 2, 0, 1)
+  V(CapAdd, Operator::kAssociative, 2, 0, 1)
 #endif // __CHERI_PURE_CAPABILITY__
 
 // The format is:

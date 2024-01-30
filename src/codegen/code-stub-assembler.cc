@@ -4752,17 +4752,22 @@ void CodeStubAssembler::FillFixedArrayWithSmiZero(TNode<FixedArray> array,
 
   static const int32_t fa_base_data_offset =
       FixedArray::kHeaderSize - kHeapObjectTag;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  TNode<WordT> backing_store = CapAdd(BitcastTaggedToWord(array),
+                                      IntPtrConstant(fa_base_data_offset));
+#else // defined(__CHERI_PURE_CAPABILITY__)
   TNode<IntPtrT> backing_store = IntPtrAdd(BitcastTaggedToWord(array),
                                            IntPtrConstant(fa_base_data_offset));
+#endif // defined(__CHERI_PURE_CAPABILITY__)
 
   // Call out to memset to perform initialization.
   TNode<ExternalReference> memset =
       ExternalConstant(ExternalReference::libc_memset_function());
 #if defined(__CHERI_PURE_CAPABILITY__)
   static_assert(kSizetSize == kPtrAddrSize);
-#else
+#else // defined(__CHERI_PURE_CAPABILITY__)
   static_assert(kSizetSize == kIntptrSize);
-#endif
+#endif // defined(__CHERI_PURE_CAPABILITY__)
   CallCFunction(memset, MachineType::Pointer(),
                 std::make_pair(MachineType::Pointer(), backing_store),
                 std::make_pair(MachineType::IntPtr(), IntPtrConstant(0)),
@@ -4778,17 +4783,22 @@ void CodeStubAssembler::FillFixedDoubleArrayWithZero(
 
   static const int32_t fa_base_data_offset =
       FixedDoubleArray::kHeaderSize - kHeapObjectTag;
+#if defined(__CHERI_PURE_CAPABILITY__)
+  TNode<WordT> backing_store = CapAdd(BitcastTaggedToWord(array),
+                                      IntPtrConstant(fa_base_data_offset));
+#else // defined(__CHERI_PURE_CAPABILITY__)
   TNode<IntPtrT> backing_store = IntPtrAdd(BitcastTaggedToWord(array),
                                            IntPtrConstant(fa_base_data_offset));
+#endif // defined(__CHERI_PURE_CAPABILITY__)
 
   // Call out to memset to perform initialization.
   TNode<ExternalReference> memset =
       ExternalConstant(ExternalReference::libc_memset_function());
 #if defined(__CHERI_PURE_CAPABILITY__)
   static_assert(kSizetSize == kPtrAddrSize);
-#else
+#else // defined(__CHERI_PURE_CAPABILITY__)
   static_assert(kSizetSize == kIntptrSize);
-#endif
+#endif // defined(__CHERI_PURE_CAPABILITY__)
   CallCFunction(memset, MachineType::Pointer(),
                 std::make_pair(MachineType::Pointer(), backing_store),
                 std::make_pair(MachineType::IntPtr(), IntPtrConstant(0)),
@@ -8548,7 +8558,11 @@ void CodeStubAssembler::NameDictionaryLookup(
                     std::is_same<Dictionary, GlobalDictionary>::value ||
                     std::is_same<Dictionary, NameToIndexHashTable>::value,
                 "Unexpected NameDictionary");
+#if defined(__CHERI_PURE_CAPABILITY__)
+  DCHECK_EQ(MachineRepresentation::kWord64, var_name_index->rep());
+#else // defined(__CHERI_PURE_CAPABILITY__)
   DCHECK_EQ(MachineType::PointerRepresentation(), var_name_index->rep());
+#endif // !defined(__CHERI_PURE_CAPABILITY__)
   DCHECK_IMPLIES(mode == kFindInsertionIndex, if_found == nullptr);
   Comment("NameDictionaryLookup");
   CSA_DCHECK(this, IsUniqueName(unique_name));
@@ -8640,7 +8654,11 @@ void CodeStubAssembler::NumberDictionaryLookup(
     TNode<NumberDictionary> dictionary, TNode<IntPtrT> intptr_index,
     Label* if_found, TVariable<IntPtrT>* var_entry, Label* if_not_found) {
   CSA_DCHECK(this, IsNumberDictionary(dictionary));
+#if defined(__CHERI_PURE_CAPABILITY__)
+  DCHECK_EQ(MachineRepresentation::kWord64, var_entry->rep());
+#else // defined(__CHERI_PURE_CAPABILITY__)
   DCHECK_EQ(MachineType::PointerRepresentation(), var_entry->rep());
+#endif // defined(__CHERI_PURE_CAPABILITY__)
   Comment("NumberDictionaryLookup");
 
   TNode<IntPtrT> capacity = SmiUntag(GetCapacity<NumberDictionary>(dictionary));

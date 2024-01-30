@@ -23,12 +23,14 @@ void ExternalPointerTable::Init(Isolate* isolate) {
                    root_space->allocation_granularity()));
   buffer_ = root_space->AllocatePages(
       VirtualAddressSpace::kNoHint, kExternalPointerTableReservationSize,
-#if defined(__CHERI_PURE_CAPABILITY__)
       // Need 
+#if defined(__CHERI_PURE_CAPABILITY__)
+      // VM_PROT_ADD_CAP is never called on prot and max_prot in mprotect itself.
+      // https://github.com/CTSRD-CHERI/cheribsd/issues/1818
       root_space->allocation_granularity(), PagePermissions::kReadWrite);
-#else
+#else // defined(__CHERI_PURE_CAPABILITY__)
       root_space->allocation_granularity(), PagePermissions::kNoAccess);
-#endif
+#endif // defined(__CHERI_PURE_CAPABILITY__)
   if (!buffer_) {
     V8::FatalProcessOutOfMemory(
         isolate,
@@ -108,7 +110,6 @@ void ExternalPointerTable::Set(uint32_t index, Address value,
   store_atomic(index + 1, tag);
 #else
   DCHECK_LT(index, capacity_);
-
   store_atomic(index, value | tag);
 #endif
 }

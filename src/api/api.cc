@@ -387,7 +387,12 @@ class ArrayBufferAllocator : public v8::ArrayBuffer::Allocator {
   void* Allocate(size_t length) override {
     return page_allocator_->AllocatePages(nullptr, RoundUp(length, page_size_),
                                           page_size_,
+#if defined(__CHERI_PURE_CAPABILITY__)
+                                          PageAllocator::kReadWrite,
                                           PageAllocator::kReadWrite);
+#else
+                                          PageAllocator::kReadWrite);
+#endif // __CHERI_PURE_CAPABILITY__
   }
 
   void* AllocateUninitialized(size_t length) override {

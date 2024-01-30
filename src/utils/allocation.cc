@@ -196,7 +196,12 @@ void* GetRandomMmapAddr() {
 }
 
 void* AllocatePages(v8::PageAllocator* page_allocator, void* hint, size_t size,
+#if defined(__CHERI_PURE_CAPABILITY__)
+                    size_t alignment, PageAllocator::Permission access,
+                    PageAllocator::Permission max_access) {
+#else
                     size_t alignment, PageAllocator::Permission access) {
+#endif // !__CHERI_PURE_CAPABILITY
   DCHECK_NOT_NULL(page_allocator);
   DCHECK_EQ(hint, AlignedAddress(hint, alignment));
   DCHECK(IsAligned(size, page_allocator->AllocatePageSize()));
@@ -205,7 +210,12 @@ void* AllocatePages(v8::PageAllocator* page_allocator, void* hint, size_t size,
   }
   void* result = nullptr;
   for (int i = 0; i < kAllocationTries; ++i) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+    result = page_allocator->AllocatePages(hint, size, alignment, access,
+					   max_access);
+#else
     result = page_allocator->AllocatePages(hint, size, alignment, access);
+#endif // !__CHERI_PURE_CAPABILITY
     if (result != nullptr) break;
     size_t request_size = size + alignment - page_allocator->AllocatePageSize();
     if (!OnCriticalMemoryPressure(request_size)) break;
@@ -252,18 +262,20 @@ VirtualMemory::VirtualMemory(v8::PageAllocator* page_allocator, size_t size,
   DCHECK(IsAligned(size, page_allocator_->CommitPageSize()));
   size_t page_size = page_allocator_->AllocatePageSize();
   alignment = RoundUp(alignment, page_size);
+#if !defined(__CHERI_PURE_CAPABILITY__)
   PageAllocator::Permission permissions =
       jit == JitPermission::kMapAsJittable
           ? PageAllocator::kNoAccessWillJitLater
-#if defined(__CHERI_PURE_CAPABILITY__)
-	  // To ensure the ability to write a capability to the mapping
-	  // it must be created with read/write permissions.
-          : PageAllocator::kReadWrite;
-#else
           : PageAllocator::kNoAccess;
-#endif
+#endif // __CHERI_PURE_CAPABILITY__
   Address address = reinterpret_cast<Address>(AllocatePages(
+#if defined(__CHERI_PURE_CAPABILITY__)
+      page_allocator_, hint, RoundUp(size, page_size), alignment, PageAllocator::kReadWrite,
+      jit == JitPermission::kMapAsJittable ?
+      PageAllocator::kNoAccessWillJitLater : PageAllocator::kReadWrite));
+#else
       page_allocator_, hint, RoundUp(size, page_size), alignment, permissions));
+#endif // __CHERI_PURE_CAPABILITY__
   if (address != kNullAddress) {
     DCHECK(IsAligned(address, alignment));
     region_ = base::AddressRegion(address, size);

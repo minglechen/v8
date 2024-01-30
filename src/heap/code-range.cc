@@ -208,7 +208,12 @@ uint8_t* CodeRange::RemapEmbeddedBuiltins(Isolate* isolate,
   embedded_blob_code_copy =
       reinterpret_cast<uint8_t*>(page_allocator()->AllocatePages(
           hint, allocate_code_size, kAllocatePageSize,
+#if defined(__CHERI_PURE_CAPABILITY__)
+          PageAllocator::kNoAccess,
           PageAllocator::kNoAccess));
+#else
+          PageAllocator::kNoAccess));
+#endif // __CHERI_PURE_CAPABILITY__
 
   if (!embedded_blob_code_copy) {
     V8::FatalProcessOutOfMemory(
@@ -229,7 +234,12 @@ uint8_t* CodeRange::RemapEmbeddedBuiltins(Isolate* isolate,
 
       void* result = page_allocator()->AllocatePages(
           reinterpret_cast<void*>(unreachable_start), unreachable_size,
+#if defined(__CHERI_PURE_CAPABILITY__)
+          kAllocatePageSize, PageAllocator::kNoAccess,
+          PageAllocator::kNoAccess);
+#else
           kAllocatePageSize, PageAllocator::kNoAccess);
+#endif // __CHERI_PURE_CAPABILITY__
       CHECK_EQ(reinterpret_cast<Address>(result), unreachable_start);
     }
   }

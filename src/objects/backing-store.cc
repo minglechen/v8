@@ -429,7 +429,12 @@ std::unique_ptr<BackingStore> BackingStore::TryAllocateAndPartiallyCommitMemory(
 #ifdef V8_ENABLE_SANDBOX
     page_allocator = GetSandboxPageAllocator();
     allocation_base = AllocatePages(page_allocator, nullptr, reservation_size,
+#if defined(__CHERI_PURE_CAPABILITY__)
+                                    page_size, PageAllocator::kNoAccess,
+				    PageAllocator::kNoAccess);
+#else
                                     page_size, PageAllocator::kNoAccess);
+#endif // __CHERI_PURE_CAPABILITY__
     if (allocation_base) return true;
     // We currently still allow falling back to the platform page allocator if
     // the sandbox page allocator fails. This will eventually be removed.
@@ -441,7 +446,12 @@ std::unique_ptr<BackingStore> BackingStore::TryAllocateAndPartiallyCommitMemory(
     page_allocator = GetPlatformPageAllocator();
 #endif  // V8_ENABLE_SANDBOX
     allocation_base = AllocatePages(page_allocator, nullptr, reservation_size,
+#if defined(__CHERI_PURE_CAPABILITY__)
+                                    page_size, PageAllocator::kNoAccess,
+				    PageAllocator::kNoAccess);
+#else
                                     page_size, PageAllocator::kNoAccess);
+#endif // __CHERI_PURE_CAPABILITY__
     return allocation_base != nullptr;
   };
   if (!gc_retry(allocate_pages)) {

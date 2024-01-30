@@ -150,8 +150,15 @@ int GetFlagsForMemoryPermission(OS::MemoryPermission access,
 }
 
 void* Allocate(void* hint, size_t size, OS::MemoryPermission access,
+#if defined(__CHERI_PURE_CAPABILITY__)
+                OS::MemoryPermission max_access,
+#endif // __CHERI_PURE_CAPABILITY__
                PageType page_type) {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  int prot = GetProtectionFromMemoryPermission(access, max_access);
+#else
   int prot = GetProtectionFromMemoryPermission(access);
+#endif // __CHERI_PURE_CAPABILITY__
   int flags = GetFlagsForMemoryPermission(access, page_type);
   void* result = mmap(hint, size, prot, flags, kMmapFd, kMmapFdOffset);
   if (result == MAP_FAILED) return nullptr;
@@ -177,27 +184,39 @@ void* Allocate(void* hint, size_t size, OS::MemoryPermission access,
 
 }  // namespace
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+int GetProtectionFromMemoryPermission(OS::MemoryPermission access,
+				      OS::MemoryPermission max_access) {
+  int prot = GetProtectionFromMemoryPermission(access);
+  switch (max_access) {
+    case OS::MemoryPermission::kNoAccessWillJitLater:
+      return PROT_MAX(PROT_READ | PROT_WRITE | PROT_EXEC) | prot;
+    case OS::MemoryPermission::kRead:
+      return PROT_MAX(PROT_READ) | prot;
+    case OS::MemoryPermission::kReadWrite:
+      return PROT_MAX(PROT_READ | PROT_WRITE) | prot;
+    case OS::MemoryPermission::kReadExecute:
+      return PROT_MAX(PROT_READ | PROT_EXEC) | prot;
+    case OS::MemoryPermission::kReadWriteExecute:
+      return PROT_MAX(PROT_READ | PROT_WRITE | PROT_EXEC) | prot;
+    default:
+      return prot;
+  }
+  UNREACHABLE();
+}
+#endif // __CHERI_PURE_CAPABILITY__
+
 // TODO(v8:10026): Add the right permission flag to make executable pages
 // guarded.
 int GetProtectionFromMemoryPermission(OS::MemoryPermission access) {
   switch (access) {
     case OS::MemoryPermission::kNoAccess:
-#if !defined(__CHERI_PURE_CAPABILITY__)
     case OS::MemoryPermission::kNoAccessWillJitLater:
-#endif
       return PROT_NONE;
-#if defined(__CHERI_PURE_CAPABILITY__)
-    case OS::MemoryPermission::kNoAccessWillJitLater:
-      return PROT_EXEC | PROT_READ | PROT_WRITE;
-#endif
     case OS::MemoryPermission::kRead:
       return PROT_READ;
     case OS::MemoryPermission::kReadWrite:
-#if defined(__CHERI_PURE_CAPABILITY__)
-      return PROT_EXEC | PROT_READ | PROT_WRITE;
-#else
       return PROT_READ | PROT_WRITE;
-#endif
     case OS::MemoryPermission::kReadWriteExecute:
       return PROT_READ | PROT_WRITE | PROT_EXEC;
     case OS::MemoryPermission::kReadExecute:
@@ -306,16 +325,14 @@ void OS::SetRandomMmapSeed(int64_t seed) {
 
 // static
 void* OS::GetRandomMmapAddr() {
+#if defined(__CHERI_PURE_CAPABILITY__)
+  ptraddr_t raw_addr;
+#else
   uintptr_t raw_addr;
+#endif
   {
     MutexGuard guard(rng_mutex.Pointer());
-#if defined(__CHERI_PURE_CAPABILITY__)
-    ptraddr_t raw_ptr_addr;
-    GetPlatformRandomNumberGenerator()->NextBytes(&raw_ptr_addr, sizeof(raw_ptr_addr));
-    raw_addr = raw_ptr_addr;
-#else
     GetPlatformRandomNumberGenerator()->NextBytes(&raw_addr, sizeof(raw_addr));
-#endif
   }
 #if V8_HOST_ARCH_ARM64
 #if defined(V8_TARGET_OS_MACOS)
@@ -407,7 +424,12 @@ void* OS::GetRandomMmapAddr() {
 #if !V8_OS_CYGWIN && !V8_OS_FUCHSIA
 // static
 void* OS::Allocate(void* hint, size_t size, size_t alignment,
+#if defined(__CHERI_PURE_CAPABILITY__)
+                   MemoryPermission access,
+                   MemoryPermission max_access) {
+#else
                    MemoryPermission access) {
+#endif // __CHERI_PURE_CAPABILITY__
   size_t page_size = AllocatePageSize();
   DCHECK_EQ(0, size % page_size);
   DCHECK_EQ(0, alignment % page_size);
@@ -415,7 +437,11 @@ void* OS::Allocate(void* hint, size_t size, size_t alignment,
   // Add the maximum misalignment so we are guaranteed an aligned base address.
   size_t request_size = size + (alignment - page_size);
   request_size = RoundUp(request_size, OS::AllocatePageSize());
+#if defined(__CHERI_PURE_CAPABILITY__)
+  void* result = base::Allocate(hint, request_size, access, max_access, PageType::kPrivate);
+#else
   void* result = base::Allocate(hint, request_size, access, PageType::kPrivate);
+#endif // __CHERI_PURE_CAPABILITY__
   if (result == nullptr) return nullptr;
 
   // Unmap memory allocated before the aligned base address.
@@ -443,7 +469,11 @@ void* OS::Allocate(void* hint, size_t size, size_t alignment,
 // static
 void* OS::AllocateShared(size_t size, MemoryPermission access) {
   DCHECK_EQ(0, size % AllocatePageSize());
+#if defined(__CHERI_PURE_CAPABILITY__)
+  return base::Allocate(nullptr, size, access, access, PageType::kShared);
+#else
   return base::Allocate(nullptr, size, access, PageType::kShared);
+#endif // __CHERI_PURE_CAPABILITY__
 }
 
 // static
@@ -590,24 +620,31 @@ bool OS::CanReserveAddressSpace() { return true; }
 Optional<AddressSpaceReservation> OS::CreateAddressSpaceReservation(
     void* hint, size_t size, size_t alignment,
     MemoryPermission max_permission) {
-  MemoryPermission permission = MemoryPermission::kNoAccess;
 #if defined(__CHERI_PURE_CAPABILITY__)
-  if (max_permission == MemoryPermission::kReadWrite) {
-    permission = MemoryPermission::kReadWrite;
-  }
+  // VM_PROT_ADD_CAP is never called on prot and max_prot in mprotect itself.
+  // https://github.com/CTSRD-CHERI/cheribsd/issues/1818
+  MemoryPermission permission = MemoryPermission::kReadWrite;
 #else
   // On POSIX, address space reservations are backed by private memory mappings.
-  permission = MemoryPermission::kNoAccess;
-#endif
+  MemoryPermission permission = MemoryPermission::kNoAccess;
+#endif // __CHERI_PURE_CAPABILITY__
   if (max_permission == MemoryPermission::kReadWriteExecute) {
     permission = MemoryPermission::kNoAccessWillJitLater;
   }
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  void* reservation = Allocate(hint, size, alignment, permission, max_permission);
+#else
   void* reservation = Allocate(hint, size, alignment, permission);
+#endif // __CHERI_PURE_CAPABILITY__
   if (!reservation && permission == MemoryPermission::kNoAccessWillJitLater) {
     // Retry without MAP_JIT, for example in case we are running on an old OS X.
     permission = MemoryPermission::kNoAccess;
+#if defined(__CHERI_PURE_CAPABILITY__)
+    reservation = Allocate(hint, size, alignment, permission, max_permission);
+#else
     reservation = Allocate(hint, size, alignment, permission);
+#endif // __CHERI_PURE_CAPABILITY__
   }
 
   if (!reservation) return {};
@@ -992,7 +1029,12 @@ bool AddressSpaceReservation::FreeSubReservation(
 }
 
 bool AddressSpaceReservation::Allocate(void* address, size_t size,
+#if defined(__CHERI_PURE_CAPABILITY__)
+                                       OS::MemoryPermission access,
+                                       OS::MemoryPermission max_access) {
+#else
                                        OS::MemoryPermission access) {
+#endif // __CHERI_PURE_CAPABILITY__
   // The region is already mmap'ed, so it just has to be made accessible now.
   DCHECK(Contains(address, size));
   if (access == OS::MemoryPermission::kNoAccess) {

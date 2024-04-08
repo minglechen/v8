@@ -20,7 +20,8 @@ Register JavaScriptFrame::context_register() { return cp; }
 Register JavaScriptFrame::constant_pool_pointer_register() { UNREACHABLE(); }
 
 int UnoptimizedFrameConstants::RegisterStackSlotCount(int register_count) {
-#ifdef __CHERI_PURE_CAPABILITY__
+#if defined(__CHERI_PURE_CAPABILITY__)
+  static_assert(InterpreterFrameConstants::kFixedFrameSize % 16 == 0);
   return register_count;
 #else
   static_assert(InterpreterFrameConstants::kFixedFrameSize % 16 == 8);

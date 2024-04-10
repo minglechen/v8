@@ -5719,10 +5719,11 @@ void Builtins::Generate_RestartFrameTrampoline(MacroAssembler* masm) {
 
 #if defined(__CHERI_PURE_CAPABILITY__)
   __ Ldr(c1, MemOperand(fp, StandardFrameConstants::kFunctionOffset));
+  __ ldr(c0, MemOperand(fp, StandardFrameConstants::kArgCOffset));
 #else // defined(__CHERI_PURE_CAPABILITY__)
   __ Ldr(x1, MemOperand(fp, StandardFrameConstants::kFunctionOffset));
-#endif // defined(__CHERI_PURE_CAPABILITY__)
   __ ldr(x0, MemOperand(fp, StandardFrameConstants::kArgCOffset));
+#endif // defined(__CHERI_PURE_CAPABILITY__)
 
   __ LeaveFrame(StackFrame::INTERPRETED);
 

@@ -120,7 +120,11 @@ class V8_EXPORT_PRIVATE ExternalPointerTable {
   static const size_t kEntriesPerBlock = kBlockSize / kSystemPointerSize;
 #endif
 
+#if defined(__CHERI_PURE_CAPABILITY__)
+  static const ptraddr_t kExternalPointerMarkBit = 1ULL << 63;
+#else
   static const Address kExternalPointerMarkBit = 1ULL << 63;
+#endif
 
   // Returns true if this external pointer table has been initialized.
   bool is_initialized() { return buffer_ != kNullAddress; }

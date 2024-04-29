@@ -19,6 +19,7 @@ file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/third_party/googletest/src)
 file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/third_party/icu)
 file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/third_party/zlib)
 file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/tools/clang)
+file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/test/benchmarks/data)
 
 ExternalProject_Add(
   build
@@ -96,6 +97,16 @@ ExternalProject_Add(
   GIT_REPOSITORY https://github.com/gcjenkinson/cheribsd-ports.git
   GIT_TAG        v8_dependencies 
   GIT_SHALLOW	 true
+  CONFIGURE_COMMAND ""
+  BUILD_COMMAND ""
+  INSTALL_COMMAND ""
+)
+
+ExternalProject_Add(
+  benchmarks
+  SOURCE_DIR	 ${CMAKE_SOURCE_DIR}/test/benchmarks/data
+  GIT_REPOSITORY https://chromium.googlesource.com/v8/deps/third_party/benchmarks.git
+  GIT_TAG        05d7188267b4560491ff9155c5ee13e207ecd65f
   CONFIGURE_COMMAND ""
   BUILD_COMMAND ""
   INSTALL_COMMAND ""

@@ -104,9 +104,6 @@ ExternalProject_Add(
 add_custom_target(apply-patches ALL
 	COMMAND find ${CMAKE_BINARY_DIR}/cheribsd-ports/lang/v8/files -type f -name 'patch-*' -print0 | xargs -t -0 -n 1 patch -p0 -u -N -d ${CMAKE_SOURCE_DIR} -i || true)
 
-add_custom_target(apply-cheribsd-patche ALL
-	COMMAND patch -p0 -u -N -d ${CMAKE_SOURCE_DIR} < ${CMAKE_BINARY_DIR}/cheribsd-ports/lang/v8/files/cheribsd.patch || true)
-
 add_custom_target(gcc-toolchain ALL
 	COMMAND echo 'checkout_google_benchmark = false' > ${CMAKE_SOURCE_DIR}/build/config/gclient_args.gni)
 

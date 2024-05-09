@@ -121,7 +121,7 @@ if __name__ == "__main__":
     if args.pmc_set:
       pmc_dir = os.path.join(output_runs_path, "pmc", args.pmc_set)
       if not os.path.exists(pmc_dir):
-        os.mkdir(pmc_dir)
+        os.makedirs(pmc_dir)
       pmc_path = "-o %s" % os.path.join(pmc_dir, "run%d.pmc" % i)
       cmdline = "%s %s %s" % (prefix_cmd, pmc_path, inner_command)
     else:    

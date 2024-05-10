@@ -112,7 +112,7 @@ if __name__ == "__main__":
     if args.trace_gc:
       # Trace GC on last run.
       if i == runs - 1:
-        inner_command = "%s --expose-gc --enable-tracing --trace-gc-heap-layout %s %s" \
+        inner_command = "%s --expose-gc --enable-tracing --trace-gc-heap-layout --gc-global %s %s" \
           % (d8_path, extra_args, cmd)
       file_path = os.path.join(output_path, suite + "_gc_trace")
 

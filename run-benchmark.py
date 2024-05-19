@@ -107,6 +107,8 @@ if __name__ == "__main__":
         help="Trace GC events.")
   parser.add_argument("-p", "--pmc-set", dest="pmc_set",
         help="Collect PMC data. Options are: arch, dcache, instr.")
+  parser.add_argument("-c", "--pmc-cumulative", action="store_true", dest="pmc_cumulative",
+        help="Collect cumulative PMC data.")
   parser.add_argument("-i", "--run-individual", action="store_true", dest="run_individual",
       help="Run individual tests in benchmark.")
   parser.add_argument("-v", "--verbose", action="store_true", dest="verbose",
@@ -181,7 +183,10 @@ if __name__ == "__main__":
 
   inner_command = "%s --expose-gc %s %s" \
       % (d8_path, extra_args, cmd)
-  prefix_cmd = "pmcstat -C"
+  if args.pmc_cumulative:
+    prefix_cmd = "pmcstat -C"
+  else:
+    prefix_cmd = "pmcstat"
   if args.pmc_set:
     if not subprocess.check_output("kldstat | grep hwpmc", shell=True):
       print("PMC support is not enabled in the kernel.")
